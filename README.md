@@ -13,24 +13,27 @@ Open source libraries and configurations used at [Customer.io](https://customer.
 
 ## Development
 
-This monorepo uses npm workspaces for managing multiple packages.
+This monorepo uses pnpm workspaces for managing multiple packages. pnpm provides better dependency resolution, faster installs, and automatic build ordering based on package dependencies.
 
 ### Setup
 
 ```bash
-npm install
+pnpm install
 ```
+
+> **Note**: This project requires pnpm >= 8.0.0. If you don't have pnpm installed, you can install it with `npm install -g pnpm` or use Corepack: `corepack enable`.
 
 ### Available Scripts
 
 ```bash
-npm run lint          # Lint all packages
-npm run lint:fix       # Lint and auto-fix issues
-npm run format         # Format all files with Prettier
-npm run format:check   # Check formatting without changes
-npm run build          # Build all packages
-npm run test           # Run tests for all packages
-npm run clean          # Clean build artifacts
+pnpm run lint          # Lint all packages
+pnpm run lint:fix      # Lint and auto-fix issues
+pnpm run format        # Format all files with Prettier
+pnpm run format:check  # Check formatting without changes
+pnpm run typecheck     # Type check all packages
+pnpm run build         # Build all packages (in dependency order)
+pnpm run test          # Run tests for all packages
+pnpm run clean         # Clean build artifacts
 ```
 
 ### Releases & Publishing
@@ -42,7 +45,7 @@ This project uses [Changeset](https://github.com/changesets/changesets) for vers
 When you make changes that should be released:
 
 ```bash
-npm run changeset
+pnpm run changeset
 ```
 
 This will prompt you to:
