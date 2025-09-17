@@ -338,10 +338,3 @@ type MagicHtmlOptions = Options & {
 ```
 
 Where `Options` inherits all [htmlparser2 ParserOptions](https://github.com/fb55/htmlparser2/wiki/Parser-options) and [DomHandlerOptions](https://github.com/fb55/domhandler#options).
-
-## Related Packages
-
-- [@ciolabs/source-htmlparser2](../source-htmlparser2) - Enhanced HTML parser with source range information
-- [@ciolabs/find-conditional-comments](../find-conditional-comments) - Find HTML conditional comments
-- [@ciolabs/process-conditional-comments](../process-conditional-comments) - Process conditional comments
-- [@ciolabs/preserve-comment-whitespace](../preserve-comment-whitespace) - Preserve comment whitespace
