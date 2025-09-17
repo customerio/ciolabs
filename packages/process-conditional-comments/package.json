@@ -1,7 +1,7 @@
 {
-  "name": "@ciolabs/prettier-config",
+  "name": "@ciolabs/process-conditional-comments",
   "version": "0.0.0",
-  "description": "Shared Prettier configuration for Customer.io projects",
+  "description": "Makes it easy to safely process HTML inside of conditional comments",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -19,25 +19,20 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",
-    "directory": "packages/prettier-config"
+    "directory": "packages/process-conditional-comments"
   },
-  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/prettier-config#readme",
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/process-conditional-comments#readme",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run"
   },
-  "peerDependencies": {
-    "prettier": "^3.0.0",
-    "@trivago/prettier-plugin-sort-imports": "^4.0.0"
-  },
-  "devDependencies": {
-    "prettier": "^3.3.3",
-    "tsup": "^8.0.0",
-    "typescript": "^5.0.0",
-    "@trivago/prettier-plugin-sort-imports": "^4.3.0"
+  "dependencies": {
+    "@ciolabs/find-conditional-comments": "workspace:*",
+    "magic-string": "^0.30.0"
   }
 }

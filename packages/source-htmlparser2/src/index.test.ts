@@ -24,7 +24,7 @@ describe('htmlparser2', () => {
     expect(element.source.openTag.isSelfClosing).toBe(false);
     expect(element.source.closeTag).not.toBe(null);
 
-    expect(source.slice(element.startIndex, element.endIndex + 1)).toBe(`<div class="">hello</div>`);
+    expect(source.slice(element.startIndex, element.endIndex! + 1)).toBe(`<div class="">hello</div>`);
 
     expect(source.slice(element.source.openTag.startIndex, element.source.openTag.endIndex + 1)).toBe(`<div class="">`);
 
@@ -242,7 +242,7 @@ describe('htmlparser2', () => {
       },
     ]);
 
-    expect(source.slice(element.startIndex, element.endIndex + 1)).toBe(`<div class="foo">content`);
+    expect(source.slice(element.startIndex, element.endIndex! + 1)).toBe(`<div class="foo">content`);
 
     expect(source.slice(element.source.openTag.startIndex, element.source.openTag.endIndex + 1)).toBe(
       `<div class="foo">`
@@ -294,7 +294,7 @@ describe('htmlparser2', () => {
       },
     ]);
 
-    expect(source.slice(element.startIndex, element.endIndex + 1)).toBe(`<div class="foo">content<`);
+    expect(source.slice(element.startIndex, element.endIndex! + 1)).toBe(`<div class="foo">content<`);
 
     expect(source.slice(element.source.openTag.startIndex, element.source.openTag.endIndex + 1)).toBe(
       `<div class="foo">`
@@ -327,7 +327,7 @@ describe('htmlparser2', () => {
     expect(main.source.openTag.isSelfClosing).toBe(false);
     expect(main.source.attributes).toEqual([]);
 
-    expect(source.slice(main.startIndex, main.endIndex + 1)).toBe('<main><div><span>ok</ main>');
+    expect(source.slice(main.startIndex, main.endIndex! + 1)).toBe('<main><div><span>ok</ main>');
     expect(source.slice(main.source.openTag.startIndex, main.source.openTag.endIndex + 1)).toBe('<main>');
     expect(source.slice(main.source.closeTag!.startIndex, main.source.closeTag!.endIndex + 1)).toBe('</ main>');
 
@@ -340,7 +340,7 @@ describe('htmlparser2', () => {
     expect(div.source.openTag.isSelfClosing).toBe(false);
     expect(div.source.attributes).toEqual([]);
 
-    expect(source.slice(div.startIndex, div.endIndex + 1)).toBe('<div><span>ok');
+    expect(source.slice(div.startIndex, div.endIndex! + 1)).toBe('<div><span>ok');
 
     expect(source.slice(div.source.openTag.startIndex, div.source.openTag.endIndex + 1)).toBe('<div>');
     expect(div.source.closeTag).toBe(null);
@@ -353,7 +353,7 @@ describe('htmlparser2', () => {
     expect(span.source.openTag.name).toBe('span');
     expect(span.source.openTag.isSelfClosing).toBe(false);
     expect(span.source.attributes).toEqual([]);
-    expect(source.slice(span.startIndex, span.endIndex + 1)).toBe('<span>ok');
+    expect(source.slice(span.startIndex, span.endIndex! + 1)).toBe('<span>ok');
 
     expect(source.slice(span.source.openTag.startIndex, span.source.openTag.endIndex + 1)).toBe('<span>');
 
@@ -374,7 +374,7 @@ describe('htmlparser2', () => {
     expect(main.source.openTag.isSelfClosing).toBe(false);
     expect(main.source.attributes).toEqual([]);
 
-    expect(source.slice(main.startIndex, main.endIndex + 1)).toBe('<main><div><span>ok');
+    expect(source.slice(main.startIndex, main.endIndex! + 1)).toBe('<main><div><span>ok');
     expect(source.slice(main.source.openTag.startIndex, main.source.openTag.endIndex + 1)).toBe('<main>');
     expect(main.source.closeTag).toBe(null);
 
@@ -387,7 +387,7 @@ describe('htmlparser2', () => {
     expect(div.source.openTag.isSelfClosing).toBe(false);
     expect(div.source.attributes).toEqual([]);
 
-    expect(source.slice(div.startIndex, div.endIndex + 1)).toBe('<div><span>ok');
+    expect(source.slice(div.startIndex, div.endIndex! + 1)).toBe('<div><span>ok');
 
     expect(source.slice(div.source.openTag.startIndex, div.source.openTag.endIndex + 1)).toBe('<div>');
     expect(div.source.closeTag).toBe(null);
@@ -400,7 +400,7 @@ describe('htmlparser2', () => {
     expect(span.source.openTag.name).toBe('span');
     expect(span.source.openTag.isSelfClosing).toBe(false);
     expect(span.source.attributes).toEqual([]);
-    expect(source.slice(span.startIndex, span.endIndex + 1)).toBe('<span>ok');
+    expect(source.slice(span.startIndex, span.endIndex! + 1)).toBe('<span>ok');
 
     expect(source.slice(span.source.openTag.startIndex, span.source.openTag.endIndex + 1)).toBe('<span>');
 

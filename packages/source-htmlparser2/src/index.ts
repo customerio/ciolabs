@@ -64,6 +64,8 @@ export type SourceElement = Omit<DomHandlerUtils.Element, 'children'> & {
   startIndex: number;
   endIndex: number;
   children: SourceChildNode[];
+  startIndex: number;
+  endIndex: number;
 };
 
 export declare type Options = ParserOptions & DomHandlerOptions & { autofix?: boolean };
