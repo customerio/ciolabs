@@ -20,8 +20,8 @@
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.7",
-    "@ciolabs/eslint-config": "*",
-    "@ciolabs/prettier-config": "*",
+    "@ciolabs/eslint-config": "workspace:*",
+    "@ciolabs/prettier-config": "workspace:*",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
@@ -42,7 +42,7 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.1",
+  "packageManager": "pnpm@10.16.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git"
