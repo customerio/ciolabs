@@ -21,7 +21,7 @@ This monorepo uses pnpm workspaces for managing multiple packages. pnpm provides
 pnpm install
 ```
 
-> **Note**: This project requires pnpm >= 8.0.0. If you don't have pnpm installed, you can install it with `npm install -g pnpm` or use Corepack: `corepack enable`.
+> **Note**: This project requires pnpm >= 10.0.0. If you don't have pnpm installed, you can install it with `npm install -g pnpm` or use Corepack: `corepack enable`.
 
 ### Available Scripts
 
@@ -72,7 +72,7 @@ This repository uses Husky and lint-staged to automatically lint and format chan
 2. Create a feature branch
 3. Make your changes
 4. Ensure all tests pass and code is properly formatted
-5. Create a changeset: `npm run changeset`
+5. Create a changeset: `pnpm run changeset`
 6. Submit a pull request
 
 ## License
