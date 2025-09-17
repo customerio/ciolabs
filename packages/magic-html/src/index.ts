@@ -176,10 +176,10 @@ export class MagicElement {
   }
 
   get classList() {
-    const classList = (this.__element.attribs.class ?? '').split(' ').map(c => c.trim());
+    const classList = (this.__element.attribs.class ?? '').split(' ').map((c: string) => c.trim());
 
     // compact
-    return classList.filter(c => Boolean(c.trim()));
+    return classList.filter((c: string) => Boolean(c.trim()));
   }
 
   get className() {
