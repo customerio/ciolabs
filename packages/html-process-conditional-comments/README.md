@@ -26,7 +26,7 @@ const html = `
 const processed = preprocess(html);
 
 // now parse the HTML and do whatever you want with it
-const doc = new MagicHtml(processed);
+const doc = new HtmlMod(processed);
 
 // do some manipulation
 doc.querySelector('div').innerHTML = 'world';

@@ -1,5 +1,5 @@
 {
-  "name": "@ciolabs/eslint-config",
+  "name": "@ciolabs/config-eslint",
   "version": "0.0.0",
   "description": "Shared ESLint configuration for Customer.io projects",
   "main": "./dist/index.js",
@@ -34,9 +34,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",
-    "directory": "packages/eslint-config"
+    "directory": "packages/config-eslint"
   },
-  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/eslint-config#readme",
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/config-eslint#readme",
   "publishConfig": {
     "access": "public"
   },

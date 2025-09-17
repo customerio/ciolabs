@@ -1,5 +1,5 @@
 {
-  "name": "@ciolabs/find-conditional-comments",
+  "name": "@ciolabs/html-find-conditional-comments",
   "version": "0.0.0",
   "description": "Finds all conditional comments in a string",
   "main": "./dist/index.js",
@@ -19,9 +19,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",
-    "directory": "packages/find-conditional-comments"
+    "directory": "packages/html-find-conditional-comments"
   },
-  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/find-conditional-comments#readme",
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-find-conditional-comments#readme",
   "publishConfig": {
     "access": "public"
   },

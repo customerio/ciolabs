@@ -1,7 +1,7 @@
 import type { Linter } from 'eslint';
 
 const config: Linter.Config = {
-  extends: ['@ciolabs/eslint-config', 'plugin:ember/recommended'],
+  extends: ['@ciolabs/config-eslint', 'plugin:ember/recommended'],
   plugins: ['ember'],
   parser: '@typescript-eslint/parser',
   parserOptions: {

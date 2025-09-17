@@ -1,45 +1,45 @@
 import { describe, expect, test } from 'vitest';
 
-import { MagicElement, MagicHtml } from './index';
+import { HtmlModElement, HtmlMod } from './index';
 
-describe('MagicHtml', () => {
+describe('HtmlMod', () => {
   describe('constructor', () => {
-    test('should create a MagicHtml instance', () => {
-      const html = new MagicHtml('<div>invalid html');
-      expect(html).toBeInstanceOf(MagicHtml);
+    test('should create a HtmlMod instance', () => {
+      const html = new HtmlMod('<div>invalid html');
+      expect(html).toBeInstanceOf(HtmlMod);
     });
 
-    test('should allow for custom MagicElement', () => {
-      class CustomMagicElement extends MagicElement {}
-      const html = new MagicHtml('<div>invalid html', {
-        MagicElement: CustomMagicElement,
+    test('should allow for custom HtmlModElement', () => {
+      class CustomHtmlModElement extends HtmlModElement {}
+      const html = new HtmlMod('<div>invalid html', {
+        HtmlModElement: CustomHtmlModElement,
       });
-      expect(html.__MagicElement).toBe(CustomMagicElement);
+      expect(html.__HtmlModElement).toBe(CustomHtmlModElement);
     });
   });
 
   describe('special characters in html should be left alone', () => {
     test('backslashes should be left alone', () => {
-      const h = new MagicHtml('<div>\\</div>');
+      const h = new HtmlMod('<div>\\</div>');
       expect(h.toString()).toBe('<div>\\</div>');
 
-      const autofix = new MagicHtml('<div>\\</div>', { autofix: true });
+      const autofix = new HtmlMod('<div>\\</div>', { autofix: true });
       expect(autofix.toString()).toBe('<div>\\</div>');
     });
 
     test('backticks should be left alone', () => {
-      const h = new MagicHtml('<div>`</div>');
+      const h = new HtmlMod('<div>`</div>');
       expect(h.toString()).toBe('<div>`</div>');
 
-      const autofix = new MagicHtml('<div>`</div>', { autofix: true });
+      const autofix = new HtmlMod('<div>`</div>', { autofix: true });
       expect(autofix.toString()).toBe('<div>`</div>');
     });
 
     test('html entities should be left alone', () => {
-      const h = new MagicHtml('<div>&lt; and &lt;ul&gt;</div>');
+      const h = new HtmlMod('<div>&lt; and &lt;ul&gt;</div>');
       expect(h.toString()).toBe('<div>&lt; and &lt;ul&gt;</div>');
 
-      const autofix = new MagicHtml('<div>&lt; and &lt;ul&gt;</div>', {
+      const autofix = new HtmlMod('<div>&lt; and &lt;ul&gt;</div>', {
         autofix: true,
       });
 
@@ -49,59 +49,59 @@ describe('MagicHtml', () => {
 
   describe('string edits', () => {
     test('should make no changes by default', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       expect(html.toString()).toBe('<div>invalid html');
     });
 
     test('should allow self-closing custom components with autofix', () => {
       const source = `<x-section>Before<x-image />after</x-section>`;
-      const html = new MagicHtml(source);
+      const html = new HtmlMod(source);
       expect(html.toString()).toBe(source);
     });
 
     test('trim()', () => {
-      const html = new MagicHtml('   <div>invalid html  ');
+      const html = new HtmlMod('   <div>invalid html  ');
       expect(html.trim().toString()).toBe('<div>invalid html');
     });
 
     test("trim('a')", () => {
-      const html = new MagicHtml('aaa<div>invalid htmlaaa');
+      const html = new HtmlMod('aaa<div>invalid htmlaaa');
       expect(html.trim('a').toString()).toBe('<div>invalid html');
     });
 
     test('trimStart()', () => {
-      const html = new MagicHtml('   <div>invalid html  ');
+      const html = new HtmlMod('   <div>invalid html  ');
       expect(html.trimStart().toString()).toBe('<div>invalid html  ');
     });
 
     test("trimStart('a')", () => {
-      const html = new MagicHtml('aaa<div>invalid htmlaaa');
+      const html = new HtmlMod('aaa<div>invalid htmlaaa');
       expect(html.trimStart('a').toString()).toBe('<div>invalid htmlaaa');
     });
 
     test('trimEnd()', () => {
-      const html = new MagicHtml('   <div>invalid html  ');
+      const html = new HtmlMod('   <div>invalid html  ');
       expect(html.trimEnd().toString()).toBe('   <div>invalid html');
     });
 
     test("trimEnd('a')", () => {
-      const html = new MagicHtml('aaa<div>invalid htmlaaa');
+      const html = new HtmlMod('aaa<div>invalid htmlaaa');
       expect(html.trimEnd('a').toString()).toBe('aaa<div>invalid html');
     });
 
     test('trimLines()', () => {
-      const html = new MagicHtml('\n  <div>invalid html  \n');
+      const html = new HtmlMod('\n  <div>invalid html  \n');
       expect(html.trimLines().toString()).toBe('  <div>invalid html  ');
     });
 
     test('isEmpty()', () => {
-      const html = new MagicHtml('   ');
+      const html = new HtmlMod('   ');
       html.trim();
       expect(html.isEmpty()).toBe(true);
     });
 
     test('clone()', () => {
-      const html = new MagicHtml('  <div>invalid html');
+      const html = new HtmlMod('  <div>invalid html');
       const html2 = html.clone();
       expect(html2.toString()).toBe('  <div>invalid html');
     });
@@ -109,7 +109,7 @@ describe('MagicHtml', () => {
 
   describe('generate source maps', () => {
     test('should generate a source map', () => {
-      const html = new MagicHtml('  <div>invalid html');
+      const html = new HtmlMod('  <div>invalid html');
       html.trim();
       const map = html.generateMap();
 
@@ -122,7 +122,7 @@ describe('MagicHtml', () => {
     });
 
     test('should generate a decoded source map', () => {
-      const html = new MagicHtml('  <div>invalid html');
+      const html = new HtmlMod('  <div>invalid html');
       html.trim();
       const map = html.generateDecodedMap();
       expect(map).toHaveProperty('file');
@@ -135,76 +135,76 @@ describe('MagicHtml', () => {
 
   describe('querySelector()', () => {
     test('should return null if no match', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       expect(html.querySelector('span')).toBe(null);
     });
 
     test('should return the first match', () => {
-      const html = new MagicHtml('<div>invalid html');
-      expect(html.querySelector('div')).toBeInstanceOf(MagicElement);
+      const html = new HtmlMod('<div>invalid html');
+      expect(html.querySelector('div')).toBeInstanceOf(HtmlModElement);
     });
 
-    test('should respect the custom MagicElement', () => {
-      class CustomMagicElement extends MagicElement {}
-      const html = new MagicHtml('<div>invalid html', {
-        MagicElement: CustomMagicElement,
+    test('should respect the custom HtmlModElement', () => {
+      class CustomHtmlModElement extends HtmlModElement {}
+      const html = new HtmlMod('<div>invalid html', {
+        HtmlModElement: CustomHtmlModElement,
       });
-      expect(html.querySelector('div')).toBeInstanceOf(CustomMagicElement);
+      expect(html.querySelector('div')).toBeInstanceOf(CustomHtmlModElement);
     });
   });
 
   describe('querySelectorAll()', () => {
     test('should return an empty array if no match', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       expect(html.querySelectorAll('span')).toEqual([]);
     });
 
     test('should return all matches', () => {
-      const html = new MagicHtml('<div>invalid html<div>another');
+      const html = new HtmlMod('<div>invalid html<div>another');
       const results = html.querySelectorAll('div');
       expect(results).toBeInstanceOf(Array);
       expect(results.length).toBe(2);
-      expect(results[0]).toBeInstanceOf(MagicElement);
-      expect(results[1]).toBeInstanceOf(MagicElement);
+      expect(results[0]).toBeInstanceOf(HtmlModElement);
+      expect(results[1]).toBeInstanceOf(HtmlModElement);
     });
   });
 
   describe('flush status', () => {
     test('should be flushed by default', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trim()', () => {
-      const html = new MagicHtml('   <div>invalid html  ');
+      const html = new HtmlMod('   <div>invalid html  ');
       expect(html.trim().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trimStart()', () => {
-      const html = new MagicHtml('   <div>invalid html  ');
+      const html = new HtmlMod('   <div>invalid html  ');
       expect(html.trimStart().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trimEnd()', () => {
-      const html = new MagicHtml('   <div>invalid html  ');
+      const html = new HtmlMod('   <div>invalid html  ');
       expect(html.trimEnd().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trimLines()', () => {
-      const html = new MagicHtml('\n  <div>invalid html  \n');
+      const html = new HtmlMod('\n  <div>invalid html  \n');
       expect(html.trimLines().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('clone()', () => {
-      const html = new MagicHtml('  <div>invalid html');
+      const html = new HtmlMod('  <div>invalid html');
       html.trim();
       const html2 = html.clone();
       expect(html.isFlushed()).toBe(false);
@@ -213,10 +213,10 @@ describe('MagicHtml', () => {
   });
 });
 
-describe('MagicElement', () => {
+describe('HtmlModElement', () => {
   describe('sourceRange', () => {
     test('should return the correct line and column numbers', () => {
-      const html = new MagicHtml('<div>\n  <span>test</span>\n</div>');
+      const html = new HtmlMod('<div>\n  <span>test</span>\n</div>');
       const span = html.querySelector('span')!;
       const range = span.sourceRange;
       expect(range.startLineNumber).toBe(2);
@@ -226,7 +226,7 @@ describe('MagicElement', () => {
     });
 
     test('should handle elements on the first line', () => {
-      const html = new MagicHtml('<div><span>test</span></div>');
+      const html = new HtmlMod('<div><span>test</span></div>');
       const span = html.querySelector('span')!;
       const range = span.sourceRange;
       expect(range.startLineNumber).toBe(1);
@@ -236,7 +236,7 @@ describe('MagicElement', () => {
     });
 
     test('should handle self-closing elements', () => {
-      const html = new MagicHtml('<div><img/></div>');
+      const html = new HtmlMod('<div><img/></div>');
       const img = html.querySelector('img')!;
       const range = img.sourceRange;
       expect(range.startLineNumber).toBe(1);
@@ -246,7 +246,7 @@ describe('MagicElement', () => {
     });
 
     test('should handle multi-line elements', () => {
-      const html = new MagicHtml('<div>\n  <span>\n    test\n  </span>\n</div>');
+      const html = new HtmlMod('<div>\n  <span>\n    test\n  </span>\n</div>');
       const span = html.querySelector('span')!;
       const range = span.sourceRange;
       expect(range.startLineNumber).toBe(2);
@@ -258,26 +258,26 @@ describe('MagicElement', () => {
 
   describe('tagName', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.tagName).toBe('div');
     });
 
     test('should be case insensitive', () => {
-      const html = new MagicHtml('<DIV>invalid html');
+      const html = new HtmlMod('<DIV>invalid html');
       const element = html.querySelector('div')!;
       expect(element.tagName).toBe('div');
     });
 
     test('should be settable with invalid html', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       element.tagName = 'span';
       expect(html.toString()).toBe('<span>invalid html');
     });
 
     test('should be settable with valid html', () => {
-      const html = new MagicHtml('<div>invalid html</div>');
+      const html = new HtmlMod('<div>invalid html</div>');
       const element = html.querySelector('div')!;
       element.tagName = 'span';
       expect(html.toString()).toBe('<span>invalid html</span>');
@@ -286,13 +286,13 @@ describe('MagicElement', () => {
 
   describe('id', () => {
     test('should exist', () => {
-      const html = new MagicHtml("<div id='foo'>invalid html");
+      const html = new HtmlMod("<div id='foo'>invalid html");
       const element = html.querySelector('div')!;
       expect(element.id).toBe('foo');
     });
 
     test('should be an empty string if not present', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.id).toBe('');
     });
@@ -300,42 +300,42 @@ describe('MagicElement', () => {
 
   describe('classList', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div class="foo">invalid html');
+      const html = new HtmlMod('<div class="foo">invalid html');
       const element = html.querySelector('div')!;
       expect(element.classList).toBeInstanceOf(Array);
       expect(element.classList).toEqual(['foo']);
     });
 
     test('should be an empty array if not present', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.classList).toBeInstanceOf(Array);
       expect(element.classList).toEqual([]);
     });
 
     test('should be an empty array if empty', () => {
-      const html = new MagicHtml('<div class="">invalid html');
+      const html = new HtmlMod('<div class="">invalid html');
       const element = html.querySelector('div')!;
       expect(element.classList).toBeInstanceOf(Array);
       expect(element.classList).toEqual([]);
     });
 
     test('should be an array of multiple classes', () => {
-      const html = new MagicHtml('<div class="foo bar">invalid html');
+      const html = new HtmlMod('<div class="foo bar">invalid html');
       const element = html.querySelector('div')!;
       expect(element.classList).toBeInstanceOf(Array);
       expect(element.classList).toEqual(['foo', 'bar']);
     });
 
     test('should be an array of multiple classes with extra spaces', () => {
-      const html = new MagicHtml('<div class=" foo  bar ">invalid html');
+      const html = new HtmlMod('<div class=" foo  bar ">invalid html');
       const element = html.querySelector('div')!;
       expect(element.classList).toBeInstanceOf(Array);
       expect(element.classList).toEqual(['foo', 'bar']);
     });
 
     test('should be an array of multiple classes with extra spaces and newlines', () => {
-      const html = new MagicHtml('<div class=" foo \n bar ">invalid html');
+      const html = new HtmlMod('<div class=" foo \n bar ">invalid html');
 
       const element = html.querySelector('div')!;
       expect(element.classList).toBeInstanceOf(Array);
@@ -345,19 +345,19 @@ describe('MagicElement', () => {
 
   describe('className', () => {
     test('should exist', () => {
-      const html = new MagicHtml("<div class='foo'>invalid html");
+      const html = new HtmlMod("<div class='foo'>invalid html");
       const element = html.querySelector('div')!;
       expect(element.className).toBe('foo');
     });
 
     test('should be a string even if has multiple classes', () => {
-      const html = new MagicHtml("<div class='foo bar'>invalid html");
+      const html = new HtmlMod("<div class='foo bar'>invalid html");
       const element = html.querySelector('div')!;
       expect(element.className).toBe('foo bar');
     });
 
     test('should be an empty string if not present', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.className).toBe('');
     });
@@ -365,7 +365,7 @@ describe('MagicElement', () => {
 
   describe('attributes', () => {
     test('should be an array of objects with "name and "value" properties', () => {
-      const html = new MagicHtml("<div foo='bar' baz='qux'>invalid html");
+      const html = new HtmlMod("<div foo='bar' baz='qux'>invalid html");
       const element = html.querySelector('div')!;
       expect(element.attributes).toEqual([
         { name: 'foo', value: 'bar' },
@@ -374,13 +374,13 @@ describe('MagicElement', () => {
     });
 
     test('should be an empty array if not present', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.attributes).toEqual([]);
     });
 
     test('should support attributes without value', () => {
-      const html = new MagicHtml('<img alt>');
+      const html = new HtmlMod('<img alt>');
       const element = html.querySelector('img')!;
       expect(element.attributes).toEqual([{ name: 'alt', value: undefined }]);
     });
@@ -388,58 +388,58 @@ describe('MagicElement', () => {
 
   describe('innerHTML', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.innerHTML).toBe('invalid html');
     });
 
     test('should exist for partially closed tags', () => {
-      const html = new MagicHtml('<div>invalid html</div');
+      const html = new HtmlMod('<div>invalid html</div');
       const element = html.querySelector('div')!;
       expect(element.innerHTML).toBe('invalid html');
     });
 
     test('should be an empty string if not present', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.innerHTML).toBe('');
     });
 
     test('should be an empty string for self-closing tags', () => {
-      const html = new MagicHtml('<div/>');
+      const html = new HtmlMod('<div/>');
       const element = html.querySelector('div')!;
       expect(element.innerHTML).toBe('');
     });
 
     test('should be an empty string for self-closing tags with attributes', () => {
-      const html = new MagicHtml('<div class="foo"/>');
+      const html = new HtmlMod('<div class="foo"/>');
       const element = html.querySelector('div')!;
       expect(element.innerHTML).toBe('');
     });
 
     test('should be settable with invalid html', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       element.innerHTML = 'new html';
       expect(html.toString()).toBe('<div>new html');
     });
 
     test('should be settable with valid html', () => {
-      const html = new MagicHtml('<div>valid html</div>');
+      const html = new HtmlMod('<div>valid html</div>');
       const element = html.querySelector('div')!;
       element.innerHTML = 'new html';
       expect(html.toString()).toBe('<div>new html</div>');
     });
 
     test('should be settable from empty string to "new html"', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.innerHTML = 'new html';
       expect(html.toString()).toBe('<div>new html</div>');
     });
 
     test('should be settable for partially closed tags', () => {
-      const html = new MagicHtml('<div>invalid html</div');
+      const html = new HtmlMod('<div>invalid html</div');
       const element = html.querySelector('div')!;
       element.innerHTML = 'new html';
       expect(html.toString()).toBe('<div>new html</div');
@@ -448,58 +448,58 @@ describe('MagicElement', () => {
 
   describe('textContent', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.textContent).toBe('invalid html');
     });
 
     test('should be empty string for self-closing tags', () => {
-      const html = new MagicHtml('<div/>');
+      const html = new HtmlMod('<div/>');
       const element = html.querySelector('div')!;
       expect(element.textContent).toBe('');
     });
 
     test('should ignore inner tags', () => {
-      const html = new MagicHtml('<div>more html<span>invalid html</span>');
+      const html = new HtmlMod('<div>more html<span>invalid html</span>');
       const element = html.querySelector('div')!;
       expect(element.textContent).toBe('more htmlinvalid html');
     });
 
     test('should respect whitespace in inner tags', () => {
-      const html = new MagicHtml('<div>more html <span>  invalid html</span>');
+      const html = new HtmlMod('<div>more html <span>  invalid html</span>');
       const element = html.querySelector('div')!;
       expect(element.textContent).toBe('more html   invalid html');
     });
 
     test('should convert html entities', () => {
-      const html = new MagicHtml('<div>more html &amp; <span>  invalid html</span>');
+      const html = new HtmlMod('<div>more html &amp; <span>  invalid html</span>');
       const element = html.querySelector('div')!;
       expect(element.textContent).toBe('more html &   invalid html');
     });
 
     test('should be settable', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       element.textContent = 'new html';
       expect(html.toString()).toBe('<div>new html');
     });
 
     test('should be settable from empty string to "new html"', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.textContent = 'new html';
       expect(html.toString()).toBe('<div>new html</div>');
     });
 
     test('should be settable and replace inner tags', () => {
-      const html = new MagicHtml('<div>more html<span>invalid html</span>');
+      const html = new HtmlMod('<div>more html<span>invalid html</span>');
       const element = html.querySelector('div')!;
       element.textContent = 'new html';
       expect(html.toString()).toBe('<div>new html');
     });
 
     test('should be settable and escape given HTML', () => {
-      const html = new MagicHtml('<div>more html<span>invalid html</span>');
+      const html = new HtmlMod('<div>more html<span>invalid html</span>');
       const element = html.querySelector('div')!;
       element.textContent = 'new html <span>foo</span>';
       expect(html.toString()).toBe('<div>new html &lt;span&gt;foo&lt;/span&gt;');
@@ -508,26 +508,26 @@ describe('MagicElement', () => {
 
   describe('outerHTML', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div>invalid html');
+      const html = new HtmlMod('<div>invalid html');
       const element = html.querySelector('div')!;
       expect(element.outerHTML).toBe('<div>invalid html');
     });
 
     test('should work for self-closing tags', () => {
-      const html = new MagicHtml('<span>  <div/> </span>');
+      const html = new HtmlMod('<span>  <div/> </span>');
       const element = html.querySelector('div')!;
 
       expect(element.outerHTML).toBe('<div/>');
     });
 
     test('should work for self-closing tags without the slash', () => {
-      const html = new MagicHtml('<img>');
+      const html = new HtmlMod('<img>');
       const element = html.querySelector('img')!;
       expect(element.outerHTML).toBe('<img>');
     });
 
     test('should exist for partially closed tags', () => {
-      const html = new MagicHtml('<div>invalid html</div');
+      const html = new HtmlMod('<div>invalid html</div');
       const element = html.querySelector('div')!;
       // we end at the first <
       expect(element.outerHTML).toBe('<div>invalid html<');
@@ -536,14 +536,14 @@ describe('MagicElement', () => {
 
   describe('children', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.children).toBeInstanceOf(Array);
       expect(element.children).toEqual([]);
     });
 
     test('should be a raw pass-through to the children array', () => {
-      const html = new MagicHtml('<div><span></span></div>');
+      const html = new HtmlMod('<div><span></span></div>');
       const element = html.querySelector('div')!;
       expect(element.children).toBeInstanceOf(Array);
       expect(element.children).toEqual([html.querySelector('span')!.__element]);
@@ -552,14 +552,14 @@ describe('MagicElement', () => {
 
   describe('parent', () => {
     test('should exist', () => {
-      const html = new MagicHtml('<div><span></span></div>');
+      const html = new HtmlMod('<div><span></span></div>');
       const element = html.querySelector('span')!;
-      expect(element.parent).toBeInstanceOf(MagicElement);
+      expect(element.parent).toBeInstanceOf(HtmlModElement);
       expect(element.parent!.tagName).toBe('div');
     });
 
     test('should be null for the root element', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.parent).toBe(null);
     });
@@ -567,21 +567,21 @@ describe('MagicElement', () => {
 
   describe('before()', () => {
     test('should insert before the element with valid html', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.before('<span></span>');
       expect(html.toString()).toBe('<span></span><div></div>');
     });
 
     test('should insert before the element with broken html', () => {
-      const html = new MagicHtml('<div>');
+      const html = new HtmlMod('<div>');
       const element = html.querySelector('div')!;
       element.before('<span></span>');
       expect(html.toString()).toBe('<span></span><div>');
     });
 
     test('should insert before the self-closing element with valid html', () => {
-      const html = new MagicHtml('<div/>');
+      const html = new HtmlMod('<div/>');
       const element = html.querySelector('div')!;
       element.before('<span></span>');
       expect(html.toString()).toBe('<span></span><div/>');
@@ -590,21 +590,21 @@ describe('MagicElement', () => {
 
   describe('after()', () => {
     test('should insert after the element with valid html', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.after('<span></span>');
       expect(html.toString()).toBe('<div></div><span></span>');
     });
 
     test('should insert after the element with broken html', () => {
-      const html = new MagicHtml('<div>');
+      const html = new HtmlMod('<div>');
       const element = html.querySelector('div')!;
       element.after('<span></span>');
       expect(html.toString()).toBe('<div><span></span>');
     });
 
     test('should insert after the self-closing element with valid html', () => {
-      const html = new MagicHtml('<div/>');
+      const html = new HtmlMod('<div/>');
       const element = html.querySelector('div')!;
       element.after('<span></span>');
       expect(html.toString()).toBe('<div/><span></span>');
@@ -613,28 +613,28 @@ describe('MagicElement', () => {
 
   describe('prepend()', () => {
     test('should prepend to the element with valid html', () => {
-      const html = new MagicHtml('<div>here</div>');
+      const html = new HtmlMod('<div>here</div>');
       const element = html.querySelector('div')!;
       element.prepend('<span></span>');
       expect(html.toString()).toBe('<div><span></span>here</div>');
     });
 
     test('should prepend to the element with broken html', () => {
-      const html = new MagicHtml('<div>here');
+      const html = new HtmlMod('<div>here');
       const element = html.querySelector('div')!;
       element.prepend('<span></span>');
       expect(html.toString()).toBe('<div><span></span>here');
     });
 
     test('should prepend to the self-closing element with slash', () => {
-      const html = new MagicHtml('<div/>');
+      const html = new HtmlMod('<div/>');
       const element = html.querySelector('div')!;
       element.prepend('<span></span>');
       expect(html.toString()).toBe('<div><span></span></div>');
     });
 
     test('should prepend to the self-closing element without slash', () => {
-      const html = new MagicHtml('<img>');
+      const html = new HtmlMod('<img>');
       const element = html.querySelector('img')!;
       element.prepend('<span></span>');
       expect(html.toString()).toBe('<img><span></span></img>');
@@ -643,28 +643,28 @@ describe('MagicElement', () => {
 
   describe('append()', () => {
     test('should append to the element with valid html', () => {
-      const html = new MagicHtml('<div>here</div>');
+      const html = new HtmlMod('<div>here</div>');
       const element = html.querySelector('div')!;
       element.append('<span></span>');
       expect(html.toString()).toBe('<div>here<span></span></div>');
     });
 
     test('should append to the element with broken html', () => {
-      const html = new MagicHtml('<div>here');
+      const html = new HtmlMod('<div>here');
       const element = html.querySelector('div')!;
       element.append('<span></span>');
       expect(html.toString()).toBe('<div>here<span></span>');
     });
 
     test('should append to the self-closing element with slash', () => {
-      const html = new MagicHtml('<div/>');
+      const html = new HtmlMod('<div/>');
       const element = html.querySelector('div')!;
       element.append('<span></span>');
       expect(html.toString()).toBe('<div><span></span></div>');
     });
 
     test('should append to the self-closing element without slash', () => {
-      const html = new MagicHtml('<img>');
+      const html = new HtmlMod('<img>');
       const element = html.querySelector('img')!;
       element.append('<span></span>');
       expect(html.toString()).toBe('<img><span></span></img>');
@@ -673,28 +673,28 @@ describe('MagicElement', () => {
 
   describe('remove()', () => {
     test('should remove the element', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
       element.remove();
       expect(html.toString()).toBe('beforeafter');
     });
 
     test('should remove the element with broken html', () => {
-      const html = new MagicHtml('before<div>hereafter');
+      const html = new HtmlMod('before<div>hereafter');
       const element = html.querySelector('div')!;
       element.remove();
       expect(html.toString()).toBe('before');
     });
 
     test('should remove the element with complex broken html', () => {
-      const html = new MagicHtml('<span>before<div>hereafter</span>');
+      const html = new HtmlMod('<span>before<div>hereafter</span>');
       const element = html.querySelector('div')!;
       element.remove();
       expect(html.toString()).toBe('<span>before</span>');
     });
 
     test('should remove the self-closing element', () => {
-      const html = new MagicHtml('before<div/>after');
+      const html = new HtmlMod('before<div/>after');
       const element = html.querySelector('div')!;
       element.remove();
       expect(html.toString()).toBe('beforeafter');
@@ -703,21 +703,21 @@ describe('MagicElement', () => {
 
   describe('replaceWith()', () => {
     test('should replace the element with valid html', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
       element.replaceWith('<span>here</span>');
       expect(html.toString()).toBe('before<span>here</span>after');
     });
 
     test('should replace the element with broken html', () => {
-      const html = new MagicHtml('before<div>hereafter');
+      const html = new HtmlMod('before<div>hereafter');
       const element = html.querySelector('div')!;
       element.replaceWith('<span></span>');
       expect(html.toString()).toBe('before<span></span>');
     });
 
     test('should replace the self-closing element with valid html', () => {
-      const html = new MagicHtml("before<div class='a'/>after");
+      const html = new HtmlMod("before<div class='a'/>after");
       const element = html.querySelector('div')!;
       element.replaceWith('<span></span>');
       expect(html.toString()).toBe('before<span></span>after');
@@ -726,19 +726,19 @@ describe('MagicElement', () => {
 
   describe('hasAttribute()', () => {
     test('should return true if the attribute exists', () => {
-      const html = new MagicHtml("<div class='a'></div>");
+      const html = new HtmlMod("<div class='a'></div>");
       const element = html.querySelector('div')!;
       expect(element.hasAttribute('class')).toBe(true);
     });
 
     test('should return false if the attribute does not exist', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.hasAttribute('class')).toBe(false);
     });
 
     test('should return true if the attribute is empty', () => {
-      const html = new MagicHtml("<div class=''></div>");
+      const html = new HtmlMod("<div class=''></div>");
       const element = html.querySelector('div')!;
       expect(element.hasAttribute('class')).toBe(true);
     });
@@ -746,13 +746,13 @@ describe('MagicElement', () => {
 
   describe('hasAttributes()', () => {
     test('should return true if the element has attributes', () => {
-      const html = new MagicHtml('<div class="a"></div>');
+      const html = new HtmlMod('<div class="a"></div>');
       const element = html.querySelector('div')!;
       expect(element.hasAttributes()).toBe(true);
     });
 
     test('should return false if the element has no attributes', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.hasAttributes()).toBe(false);
     });
@@ -760,26 +760,26 @@ describe('MagicElement', () => {
 
   describe('getAttribute()', () => {
     test('should return the attribute value', () => {
-      const html = new MagicHtml("<div class='a'></div>");
+      const html = new HtmlMod("<div class='a'></div>");
       const element = html.querySelector('div')!;
       expect(element.getAttribute('class')).toBe('a');
     });
 
     test('should return the attribute value with quotes unescaped if possible', () => {
-      const html = new MagicHtml(`<div class="&quot;a&quot;" id='&#39;b&#39;'></div>`);
+      const html = new HtmlMod(`<div class="&quot;a&quot;" id='&#39;b&#39;'></div>`);
       const element = html.querySelector('div')!;
       expect(element.getAttribute('class')).toBe('"a"');
       expect(element.getAttribute('id')).toBe("'b'");
     });
 
     test('should return null if the attribute does not exist', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.getAttribute('class')).toBe(null);
     });
 
     test('should return empty string if the attribute is empty', () => {
-      const html = new MagicHtml("<div class=''></div>");
+      const html = new HtmlMod("<div class=''></div>");
       const element = html.querySelector('div')!;
       expect(element.getAttribute('class')).toBe('');
     });
@@ -787,13 +787,13 @@ describe('MagicElement', () => {
 
   describe('getAttributeNames()', () => {
     test('should return the attribute names', () => {
-      const html = new MagicHtml("<div class='a' id='b'></div>");
+      const html = new HtmlMod("<div class='a' id='b'></div>");
       const element = html.querySelector('div')!;
       expect(element.getAttributeNames()).toEqual(['class', 'id']);
     });
 
     test('should return empty array if the element has no attributes', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       expect(element.getAttributeNames()).toEqual([]);
     });
@@ -801,154 +801,154 @@ describe('MagicElement', () => {
 
   describe('setAttribute()', () => {
     test('should add an attribute to a tag', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', '');
       expect(html.toString()).toBe('<div class=""></div>');
     });
 
     test('should add an attribute and single letter value to a tag', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe('<div class="a"></div>');
     });
 
     test('should add an attribute and multi letter value to a tag', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'abc');
       expect(html.toString()).toBe('<div class="abc"></div>');
     });
 
     test('should add an attribute to a void tag with a trailing slash', () => {
-      const html = new MagicHtml('<img />');
+      const html = new HtmlMod('<img />');
       const element = html.querySelector('img')!;
       element.setAttribute('class', '');
       expect(html.toString()).toBe('<img class="" />');
     });
 
     test('should add an attribute to a void tag without a trailing slash', () => {
-      const html = new MagicHtml('<img>');
+      const html = new HtmlMod('<img>');
       const element = html.querySelector('img')!;
       element.setAttribute('class', '');
       expect(html.toString()).toBe('<img class="">');
     });
 
     test('should add an attribute to a void tag with a trailing slash and single letter value', () => {
-      const html = new MagicHtml('<img />');
+      const html = new HtmlMod('<img />');
       const element = html.querySelector('img')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe('<img class="a" />');
     });
 
     test('should add an attribute to a void tag without a trailing slash and single letter value', () => {
-      const html = new MagicHtml('<img>');
+      const html = new HtmlMod('<img>');
       const element = html.querySelector('img')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe('<img class="a">');
     });
 
     test('should add an attribute to a void tag with a trailing slash and multi letter value', () => {
-      const html = new MagicHtml('<img />');
+      const html = new HtmlMod('<img />');
       const element = html.querySelector('img')!;
       element.setAttribute('class', 'abc');
       expect(html.toString()).toBe('<img class="abc" />');
     });
 
     test('should add an attribute to a void tag without a trailing slash and multi letter value', () => {
-      const html = new MagicHtml('<img>');
+      const html = new HtmlMod('<img>');
       const element = html.querySelector('img')!;
       element.setAttribute('class', 'abc');
       expect(html.toString()).toBe('<img class="abc">');
     });
 
     test('should update the empty attribute value on a tag with double quotes', () => {
-      const html = new MagicHtml('<div class=""></div>');
+      const html = new HtmlMod('<div class=""></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe('<div class="a"></div>');
     });
 
     test('should update the empty attribute value on a tag with single quotes', () => {
-      const html = new MagicHtml("<div class=''></div>");
+      const html = new HtmlMod("<div class=''></div>");
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe("<div class='a'></div>");
     });
 
     test('should update the empty attribute value on a tag with no quotes', () => {
-      const html = new MagicHtml('<div class=></div>');
+      const html = new HtmlMod('<div class=></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe('<div class=a></div>');
     });
 
     test('should update the empty attribute value on a tag with no quotes but it needs quotes', () => {
-      const html = new MagicHtml('<div class=></div>');
+      const html = new HtmlMod('<div class=></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'a and b');
       expect(html.toString()).toBe('<div class="a and b"></div>');
     });
 
     test('should update the empty attribute value on a tag with no quotes or equal sign', () => {
-      const html = new MagicHtml('<div class></div>');
+      const html = new HtmlMod('<div class></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'a');
       expect(html.toString()).toBe('<div class="a"></div>');
     });
 
     test('should update the single letter attribute value on a tag with double quotes', () => {
-      const html = new MagicHtml('<div class="a"></div>');
+      const html = new HtmlMod('<div class="a"></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'b');
       expect(html.toString()).toBe('<div class="b"></div>');
     });
 
     test('should update the single letter attribute value on a tag with single quotes', () => {
-      const html = new MagicHtml("<div class='a'></div>");
+      const html = new HtmlMod("<div class='a'></div>");
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'b');
       expect(html.toString()).toBe("<div class='b'></div>");
     });
 
     test('should update the single letter attribute value on a tag with no quotes', () => {
-      const html = new MagicHtml('<div class=a></div>');
+      const html = new HtmlMod('<div class=a></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'b');
       expect(html.toString()).toBe('<div class=b></div>');
     });
 
     test('should update the multi letter attribute value on a tag with double quotes', () => {
-      const html = new MagicHtml('<div class="abc"></div>');
+      const html = new HtmlMod('<div class="abc"></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'def');
       expect(html.toString()).toBe('<div class="def"></div>');
     });
 
     test('should update the multi letter attribute value on a tag with single quotes', () => {
-      const html = new MagicHtml("<div class='abc'></div>");
+      const html = new HtmlMod("<div class='abc'></div>");
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'def');
       expect(html.toString()).toBe("<div class='def'></div>");
     });
 
     test('should update the multi letter attribute value on a tag with no quotes', () => {
-      const html = new MagicHtml('<div class=abc></div>');
+      const html = new HtmlMod('<div class=abc></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'def');
       expect(html.toString()).toBe('<div class=def></div>');
     });
 
     test('should update the attribute value and add quotes since it has a space', () => {
-      const html = new MagicHtml('<div class=abc></div>');
+      const html = new HtmlMod('<div class=abc></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'def ghi');
       expect(html.toString()).toBe('<div class="def ghi"></div>');
     });
 
     test('should update the attribute value and add quotes since it has a <', () => {
-      const html = new MagicHtml('<div class=abc></div>');
+      const html = new HtmlMod('<div class=abc></div>');
       const element = html.querySelector('div')!;
       element.setAttribute('class', 'def<ghi');
       expect(html.toString()).toBe('<div class="def<ghi"></div>');
@@ -956,35 +956,35 @@ describe('MagicElement', () => {
 
     describe('single quotes', () => {
       test('should update an attribute value containing double quotes by changing to single quotes', () => {
-        const html = new MagicHtml('<div class="abc"></div>');
+        const html = new HtmlMod('<div class="abc"></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', 'def"ghi');
         expect(html.toString()).toBe(`<div class='def"ghi'></div>`);
       });
 
       test('should update an attribute value containing no quotes by adding single quotes', () => {
-        const html = new MagicHtml('<div class=abc></div>');
+        const html = new HtmlMod('<div class=abc></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', 'def"ghi');
         expect(html.toString()).toBe(`<div class='def"ghi'></div>`);
       });
 
       test('should set an attribute value by adding single quotes', () => {
-        const html = new MagicHtml('<div class></div>');
+        const html = new HtmlMod('<div class></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', 'def"ghi');
         expect(html.toString()).toBe(`<div class='def"ghi'></div>`);
       });
 
       test('should set an empty attribute value by adding single quotes', () => {
-        const html = new MagicHtml('<div class=></div>');
+        const html = new HtmlMod('<div class=></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', 'def"ghi');
         expect(html.toString()).toBe(`<div class='def"ghi'></div>`);
       });
 
       test('should set an attribute value containing an empty string by adding single quotes', () => {
-        const html = new MagicHtml('<div class=""></div>');
+        const html = new HtmlMod('<div class=""></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', 'def"ghi');
         expect(html.toString()).toBe(`<div class='def"ghi'></div>`);
@@ -993,35 +993,35 @@ describe('MagicElement', () => {
 
     describe('double quotes', () => {
       test('should update an attribute value containing single quotes by changing to double quotes', () => {
-        const html = new MagicHtml("<div class='abc'></div>");
+        const html = new HtmlMod("<div class='abc'></div>");
         const element = html.querySelector('div')!;
         element.setAttribute('class', "def'ghi");
         expect(html.toString()).toBe(`<div class="def'ghi"></div>`);
       });
 
       test('should update an attribute value containing no quotes by adding single quotes', () => {
-        const html = new MagicHtml('<div class=abc></div>');
+        const html = new HtmlMod('<div class=abc></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', "def'ghi");
         expect(html.toString()).toBe(`<div class="def'ghi"></div>`);
       });
 
       test('should set an attribute value by adding double quotes', () => {
-        const html = new MagicHtml('<div class></div>');
+        const html = new HtmlMod('<div class></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', "def'ghi");
         expect(html.toString()).toBe(`<div class="def'ghi"></div>`);
       });
 
       test('should set a empty attribute value by adding double quotes', () => {
-        const html = new MagicHtml('<div class=></div>');
+        const html = new HtmlMod('<div class=></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', "def'ghi");
         expect(html.toString()).toBe(`<div class="def'ghi"></div>`);
       });
 
       test('should set an attribute value containing an empty string by adding double quotes', () => {
-        const html = new MagicHtml("<div class=''></div>");
+        const html = new HtmlMod("<div class=''></div>");
         const element = html.querySelector('div')!;
         element.setAttribute('class', "def'ghi");
         expect(html.toString()).toBe(`<div class="def'ghi"></div>`);
@@ -1030,14 +1030,14 @@ describe('MagicElement', () => {
 
     describe('mixed quotes', () => {
       test('should update the attribute value with single quotes and encode mixed quotes', () => {
-        const html = new MagicHtml("<div class='abc'></div>");
+        const html = new HtmlMod("<div class='abc'></div>");
         const element = html.querySelector('div')!;
         element.setAttribute('class', `def'g"hi`);
         expect(html.toString()).toBe(`<div class='def&#39;g"hi'></div>`);
       });
 
       test('should update the attribute value with double quotes and encode mixed quotes', () => {
-        const html = new MagicHtml('<div class="abc"></div>');
+        const html = new HtmlMod('<div class="abc"></div>');
         const element = html.querySelector('div')!;
         element.setAttribute('class', `def'g"hi`);
         expect(html.toString()).toBe(`<div class="def'g&quot;hi"></div>`);
@@ -1045,7 +1045,7 @@ describe('MagicElement', () => {
     });
 
     test('should set the attribute with empty value to update it', () => {
-      const html = new MagicHtml('<div class="a"></div>');
+      const html = new HtmlMod('<div class="a"></div>');
 
       const element = html.querySelector('div')!;
       element.setAttribute('class', '');
@@ -1055,49 +1055,49 @@ describe('MagicElement', () => {
 
   describe('toggleAttribute()', () => {
     test('should toggle off the attribute if it has a value', () => {
-      const html = new MagicHtml('<div class="a"></div>');
+      const html = new HtmlMod('<div class="a"></div>');
       const element = html.querySelector('div')!;
       element.toggleAttribute('class');
       expect(html.toString()).toBe('<div></div>');
     });
 
     test('should toggle off the attribute if it has no value', () => {
-      const html = new MagicHtml("<div class=''></div>");
+      const html = new HtmlMod("<div class=''></div>");
       const element = html.querySelector('div')!;
       element.toggleAttribute('class');
       expect(html.toString()).toBe('<div></div>');
     });
 
     test('should toggle off the attribute if it has no value and no quotes', () => {
-      const html = new MagicHtml('<div class=></div>');
+      const html = new HtmlMod('<div class=></div>');
       const element = html.querySelector('div')!;
       element.toggleAttribute('class');
       expect(html.toString()).toBe('<div></div>');
     });
 
     test('should toggle off the attribute if it has no value and no quotes or equal sign', () => {
-      const html = new MagicHtml('<div class></div>');
+      const html = new HtmlMod('<div class></div>');
       const element = html.querySelector('div')!;
       element.toggleAttribute('class');
       expect(html.toString()).toBe('<div></div>');
     });
 
     test('should toggle on the attribute', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.toggleAttribute('class');
       expect(html.toString()).toBe('<div class=""></div>');
     });
 
     test('should toggle on the attribute when forced', () => {
-      const html = new MagicHtml("<div class='value'></div>");
+      const html = new HtmlMod("<div class='value'></div>");
       const element = html.querySelector('div')!;
       element.toggleAttribute('class', true);
       expect(html.toString()).toBe("<div class=''></div>");
     });
 
     test('should toggle off the attribute when forced', () => {
-      const html = new MagicHtml('<div></div>');
+      const html = new HtmlMod('<div></div>');
       const element = html.querySelector('div')!;
       element.toggleAttribute('class', false);
       expect(html.toString()).toBe('<div></div>');
@@ -1106,28 +1106,28 @@ describe('MagicElement', () => {
 
   describe('removeAttribute()', () => {
     test('should remove the attribute', () => {
-      const html = new MagicHtml('<div class="a"></div>');
+      const html = new HtmlMod('<div class="a"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
       expect(html.toString()).toBe('<div></div>');
     });
 
     test('should make always have a space between the remaining attributes and tag name', () => {
-      const html = new MagicHtml('<div remove-me id="b"></div>');
+      const html = new HtmlMod('<div remove-me id="b"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('remove-me');
       expect(html.toString()).toBe('<div id="b"></div>');
     });
 
     test('should make always have a space between the remaining attributes', () => {
-      const html = new MagicHtml('<div class="a" remove-me id="b"></div>');
+      const html = new HtmlMod('<div class="a" remove-me id="b"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('remove-me');
       expect(html.toString()).toBe('<div class="a" id="b"></div>');
     });
 
     test('should remove the attribute with no value', () => {
-      const html = new MagicHtml("<div class=''></div>");
+      const html = new HtmlMod("<div class=''></div>");
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
 
@@ -1135,7 +1135,7 @@ describe('MagicElement', () => {
     });
 
     test('should remove the attribute with no value and no quotes', () => {
-      const html = new MagicHtml('<div a class=></div>');
+      const html = new HtmlMod('<div a class=></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
 
@@ -1143,7 +1143,7 @@ describe('MagicElement', () => {
     });
 
     test('should remove the attribute with no value and no quotes or equal sign', () => {
-      const html = new MagicHtml('<div a class b></div>');
+      const html = new HtmlMod('<div a class b></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
 
@@ -1151,14 +1151,14 @@ describe('MagicElement', () => {
     });
 
     test('should remove all instances of the attribute', () => {
-      const html = new MagicHtml(`<div class="a" class=b class='c'></div>`);
+      const html = new HtmlMod(`<div class="a" class=b class='c'></div>`);
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
       expect(html.toString()).toBe('<div></div>');
     });
 
     test('should remove all instances of the attribute with left over attributes', () => {
-      const html = new MagicHtml(`<div a  b class="a" class=b class c class='c' d ></div>`);
+      const html = new HtmlMod(`<div a  b class="a" class=b class c class='c' d ></div>`);
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
       expect(html.toString()).toBe('<div a  b c  d ></div>');
@@ -1167,78 +1167,78 @@ describe('MagicElement', () => {
 
   describe('querySelector()', () => {
     test('should return null if no match', () => {
-      const html = new MagicHtml('<main><div>invalid html</main>');
+      const html = new HtmlMod('<main><div>invalid html</main>');
       const main = html.querySelector('main')!;
       expect(main.querySelector('span')).toBe(null);
     });
 
     test('should return the first match', () => {
-      const html = new MagicHtml('<main><div>invalid html</main>');
+      const html = new HtmlMod('<main><div>invalid html</main>');
       const main = html.querySelector('main')!;
-      expect(main.querySelector('div')).toBeInstanceOf(MagicElement);
+      expect(main.querySelector('div')).toBeInstanceOf(HtmlModElement);
     });
 
-    test('should respect the custom MagicElement', () => {
-      class CustomMagicElement extends MagicElement {}
-      const html = new MagicHtml('<main><div>invalid html</main>', {
-        MagicElement: CustomMagicElement,
+    test('should respect the custom HtmlModElement', () => {
+      class CustomHtmlModElement extends HtmlModElement {}
+      const html = new HtmlMod('<main><div>invalid html</main>', {
+        HtmlModElement: CustomHtmlModElement,
       });
       const main = html.querySelector('main')!;
-      expect(main.querySelector('div')).toBeInstanceOf(CustomMagicElement);
+      expect(main.querySelector('div')).toBeInstanceOf(CustomHtmlModElement);
     });
   });
 
   describe('querySelectorAll()', () => {
     test('should return an empty array if no match', () => {
-      const html = new MagicHtml('<main><div>invalid html</main>');
+      const html = new HtmlMod('<main><div>invalid html</main>');
       const main = html.querySelector('main')!;
       expect(main.querySelectorAll('span')).toEqual([]);
     });
 
     test('should return all matches', () => {
-      const html = new MagicHtml('<main><div>invalid html<div>another</main>');
+      const html = new HtmlMod('<main><div>invalid html<div>another</main>');
       const main = html.querySelector('main')!;
       const results = main.querySelectorAll('div');
       expect(results).toBeInstanceOf(Array);
       expect(results.length).toBe(2);
-      expect(results[0]).toBeInstanceOf(MagicElement);
-      expect(results[1]).toBeInstanceOf(MagicElement);
+      expect(results[0]).toBeInstanceOf(HtmlModElement);
+      expect(results[1]).toBeInstanceOf(HtmlModElement);
     });
   });
 
   describe('clone()', () => {
     test('should clone the element', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
       const clone = element.clone();
       expect(clone.toString()).toBe('<div>here</div>');
     });
 
-    test('should be detatched from the original MagicHtml', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+    test('should be detatched from the original HtmlMod', () => {
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
-      expect(element.__magicHtml === html).toBe(true);
+      expect(element.__htmlMod === html).toBe(true);
       const clone = element.clone();
       expect(clone.toString()).toBe('<div>here</div>');
-      expect(clone.__magicHtml === html).toBe(false);
+      expect(clone.__htmlMod === html).toBe(false);
     });
   });
 
   describe('toString()', () => {
     test('should return the html', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
       expect(element.toString()).toBe('<div>here</div>');
     });
 
     test('should equal "outerHTML"', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
       expect(element.toString()).toBe(element.outerHTML);
     });
 
     test('should equal "outerHTML" from a cloned element', () => {
-      const html = new MagicHtml('before<div>here</div>after');
+      const html = new HtmlMod('before<div>here</div>after');
       const element = html.querySelector('div')!;
       const clone = element.clone();
       expect(clone.toString()).toBe(clone.outerHTML);

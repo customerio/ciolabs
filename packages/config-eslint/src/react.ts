@@ -2,7 +2,7 @@ import type { Linter } from 'eslint';
 
 const config: Linter.Config = {
   extends: [
-    '@ciolabs/eslint-config',
+    '@ciolabs/config-eslint',
     'plugin:react/recommended',
     'plugin:react-hooks/recommended',
     'plugin:jsx-a11y/recommended',

@@ -1,7 +1,7 @@
 import type { Linter } from 'eslint';
 
 const config: Linter.Config = {
-  extends: ['@ciolabs/eslint-config'],
+  extends: ['@ciolabs/config-eslint'],
   env: {
     node: true,
     browser: false,

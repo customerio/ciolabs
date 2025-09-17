@@ -1,1 +1,1 @@
-module.exports = require('@ciolabs/prettier-config');
+module.exports = require('@ciolabs/config-prettier');
