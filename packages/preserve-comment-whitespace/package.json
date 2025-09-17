@@ -1,0 +1,39 @@
+{
+  "name": "@ciolabs/preserve-comment-whitespace",
+  "version": "0.0.0",
+  "description": "Preserves the presence or lack thereof of whitespace surrounding HTML comments",
+  "author": "Avi Goldman <avi@customer.io>",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "magic-string": "^0.30.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "html",
+    "comments",
+    "whitespace",
+    "formatting",
+    "preserve"
+  ]
+}
