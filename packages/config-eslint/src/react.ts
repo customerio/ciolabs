@@ -1,15 +1,20 @@
 import type { Linter } from 'eslint';
 
+import baseConfig from './index';
+
 const config: Linter.Config = {
+  ...baseConfig,
   extends: [
-    '@ciolabs/eslint-config',
+    ...(baseConfig.extends || []),
     'plugin:react/recommended',
     'plugin:react-hooks/recommended',
     'plugin:jsx-a11y/recommended',
   ],
-  plugins: ['react', 'react-hooks', 'jsx-a11y'],
+  plugins: [...(baseConfig.plugins || []), 'react', 'react-hooks', 'jsx-a11y'],
   parserOptions: {
+    ...baseConfig.parserOptions,
     ecmaFeatures: {
+      ...baseConfig.parserOptions?.ecmaFeatures,
       jsx: true,
     },
   },
@@ -19,6 +24,7 @@ const config: Linter.Config = {
     },
   },
   rules: {
+    ...baseConfig.rules,
     'react/react-in-jsx-scope': 'off',
     'react/prop-types': 'off',
     'react-hooks/rules-of-hooks': 'error',

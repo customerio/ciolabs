@@ -1,12 +1,16 @@
 import type { Linter } from 'eslint';
 
+import baseConfig from './index';
+
 const config: Linter.Config = {
-  extends: ['@ciolabs/eslint-config'],
+  ...baseConfig,
   env: {
+    ...baseConfig.env,
     node: true,
     browser: false,
   },
   rules: {
+    ...baseConfig.rules,
     'no-console': 'off',
     '@typescript-eslint/no-var-requires': 'off',
   },

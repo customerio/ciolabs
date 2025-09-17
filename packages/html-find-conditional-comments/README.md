@@ -1,17 +1,17 @@
-# @ciolabs/find-conditional-comments
+# @ciolabs/html-find-conditional-comments
 
 > Finds all conditional comments in a string
 
 ## Install
 
 ```bash
-npm install @ciolabs/find-conditional-comments
+npm install @ciolabs/html-find-conditional-comments
 ```
 
 ## Usage
 
 ```js
-import findConditionalComments from '@ciolabs/find-conditional-comments';
+import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 
 const html = `
 <!--[if mso]>

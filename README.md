@@ -4,13 +4,13 @@ Open source libraries and configurations used at [Customer.io](https://customer.
 
 ## Packages
 
-- [@ciolabs/eslint-config](./packages/eslint-config) - Shared ESLint configuration for Customer.io projects
-- [@ciolabs/prettier-config](./packages/prettier-config) - Shared Prettier configuration for Customer.io projects
-- [@ciolabs/find-conditional-comments](./packages/find-conditional-comments) - Finds all conditional comments in a string
-- [@ciolabs/preserve-comment-whitespace](./packages/preserve-comment-whitespace) - Preserves the presence or lack thereof of whitespace surrounding HTML comments
-- [@ciolabs/process-conditional-comments](./packages/process-conditional-comments) - Makes it easy to safely process HTML inside of conditional comments
-- [@ciolabs/source-htmlparser2](./packages/source-htmlparser2) - A wrapper around htmlparser2 that adds source range information to the AST
-- [@ciolabs/magic-html](./packages/magic-html) - Manipulate HTML strings with a Browser-like API
+- [@ciolabs/config-eslint](./packages/config-eslint) - Shared ESLint configuration for Customer.io projects
+- [@ciolabs/config-prettier](./packages/config-prettier) - Shared Prettier configuration for Customer.io projects
+- [@ciolabs/html-find-conditional-comments](./packages/html-find-conditional-comments) - Finds all conditional comments in a string
+- [@ciolabs/html-preserve-comment-whitespace](./packages/html-preserve-comment-whitespace) - Preserves the presence or lack thereof of whitespace surrounding HTML comments
+- [@ciolabs/html-process-conditional-comments](./packages/html-process-conditional-comments) - Makes it easy to safely process HTML inside of conditional comments
+- [@ciolabs/htmlparser2-source](./packages/htmlparser2-source) - A wrapper around htmlparser2 that adds source range information to the AST
+- [@ciolabs/html-mod](./packages/html-mod) - Manipulate HTML strings with a Browser-like API
 
 ## Development
 

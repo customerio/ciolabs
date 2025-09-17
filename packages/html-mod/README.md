@@ -1,4 +1,4 @@
-# @ciolabs/magic-html
+# @ciolabs/html-mod
 
 > Manipulate HTML strings with a Browser-like API
 
@@ -63,20 +63,20 @@ And if the user had anything not 100% correct (i.e. a missing tag) we just "fixe
 
 We need a tool that can parse the HTML, but not serialize it. We need a tool that can edit the HTML without changing the whole file.
 
-This is where `magic-html` comes in. It's a tool that can parse the HTML so we get the AST-style manipulation. But instead of manipulating the AST we take the HTML and manipulate the string directly. That way we only ever change the part of the HTML we want to change.
+This is where `html-mod` comes in. It's a tool that can parse the HTML so we get the AST-style manipulation. But instead of manipulating the AST we take the HTML and manipulate the string directly. That way we only ever change the part of the HTML we want to change.
 
 ## Install
 
 ```bash
-npm install @ciolabs/magic-html
+npm install @ciolabs/html-mod
 ```
 
 ## Usage
 
 ```typescript
-import { MagicHtml } from '@ciolabs/magic-html';
+import { HtmlMod } from '@ciolabs/html-mod';
 
-const h = new MagicHtml('<div>hello</div>');
+const h = new HtmlMod('<div>hello</div>');
 
 h.querySelector('div')!.innerHTML = 'world';
 
@@ -91,9 +91,9 @@ When you are manipulating the HTML, you are really manipulating the underlying s
 If you need to query against the manipulated HTML string, you need to "flush" the manipulations. This will take the manipulated HTML string and reparse it. This is not a cheap operation, so you should only do it when you absolutely need to.
 
 ```typescript
-import { MagicHtml } from '@ciolabs/magic-html';
+import { HtmlMod } from '@ciolabs/html-mod';
 
-const h = new MagicHtml('<div>hello</div>');
+const h = new HtmlMod('<div>hello</div>');
 
 h.querySelector('div')!.append('<div>world</div>');
 
@@ -107,32 +107,32 @@ console.log(h.querySelectorAll('div').length); //=> 2
 You can check if the manipulations have been flushed by calling `isFlushed()`:
 
 ```typescript
-import { MagicHtml } from '@ciolabs/magic-html';
+import { HtmlMod } from '@ciolabs/html-mod';
 
-const h = new MagicHtml('<div>hello</div>');
+const h = new HtmlMod('<div>hello</div>');
 
 h.querySelector('div')!.append('<div>world</div>');
 
 console.log(h.isFlushed()); //=> false
 ```
 
-## MagicHtml
+## HtmlMod
 
-The `MagicHtml` class is the main class for this package. It's the class that you use to query for `MagicElement` elements and manipulate the HTML string.
+The `HtmlMod` class is the main class for this package. It's the class that you use to query for `HtmlModElement` elements and manipulate the HTML string.
 
 ### constructor(html: string, options?)
 
 #### options
 
-> `MagicHtmlOptions` | optional
+> `HtmlModOptions` | optional
 
 The full options for [htmlparser2](https://github.com/fb55/htmlparser2/wiki/Parser-options#option-xmlmode). This is the underlying parser used to parse the HTML.
 
-#### options.MagicElement
+#### options.HtmlModElement
 
 > `Class` | optional
 
-The class to use for the `MagicElement` class. This is the class that is used to manipulate the HTML. By default, it uses the `MagicElement` class in this package.
+The class to use for the `HtmlModElement` class. This is the class that is used to manipulate the HTML. By default, it uses the `HtmlModElement` class in this package.
 
 ### Methods
 
@@ -176,9 +176,9 @@ Generates a map of the HTML string. This is used to map the manipulated HTML str
 
 Returns the manipulated HTML string.
 
-#### clone() => MagicHtml
+#### clone() => HtmlMod
 
-Returns a new `MagicHtml` instance with the same HTML string.
+Returns a new `HtmlMod` instance with the same HTML string.
 
 #### flush() => this
 
@@ -186,17 +186,17 @@ Flushes the manipulations. This will take the manipulated HTML string and repars
 
 Returns `this`.
 
-#### querySelector(selector: string) => MagicElement | null
+#### querySelector(selector: string) => HtmlModElement | null
 
-Returns the first `MagicElement` that matches the selector.
+Returns the first `HtmlModElement` that matches the selector.
 
-#### querySelectorAll(selector: string) => MagicElement[]
+#### querySelectorAll(selector: string) => HtmlModElement[]
 
-Returns an array of `MagicElement` that match the selector.
+Returns an array of `HtmlModElement` that match the selector.
 
-## MagicElement
+## HtmlModElement
 
-The `MagicElement` class is the class that is used to manipulate the HTML. It's the class that is returned when you run a query.
+The `HtmlModElement` class is the class that is used to manipulate the HTML. It's the class that is returned when you run a query.
 
 ### Properties
 
@@ -236,7 +236,7 @@ The text content of the element. This can be set.
 
 An array of the children of the element.
 
-#### parent: MagicElement | null
+#### parent: HtmlModElement | null
 
 The parent element.
 
@@ -309,31 +309,31 @@ Toggles the attribute.
 
 Removes the attribute.
 
-#### querySelector(selector: string) => MagicElement | null
+#### querySelector(selector: string) => HtmlModElement | null
 
-Returns the first `MagicElement` that matches the selector.
+Returns the first `HtmlModElement` that matches the selector.
 
-#### querySelectorAll(selector: string) => MagicElement[]
+#### querySelectorAll(selector: string) => HtmlModElement[]
 
-Returns an array of `MagicElement` that match the selector.
+Returns an array of `HtmlModElement` that match the selector.
 
 #### toString() => string
 
 Returns the HTML string. Same as `outerHTML`.
 
-#### clone() => MagicElement
+#### clone() => HtmlModElement
 
-Returns a new `MagicElement` instance with the same HTML string.
+Returns a new `HtmlModElement` instance with the same HTML string.
 
-Useful if you want to manipulate the HTML without affecting the original `MagicHtml` instance.
+Useful if you want to manipulate the HTML without affecting the original `HtmlMod` instance.
 
 ## Types
 
-### MagicHtmlOptions
+### HtmlModOptions
 
 ```typescript
-type MagicHtmlOptions = Options & {
-  MagicElement?: typeof MagicElement;
+type HtmlModOptions = Options & {
+  HtmlModElement?: typeof HtmlModElement;
 };
 ```
 

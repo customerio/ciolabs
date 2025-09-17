@@ -1,15 +1,15 @@
 {
-  "name": "@ciolabs/source-htmlparser2",
+  "name": "@ciolabs/html-preserve-comment-whitespace",
   "version": "0.0.0",
-  "description": "A wrapper around htmlparser2 that adds source range information to the AST",
+  "description": "Preserves the presence or lack thereof of whitespace surrounding HTML comments",
   "author": "Customer.io <win@customer.io>",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",
-    "directory": "packages/source-htmlparser2"
+    "directory": "packages/html-preserve-comment-whitespace"
   },
-  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/source-htmlparser2#readme",
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-preserve-comment-whitespace#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -33,8 +33,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "domhandler": "^5.0.3",
-    "domutils": "^3.1.0",
-    "htmlparser2": "^8.0.1"
+    "magic-string": "^0.30.8"
   }
 }

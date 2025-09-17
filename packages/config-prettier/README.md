@@ -1,11 +1,11 @@
-# @ciolabs/prettier-config
+# @ciolabs/config-prettier
 
 Shared Prettier configuration for Customer.io projects.
 
 ## Installation
 
 ```bash
-npm install --save-dev @ciolabs/prettier-config prettier
+npm install --save-dev @ciolabs/config-prettier prettier
 ```
 
 ## Usage
@@ -14,20 +14,20 @@ In your `package.json`:
 
 ```json
 {
-  "prettier": "@ciolabs/prettier-config"
+  "prettier": "@ciolabs/config-prettier"
 }
 ```
 
 Or create a `.prettierrc.js`:
 
 ```js
-module.exports = require('@ciolabs/prettier-config');
+module.exports = require('@ciolabs/config-prettier');
 ```
 
 Or using ESM:
 
 ```js
-import config from '@ciolabs/prettier-config';
+import config from '@ciolabs/config-prettier';
 
 export default config;
 ```

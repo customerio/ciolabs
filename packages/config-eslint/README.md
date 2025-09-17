@@ -1,4 +1,4 @@
-# @ciolabs/eslint-config
+# @ciolabs/config-eslint
 
 Shared ESLint configuration for Customer.io projects.
 
@@ -7,7 +7,7 @@ Shared ESLint configuration for Customer.io projects.
 ### Base Dependencies
 
 ```bash
-npm install --save-dev @ciolabs/eslint-config eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint-config-prettier eslint-plugin-import eslint-plugin-unicorn eslint-plugin-unused-imports eslint-import-resolver-typescript
+npm install --save-dev @ciolabs/config-eslint eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint-config-prettier eslint-plugin-import eslint-plugin-unicorn eslint-plugin-unused-imports eslint-import-resolver-typescript
 ```
 
 ### Additional Dependencies for React
@@ -30,14 +30,14 @@ In your `.eslintrc.js`:
 
 ```js
 module.exports = {
-  extends: ['@ciolabs/eslint-config'],
+  extends: ['@ciolabs/config-eslint'],
 };
 ```
 
 Or using ESM in `eslint.config.js`:
 
 ```js
-import config from '@ciolabs/eslint-config';
+import config from '@ciolabs/config-eslint';
 
 export default [config];
 ```
@@ -48,7 +48,7 @@ For React projects:
 
 ```js
 module.exports = {
-  extends: ['@ciolabs/eslint-config/react'],
+  extends: ['@ciolabs/config-eslint/react'],
 };
 ```
 
@@ -58,7 +58,7 @@ For Ember projects:
 
 ```js
 module.exports = {
-  extends: ['@ciolabs/eslint-config/ember'],
+  extends: ['@ciolabs/config-eslint/ember'],
 };
 ```
 
@@ -68,7 +68,7 @@ For Node.js projects:
 
 ```js
 module.exports = {
-  extends: ['@ciolabs/eslint-config/node'],
+  extends: ['@ciolabs/config-eslint/node'],
 };
 ```
 

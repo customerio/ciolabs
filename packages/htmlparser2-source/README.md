@@ -1,17 +1,17 @@
-# @ciolabs/source-htmlparser2
+# @ciolabs/htmlparser2-source
 
 > A wrapper around [htmlparser2](https://github.com/fb55/htmlparser2) that adds source range information to the AST.
 
 ## Install
 
 ```
-npm install @ciolabs/source-htmlparser2
+npm install @ciolabs/htmlparser2-source
 ```
 
 ## Usage
 
 ```typescript
-import { parseDocument } from '@ciolabs/source-htmlparser2';
+import { parseDocument } from '@ciolabs/htmlparser2-source';
 
 const html = '<div>hello</div>';
 
@@ -40,7 +40,7 @@ Returns a `SourceDocument` with enhanced elements that include source range info
 This will add in the missing close tags into the AST. Note, because they don't exist in the source, they will have index positions of -1.
 
 ```typescript
-import { parseDocument, nodeToString } from '@ciolabs/source-htmlparser2';
+import { parseDocument, nodeToString } from '@ciolabs/htmlparser2-source';
 
 const html = '<div>hello';
 
@@ -112,7 +112,7 @@ type SourceDocument = {
 Converts a parsed node back to its HTML string representation.
 
 ```typescript
-import { parseDocument, nodeToString } from '@ciolabs/source-htmlparser2';
+import { parseDocument, nodeToString } from '@ciolabs/htmlparser2-source';
 
 const html = '<div class="test">content</div>';
 const document = parseDocument(html);

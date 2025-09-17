@@ -1,5 +1,5 @@
 {
-  "name": "@ciolabs/magic-html",
+  "name": "@ciolabs/html-mod",
   "version": "0.0.0",
   "description": "Manipulate HTML strings with a Browser-like API",
   "author": "Customer.io <win@customer.io>",
@@ -7,9 +7,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",
-    "directory": "packages/magic-html"
+    "directory": "packages/html-mod"
   },
-  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/magic-html#readme",
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-mod#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ciolabs/source-htmlparser2": "workspace:*",
+    "@ciolabs/htmlparser2-source": "workspace:*",
     "cheerio-select": "^2.1.0",
     "escape-html": "^1.0.3",
     "html-entities": "^2.5.2",

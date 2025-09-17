@@ -1,4 +1,4 @@
-import findConditionalComments from '@ciolabs/find-conditional-comments';
+import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 import MagicString from 'magic-string';
 
 const OPENER = `<!--__PROCESS_CONDITIONAL_COMMENTS`;

@@ -5,26 +5,26 @@ import {
   Options,
   DomUtils,
   nodeToString,
-} from '@ciolabs/source-htmlparser2';
+} from '@ciolabs/htmlparser2-source';
 import { select } from 'cheerio-select';
 import escapeHtml from 'escape-html';
 import { decode } from 'html-entities';
 import MagicString from 'magic-string';
 
-export type MagicHtmlOptions = Options & {
-  MagicElement?: typeof MagicElement; // allow for custom MagicElement
+export type HtmlModOptions = Options & {
+  HtmlModElement?: typeof HtmlModElement; // allow for custom HtmlModElement
 };
 
-export class MagicHtml {
+export class HtmlMod {
   __source: string;
   __s: MagicString;
   __dom: SourceDocument;
   __flushed = false;
-  __MagicHtml: typeof MagicHtml;
-  __MagicElement: typeof MagicElement;
-  __options: MagicHtmlOptions;
+  __HtmlMod: typeof HtmlMod;
+  __HtmlModElement: typeof HtmlModElement;
+  __options: HtmlModOptions;
 
-  constructor(source: string, options?: MagicHtmlOptions) {
+  constructor(source: string, options?: HtmlModOptions) {
     this.__source = source;
     this.__options = {
       recognizeSelfClosing: true,
@@ -33,8 +33,8 @@ export class MagicHtml {
     this.__s = new MagicString(source);
     this.__dom = parseDocument(source, this.__options);
     this.__flushed = true;
-    this.__MagicElement = options?.MagicElement || MagicElement;
-    this.__MagicHtml = MagicHtml;
+    this.__HtmlModElement = options?.HtmlModElement || HtmlModElement;
+    this.__HtmlMod = HtmlMod;
   }
   trim(charType?: Parameters<typeof MagicString.prototype.trim>[0]) {
     this.__s.trim(charType);
@@ -76,7 +76,7 @@ export class MagicHtml {
     return this.__s.toString();
   }
   clone() {
-    return new MagicHtml(this.__s.toString());
+    return new HtmlMod(this.__s.toString());
   }
 
   flush(source?: string) {
@@ -88,36 +88,36 @@ export class MagicHtml {
     return this;
   }
 
-  querySelector(selector: string): MagicElement | null {
+  querySelector(selector: string): HtmlModElement | null {
     const result = select(selector, this.__dom)?.[0];
     if (!result) {
       return null;
     }
 
-    return new this.__MagicElement(result as unknown as SourceElement, this);
+    return new this.__HtmlModElement(result as unknown as SourceElement, this);
   }
 
-  querySelectorAll(selector: string): MagicElement[] {
+  querySelectorAll(selector: string): HtmlModElement[] {
     return select(selector, this.__dom).map(element => {
-      return new this.__MagicElement(element as unknown as SourceElement, this);
+      return new this.__HtmlModElement(element as unknown as SourceElement, this);
     });
   }
 }
 
-export class MagicElement {
+export class HtmlModElement {
   __element: SourceElement;
-  __magicHtml: MagicHtml;
+  __htmlMod: HtmlMod;
   __isClone = false;
 
-  constructor(element: SourceElement, magicHtml: MagicHtml) {
+  constructor(element: SourceElement, htmlModule: HtmlMod) {
     this.__element = element;
-    this.__magicHtml = magicHtml;
+    this.__htmlMod = htmlModule;
   }
 
   get sourceRange() {
     const startIndex = this.__element.source.openTag.startIndex;
     const endIndex = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
-    const html = this.__magicHtml.__source;
+    const html = this.__htmlMod.__source;
 
     // count the lines before this element
     const startLines: string[] = html.slice(0, Math.max(0, startIndex)).split(/\n/);
@@ -153,7 +153,7 @@ export class MagicElement {
     const currentTagName = this.__element.tagName;
 
     // override the opening tag
-    this.__magicHtml.__s.overwrite(
+    this.__htmlMod.__s.overwrite(
       this.__element.source.openTag.startIndex + 1,
       this.__element.source.openTag.startIndex + 1 + currentTagName.length,
       tagName
@@ -161,14 +161,14 @@ export class MagicElement {
 
     // override the closing tag
     if (this.__element.source.closeTag) {
-      this.__magicHtml.__s.overwrite(
+      this.__htmlMod.__s.overwrite(
         this.__element.source.closeTag.startIndex + 2,
         this.__element.source.closeTag.startIndex + 2 + currentTagName.length,
         tagName
       );
     }
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
   }
 
   get id() {
@@ -200,7 +200,7 @@ export class MagicElement {
       return '';
     }
 
-    return this.__magicHtml.__source.slice(
+    return this.__htmlMod.__source.slice(
       this.__element.source.openTag.endIndex + 1,
       this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex
     );
@@ -212,15 +212,15 @@ export class MagicElement {
     }
 
     if (this.innerHTML.length === 0) {
-      this.__magicHtml.__s.appendRight(this.__element.source.openTag.endIndex + 1, html);
+      this.__htmlMod.__s.appendRight(this.__element.source.openTag.endIndex + 1, html);
     } else {
-      this.__magicHtml.__s.overwrite(
+      this.__htmlMod.__s.overwrite(
         this.__element.source.openTag.endIndex + 1,
         this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex,
         html
       );
     }
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
   }
 
   get textContent() {
@@ -238,7 +238,7 @@ export class MagicElement {
   }
 
   get outerHTML() {
-    return this.__magicHtml.__source.slice(
+    return this.__htmlMod.__source.slice(
       this.__element.source.openTag.startIndex,
       this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1
     );
@@ -248,28 +248,28 @@ export class MagicElement {
     return this.__element.children;
   }
 
-  get parent(): MagicElement | null {
+  get parent(): HtmlModElement | null {
     const { parent } = this.__element;
 
     if (parent?.type === 'tag') {
-      return new this.__magicHtml.__MagicElement(parent as unknown as SourceElement, this.__magicHtml);
+      return new this.__htmlMod.__HtmlModElement(parent as unknown as SourceElement, this.__htmlMod);
     }
 
     return null;
   }
 
   before(html: string) {
-    this.__magicHtml.__s.prependLeft(this.__element.source.openTag.startIndex, html);
+    this.__htmlMod.__s.prependLeft(this.__element.source.openTag.startIndex, html);
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
 
   after(html: string) {
-    this.__magicHtml.__s.appendRight(this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1, html);
+    this.__htmlMod.__s.appendRight(this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1, html);
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
@@ -279,24 +279,24 @@ export class MagicElement {
      * If the element is self closing, we need to remove the slash
      */
     if (this.__element.source.openTag.isSelfClosing) {
-      const hasSlash = this.__magicHtml.__source.charAt(this.__element.source.openTag.endIndex - 1) === '/';
+      const hasSlash = this.__htmlMod.__source.charAt(this.__element.source.openTag.endIndex - 1) === '/';
 
       if (hasSlash) {
         // remove the slash
-        this.__magicHtml.__s.remove(this.__element.source.openTag.endIndex - 1, this.__element.source.openTag.endIndex);
+        this.__htmlMod.__s.remove(this.__element.source.openTag.endIndex - 1, this.__element.source.openTag.endIndex);
       }
     }
 
-    this.__magicHtml.__s.prependLeft(this.__element.source.openTag.endIndex + 1, html);
+    this.__htmlMod.__s.prependLeft(this.__element.source.openTag.endIndex + 1, html);
 
     /**
      * If the element was self closing, we need to add the closing tag
      */
     if (this.__element.source.openTag.isSelfClosing) {
-      this.__magicHtml.__s.appendRight(this.__element.source.openTag.endIndex + 1, `</${this.__element.tagName}>`);
+      this.__htmlMod.__s.appendRight(this.__element.source.openTag.endIndex + 1, `</${this.__element.tagName}>`);
     }
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
@@ -309,44 +309,38 @@ export class MagicElement {
       return this.prepend(html);
     }
 
-    this.__magicHtml.__s.appendRight(this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex, html);
+    this.__htmlMod.__s.appendRight(this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex, html);
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
 
   remove() {
-    this.__magicHtml.__s.remove(
+    this.__htmlMod.__s.remove(
       this.__element.source.openTag.startIndex,
       // if the item we are removing is the last item in the document,
       // the +1 will cause an out of bounds error so we make sure
       // we don't go past the end of the document
-      Math.min(
-        this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1,
-        this.__magicHtml.__source.length
-      )
+      Math.min(this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1, this.__htmlMod.__source.length)
     );
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
 
   replaceWith(html: string) {
-    this.__magicHtml.__s.overwrite(
+    this.__htmlMod.__s.overwrite(
       this.__element.source.openTag.startIndex,
       // if the item we are replacinng is the last item in the document,
       // the +1 will cause an out of bounds error so we make sure
       // we don't go past the end of the document
-      Math.min(
-        this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1,
-        this.__magicHtml.__source.length
-      ),
+      Math.min(this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1, this.__htmlMod.__source.length),
       html
     );
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
@@ -387,7 +381,7 @@ export class MagicElement {
        * A value is already set, so we need to overwrite it
        */
       if (attribute?.value && attribute.value.startIndex <= attribute.value.endIndex) {
-        this.__magicHtml.__s.overwrite(
+        this.__htmlMod.__s.overwrite(
           attribute.value?.startIndex + (hasQuote ? -1 : 0),
           attribute.value?.endIndex + 1 + (hasQuote ? 1 : 0),
           `${quoteChar}${escapedValue}${quoteChar}`
@@ -402,19 +396,19 @@ export class MagicElement {
       ) {
         // If the empty value is quoted, we need to replace those as well
         if (hasQuote) {
-          this.__magicHtml.__s.overwrite(
+          this.__htmlMod.__s.overwrite(
             attribute.value?.startIndex - 1,
             attribute.value?.endIndex + 2,
             `${quoteChar}${escapedValue}${quoteChar}`
           );
         } else {
-          this.__magicHtml.__s.appendRight(attribute.value.startIndex, `${quoteChar}${escapedValue}${quoteChar}`);
+          this.__htmlMod.__s.appendRight(attribute.value.startIndex, `${quoteChar}${escapedValue}${quoteChar}`);
         }
       } else {
         /**
          * No value is set, so we need to add it
          */
-        this.__magicHtml.__s.appendRight(
+        this.__htmlMod.__s.appendRight(
           attribute.name.endIndex + 1,
           `=${quoteChar || '"'}${escapedValue}${quoteChar || '"'}`
         );
@@ -423,13 +417,13 @@ export class MagicElement {
       /**
        * No attribute is set, so we need to add it
        */
-      this.__magicHtml.__s.appendRight(
+      this.__htmlMod.__s.appendRight(
         this.__element.source.openTag.startIndex + this.__element.tagName.length + 1, // +1 for the <
         ` ${name}=${quoteChar || '"'}${escapedValue}${quoteChar || '"'}`
       );
     }
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
@@ -447,7 +441,7 @@ export class MagicElement {
       }
     }
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
@@ -462,7 +456,7 @@ export class MagicElement {
       const isLastAttribute = attribute === this.__element.source.attributes.at(-1);
       const isPreviousRemoved = index > 0 && this.__element.source.attributes[index - 1].name.data === name;
 
-      this.__magicHtml.__s.remove(
+      this.__htmlMod.__s.remove(
         attribute.source.startIndex -
           (remainingAttributesCount === 0
             ? 1 // -1 for the leading space if there are no more attributes
@@ -475,38 +469,38 @@ export class MagicElement {
       );
     }
 
-    this.__magicHtml.__flushed = false;
+    this.__htmlMod.__flushed = false;
 
     return this;
   }
 
-  querySelector(selector: string): MagicElement | null {
+  querySelector(selector: string): HtmlModElement | null {
     const result = select(selector, this.__element)?.[0] ?? null;
     if (!result) {
       return null;
     }
 
-    return new this.__magicHtml.__MagicElement(result as unknown as SourceElement, this.__magicHtml);
+    return new this.__htmlMod.__HtmlModElement(result as unknown as SourceElement, this.__htmlMod);
   }
 
-  querySelectorAll(selector: string): MagicElement[] {
+  querySelectorAll(selector: string): HtmlModElement[] {
     return select(selector, this.__element).map(element => {
-      return new this.__magicHtml.__MagicElement(element as unknown as SourceElement, this.__magicHtml);
+      return new this.__htmlMod.__HtmlModElement(element as unknown as SourceElement, this.__htmlMod);
     });
   }
 
   toString() {
     if (this.__isClone) {
-      return this.__magicHtml.toString();
+      return this.__htmlMod.toString();
     }
 
     return this.outerHTML;
   }
 
   clone() {
-    const MagicHtml = this.__magicHtml.__MagicHtml;
+    const HtmlModule = this.__htmlMod.__HtmlMod;
 
-    const clone = new MagicHtml(this.outerHTML).querySelector('*') as this;
+    const clone = new HtmlModule(this.outerHTML).querySelector('*') as this;
     clone.__isClone = true;
 
     return clone;

@@ -75,6 +75,7 @@ const config: Linter.Config = {
           iOS: false,
           env: false,
           args: false,
+          mod: false,
         },
       },
     ],
@@ -98,4 +99,4 @@ const config: Linter.Config = {
   },
 };
 
-module.exports = config;
+export default config;
