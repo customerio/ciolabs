@@ -1,7 +1,6 @@
 import type { Linter } from 'eslint';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const baseConfig = require('./index');
+import baseConfig from './index';
 
 const config: Linter.Config = {
   ...baseConfig,

@@ -99,4 +99,4 @@ const config: Linter.Config = {
   },
 };
 
-module.exports = config;
+export default config;
