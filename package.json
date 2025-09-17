@@ -2,18 +2,16 @@
   "name": "ciolabs",
   "version": "0.0.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "build": "pnpm run --recursive build",
+    "test": "pnpm run --recursive test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dev": "npm run dev --workspaces --if-present",
-    "clean": "npm run clean --workspaces --if-present",
+    "typecheck": "tsc --noEmit",
+    "dev": "pnpm run --recursive dev",
+    "clean": "pnpm run --recursive clean",
     "prepare": "husky install",
     "changeset": "changeset",
     "changeset:version": "changeset version",
@@ -22,8 +20,9 @@
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.7",
-    "@ciolabs/eslint-config": "*",
-    "@ciolabs/prettier-config": "*",
+    "@ciolabs/eslint-config": "workspace:*",
+    "@ciolabs/prettier-config": "workspace:*",
+    "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
@@ -42,8 +41,9 @@
   },
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "pnpm": ">=10.0.0"
   },
+  "packageManager": "pnpm@10.16.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git"
