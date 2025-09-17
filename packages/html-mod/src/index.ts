@@ -109,9 +109,9 @@ export class HtmlModElement {
   __htmlMod: HtmlMod;
   __isClone = false;
 
-  constructor(element: SourceElement, htmlMod: HtmlMod) {
+  constructor(element: SourceElement, htmlModule: HtmlMod) {
     this.__element = element;
-    this.__htmlMod = htmlMod;
+    this.__htmlMod = htmlModule;
   }
 
   get sourceRange() {
@@ -498,9 +498,9 @@ export class HtmlModElement {
   }
 
   clone() {
-    const HtmlMod = this.__htmlMod.__HtmlMod;
+    const HtmlModule = this.__htmlMod.__HtmlMod;
 
-    const clone = new HtmlMod(this.outerHTML).querySelector('*') as this;
+    const clone = new HtmlModule(this.outerHTML).querySelector('*') as this;
     clone.__isClone = true;
 
     return clone;

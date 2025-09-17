@@ -1,14 +1,18 @@
 import type { Linter } from 'eslint';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const baseConfig = require('./index');
+
 const config: Linter.Config = {
-  extends: ['@ciolabs/config-eslint', 'plugin:ember/recommended'],
-  plugins: ['ember'],
+  ...baseConfig,
+  extends: [...(baseConfig.extends || []), 'plugin:ember/recommended'],
+  plugins: [...(baseConfig.plugins || []), 'ember'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
+    ...baseConfig.parserOptions,
     project: ['./tsconfig.eslint.json'],
     ecmaFeatures: {
+      ...baseConfig.parserOptions?.ecmaFeatures,
       jsx: true,
     },
   },
@@ -28,6 +32,7 @@ const config: Linter.Config = {
     'ember/no-shadow-route-definition': ['off'],
     'ember/no-side-effects': ['off'],
 
+    ...baseConfig.rules,
     // Override base rules for Ember
     'unicorn/filename-case': 'off', // Ember has different naming conventions
   },

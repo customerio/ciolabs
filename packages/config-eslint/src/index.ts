@@ -75,6 +75,7 @@ const config: Linter.Config = {
           iOS: false,
           env: false,
           args: false,
+          mod: false,
         },
       },
     ],
