@@ -2,8 +2,17 @@
   "name": "@ciolabs/preserve-comment-whitespace",
   "version": "0.0.0",
   "description": "Preserves the presence or lack thereof of whitespace surrounding HTML comments",
-  "author": "Avi Goldman <avi@customer.io>",
+  "author": "Customer.io <win@customer.io>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/preserve-comment-whitespace"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/preserve-comment-whitespace#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -21,19 +30,12 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "magic-string": "^0.30.8"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"
-  },
-  "keywords": [
-    "html",
-    "comments",
-    "whitespace",
-    "formatting",
-    "preserve"
-  ]
+  }
 }
