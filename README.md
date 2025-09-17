@@ -7,6 +7,8 @@ Open source libraries and configurations used at [Customer.io](https://customer.
 - [@ciolabs/eslint-config](./packages/eslint-config) - Shared ESLint configuration with TypeScript, React, Ember, and Node.js support
 - [@ciolabs/prettier-config](./packages/prettier-config) - Shared Prettier configuration for consistent formatting
 - [@ciolabs/find-conditional-comments](./packages/find-conditional-comments) - Finds HTML conditional comments (like `<!--[if mso]>` for Outlook emails)
+- [@ciolabs/process-conditional-comments](./packages/process-conditional-comments) - Preprocesses and postprocesses HTML content inside conditional comments
+- [@ciolabs/preserve-comment-whitespace](./packages/preserve-comment-whitespace) - Preserves the presence or lack thereof of whitespace surrounding HTML comments
 
 ## Development
 
