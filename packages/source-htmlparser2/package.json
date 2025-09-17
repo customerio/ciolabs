@@ -1,0 +1,40 @@
+{
+  "name": "@ciolabs/source-htmlparser2",
+  "version": "0.0.0",
+  "description": "A wrapper around htmlparser2 that adds source range information to the AST",
+  "author": "Customer.io <win@customer.io>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/source-htmlparser2"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/source-htmlparser2#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "domhandler": "^5.0.3",
+    "domutils": "^3.1.0",
+    "htmlparser2": "^8.0.1"
+  }
+}
