@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      magic-string:
+        specifier: ^0.30.19
+        version: 0.30.19
     devDependencies:
       '@changesets/changelog-github':
         specifier: ^0.5.1
@@ -140,6 +144,15 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.2
+
+  packages/process-conditional-comments:
+    dependencies:
+      '@ciolabs/find-conditional-comments':
+        specifier: workspace:*
+        version: link:../find-conditional-comments
+      magic-string:
+        specifier: ^0.30.0
+        version: 0.30.19
 
   packages/source-htmlparser2:
     dependencies:

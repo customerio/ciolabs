@@ -32,7 +32,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ciolabs/find-conditional-comments": "*",
+    "@ciolabs/find-conditional-comments": "workspace:*",
     "magic-string": "^0.30.0"
   }
 }
