@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      magic-string:
-        specifier: ^0.30.19
-        version: 0.30.19
     devDependencies:
       '@changesets/changelog-github':
         specifier: ^0.5.1

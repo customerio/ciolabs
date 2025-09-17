@@ -59,8 +59,5 @@
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
-  },
-  "dependencies": {
-    "magic-string": "^0.30.19"
   }
 }
