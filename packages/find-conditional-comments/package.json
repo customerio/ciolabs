@@ -1,0 +1,42 @@
+{
+  "name": "@ciolabs/find-conditional-comments",
+  "version": "0.0.0",
+  "description": "Finds all conditional comments in a string",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "author": "Customer.io <win@customer.io>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/find-conditional-comments"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/find-conditional-comments#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "conditional",
+    "comments",
+    "html",
+    "email",
+    "outlook",
+    "mso"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  }
+}
