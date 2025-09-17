@@ -35,7 +35,13 @@ test('email formatter should respect the whitespace', () => {
     <div> <!--[if MAC]> hello    <![endif]-->      </div>
   `);
 
-  expect(result).toBe(`<div> <!--[if MAC]> hello    <![endif]-->      </div>`);
+  expect(result).toBe(`<div> <!--[if MAC]> hello <![endif]--> </div>`);
+});
+
+test('should keep no whitespace if there was none', () => {
+  const result = emailFormatter(`<div><!--[if MAC]>hello<![endif]--></div>`);
+
+  expect(result).toBe(`<div><!--[if MAC]>hello<![endif]--></div>`);
 });
 
 test('email formatter should properly format from a single line', () => {
