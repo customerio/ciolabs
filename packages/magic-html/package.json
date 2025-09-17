@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ciolabs/source-htmlparser2": "*",
+    "@ciolabs/source-htmlparser2": "workspace:*",
     "cheerio-select": "^2.1.0",
     "escape-html": "^1.0.3",
     "html-entities": "^2.5.2",
