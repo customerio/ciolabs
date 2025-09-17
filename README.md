@@ -10,6 +10,7 @@ Open source libraries and configurations used at [Customer.io](https://customer.
 - [@ciolabs/process-conditional-comments](./packages/process-conditional-comments) - Preprocesses and postprocesses HTML content inside conditional comments
 - [@ciolabs/preserve-comment-whitespace](./packages/preserve-comment-whitespace) - Preserves the presence or lack thereof of whitespace surrounding HTML comments
 - [@ciolabs/source-htmlparser2](./packages/source-htmlparser2) - A wrapper around htmlparser2 that adds source range information to the AST
+- [@ciolabs/magic-html](./packages/magic-html) - Manipulate HTML strings with a Browser-like API
 
 ## Development
 

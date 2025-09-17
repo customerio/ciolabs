@@ -1,0 +1,46 @@
+{
+  "name": "@ciolabs/magic-html",
+  "version": "0.0.0",
+  "description": "Manipulate HTML strings with a Browser-like API",
+  "author": "Customer.io <win@customer.io>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/magic-html"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/magic-html#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ciolabs/source-htmlparser2": "*",
+    "cheerio-select": "^2.1.0",
+    "escape-html": "^1.0.3",
+    "html-entities": "^2.5.2",
+    "magic-string": "^0.30.0"
+  },
+  "devDependencies": {
+    "@types/escape-html": "^1.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

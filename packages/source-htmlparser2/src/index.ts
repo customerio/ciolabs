@@ -61,6 +61,8 @@ export type SourceChildNode =
 
 export type SourceElement = Omit<DomHandlerUtils.Element, 'children'> & {
   source: ElementSource;
+  startIndex: number;
+  endIndex: number;
   children: SourceChildNode[];
 };
 

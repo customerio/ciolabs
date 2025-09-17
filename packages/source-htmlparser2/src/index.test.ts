@@ -28,7 +28,7 @@ describe('htmlparser2', () => {
 
     expect(source.slice(element.source.openTag.startIndex, element.source.openTag.endIndex + 1)).toBe(`<div class="">`);
 
-    expect(source.slice(element.source.closeTag.startIndex, element.source.closeTag.endIndex + 1)).toBe(`</div>`);
+    expect(source.slice(element.source.closeTag!.startIndex, element.source.closeTag!.endIndex + 1)).toBe(`</div>`);
 
     expect(
       source.slice(
@@ -39,7 +39,7 @@ describe('htmlparser2', () => {
     ).toBe(`class`);
 
     expect(
-      source.slice(element.source.attributes[0].value.startIndex, element.source.attributes[0].value.endIndex + 1)
+      source.slice(element.source.attributes[0].value!.startIndex, element.source.attributes[0].value!.endIndex + 1)
     ).toBe(``);
 
     expect(
@@ -97,7 +97,7 @@ describe('htmlparser2', () => {
     ).toBe(`class`);
 
     expect(
-      source.slice(element.source.attributes[0].value.startIndex, element.source.attributes[0].value.endIndex + 1)
+      source.slice(element.source.attributes[0].value!.startIndex, element.source.attributes[0].value!.endIndex + 1)
     ).toBe(`foo`);
 
     expect(
@@ -147,7 +147,7 @@ describe('htmlparser2', () => {
     ).toBe(`class`);
 
     expect(
-      source.slice(element.source.attributes[0].value.startIndex, element.source.attributes[0].value.endIndex + 1)
+      source.slice(element.source.attributes[0].value!.startIndex, element.source.attributes[0].value!.endIndex + 1)
     ).toBe(`foo`);
 
     expect(
@@ -201,7 +201,7 @@ describe('htmlparser2', () => {
     ).toBe(`class`);
 
     expect(
-      source.slice(element.source.attributes[0].value.startIndex, element.source.attributes[0].value.endIndex + 1)
+      source.slice(element.source.attributes[0].value!.startIndex, element.source.attributes[0].value!.endIndex + 1)
     ).toBe(`foo`);
 
     expect(
@@ -253,7 +253,7 @@ describe('htmlparser2', () => {
     ).toBe(`class`);
 
     expect(
-      source.slice(element.source.attributes[0].value.startIndex, element.source.attributes[0].value.endIndex + 1)
+      source.slice(element.source.attributes[0].value!.startIndex, element.source.attributes[0].value!.endIndex + 1)
     ).toBe(`foo`);
 
     expect(
@@ -305,7 +305,7 @@ describe('htmlparser2', () => {
     ).toBe(`class`);
 
     expect(
-      source.slice(element.source.attributes[0].value.startIndex, element.source.attributes[0].value.endIndex + 1)
+      source.slice(element.source.attributes[0].value!.startIndex, element.source.attributes[0].value!.endIndex + 1)
     ).toBe(`foo`);
 
     expect(
@@ -329,7 +329,7 @@ describe('htmlparser2', () => {
 
     expect(source.slice(main.startIndex, main.endIndex + 1)).toBe('<main><div><span>ok</ main>');
     expect(source.slice(main.source.openTag.startIndex, main.source.openTag.endIndex + 1)).toBe('<main>');
-    expect(source.slice(main.source.closeTag.startIndex, main.source.closeTag.endIndex + 1)).toBe('</ main>');
+    expect(source.slice(main.source.closeTag!.startIndex, main.source.closeTag!.endIndex + 1)).toBe('</ main>');
 
     const [div] = main.children;
     if (div.type !== ElementType.Tag) {
@@ -448,9 +448,9 @@ this is the end`);
       throw new Error('Expected element');
     }
 
-    expect(element.source.closeTag.name).toBe('div');
-    expect(element.source.closeTag.startIndex).toBe(12);
-    expect(element.source.closeTag.endIndex).toBe(source.length);
+    expect(element.source.closeTag!.name).toBe('div');
+    expect(element.source.closeTag!.startIndex).toBe(12);
+    expect(element.source.closeTag!.endIndex).toBe(source.length);
   });
 
   describe('autofix', () => {
@@ -465,9 +465,9 @@ this is the end`);
         throw new Error('Expected element');
       }
 
-      expect(element.source.closeTag.name).toBe('div');
-      expect(element.source.closeTag.startIndex).toBe(-1);
-      expect(element.source.closeTag.endIndex).toBe(-1);
+      expect(element.source.closeTag!.name).toBe('div');
+      expect(element.source.closeTag!.startIndex).toBe(-1);
+      expect(element.source.closeTag!.endIndex).toBe(-1);
 
       expect(nodeToString(document)).toBe(`<div>content</div>`);
     });
@@ -483,9 +483,9 @@ this is the end`);
         throw new Error('Expected element');
       }
 
-      expect(element.source.closeTag.name).toBe('div');
-      expect(element.source.closeTag.startIndex).toBe(-1);
-      expect(element.source.closeTag.endIndex).toBe(-1);
+      expect(element.source.closeTag!.name).toBe('div');
+      expect(element.source.closeTag!.startIndex).toBe(-1);
+      expect(element.source.closeTag!.endIndex).toBe(-1);
 
       expect(nodeToString(document)).toBe(`<div>content</div>`);
     });
@@ -501,9 +501,9 @@ this is the end`);
         throw new Error('Expected element');
       }
 
-      expect(main.source.closeTag.name).toBe('main');
-      expect(main.source.closeTag.startIndex).toBe(-1);
-      expect(main.source.closeTag.endIndex).toBe(-1);
+      expect(main.source.closeTag!.name).toBe('main');
+      expect(main.source.closeTag!.startIndex).toBe(-1);
+      expect(main.source.closeTag!.endIndex).toBe(-1);
 
       expect(nodeToString(document)).toBe(`<main><div>content</div></main>`);
     });
