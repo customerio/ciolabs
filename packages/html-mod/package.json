@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "Manipulate HTML strings with a Browser-like API",
   "author": "Customer.io <win@customer.io>",
-  "license": "MIT",
+  "license": "Apache-2.0 WITH Commons-Clause",
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",

@@ -79,7 +79,7 @@ This repository uses Husky and lint-staged to automatically lint and format chan
 
 ## License
 
-MIT License - see [LICENSE](./LICENSE) file for details.
+Apache License 2.0 with Commons Clause - see [LICENSE](./LICENSE) file for details.
 
 ---
 
