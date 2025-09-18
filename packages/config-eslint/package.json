@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/config-eslint",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Shared ESLint configuration for Customer.io projects",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

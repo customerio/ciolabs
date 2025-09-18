@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/html-find-conditional-comments",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Finds all conditional comments in a string",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
