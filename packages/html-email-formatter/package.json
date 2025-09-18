@@ -1,0 +1,44 @@
+{
+  "name": "@ciolabs/html-email-formatter",
+  "version": "0.0.0",
+  "description": "Format and prettify HTML email content",
+  "author": "Customer.io <win@customer.io>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/html-email-formatter"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-email-formatter#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ciolabs/html-find-conditional-comments": "workspace:*",
+    "@ciolabs/html-preserve-comment-whitespace": "workspace:*",
+    "@types/js-beautify": "^1.13.3",
+    "@types/pretty": "^2.0.1",
+    "js-beautify": "^1.15.1",
+    "magic-string": "^0.30.0",
+    "pretty": "^2.0.0"
+  }
+}
