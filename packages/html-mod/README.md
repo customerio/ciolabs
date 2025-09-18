@@ -23,8 +23,8 @@ Email code will have plenty of quirks. And it will contain personalization langu
 
 For example, running this HTML through cheerio:
 
-```html
-<a href="{{" url }}>Click me</a>
+```
+<a href={{ url }}>Click me</a>
 ```
 
 will result in this:
@@ -41,8 +41,8 @@ User source files might have similar quirks. But more importantly, we want to ed
 
 An example is if we are trying to add a class to this `div`:
 
-```html
-<main class="main">
+```
+<main class='main'>
   <div class="button">Click me</div>
 </main>
 ```
