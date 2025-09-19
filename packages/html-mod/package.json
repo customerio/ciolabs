@@ -40,7 +40,6 @@
     "magic-string": "^0.30.0"
   },
   "devDependencies": {
-    "@types/escape-html": "^1.0.0",
-    "@types/node": "^20.0.0"
+    "@types/escape-html": "^1.0.0"
   }
 }
