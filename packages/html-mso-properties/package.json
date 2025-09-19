@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/html-mso-properties",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Microsoft Office CSS properties",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
