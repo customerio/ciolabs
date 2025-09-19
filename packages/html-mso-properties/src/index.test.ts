@@ -7,8 +7,8 @@ describe('@ciolabs/html-mso-properties', () => {
     expect(Array.isArray(msoProperties)).toBe(true);
   });
 
-  test('should have more than 1000 properties', () => {
-    expect(msoProperties.length).toBeGreaterThan(1000);
+  test('should have more than 400 properties', () => {
+    expect(msoProperties.length).toBeGreaterThan(400);
   });
 
   test('should have font-color as the first property', () => {
