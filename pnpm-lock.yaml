@@ -180,9 +180,8 @@ importers:
       '@types/escape-html':
         specifier: ^1.0.0
         version: 1.0.4
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.16
+
+  packages/html-mso-properties: {}
 
   packages/html-preserve-comment-whitespace:
     dependencies:
