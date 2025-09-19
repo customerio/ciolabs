@@ -1,0 +1,35 @@
+{
+  "name": "@ciolabs/html-mso-properties",
+  "version": "0.0.0",
+  "description": "Microsoft Office CSS properties",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "author": "Customer.io <win@customer.io>",
+  "license": "Apache-2.0 WITH Commons-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/html-mso-properties"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-mso-properties#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  }
+}
