@@ -32,7 +32,7 @@
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
-    "postinstall": "patch-package && cd node_modules/morphdom && npm run build"
+    "postinstall": "patch-package && cd node_modules/morphdom && npm run rollup"
   },
   "dependencies": {
     "morphdom": "2.7.2",
