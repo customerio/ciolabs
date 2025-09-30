@@ -1,15 +1,15 @@
 {
-  "name": "@ciolabs/framecast",
+  "name": "@ciolabs/morphdom",
   "version": "0.0.0",
-  "description": "TypeScript cross-frame communication library.",
+  "description": "A flexible wrapper around morphdom, a way to diff and patch DOM elements.",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",
   "repository": {
     "type": "git",
     "url": "https://github.com/customerio/ciolabs.git",
-    "directory": "packages/framecast"
+    "directory": "packages/morphdom"
   },
-  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/framecast#readme",
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/morphdom#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -24,17 +24,21 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "patches"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "patch-package && cd node_modules/morphdom && npm run rollup"
   },
   "dependencies": {
-    "nanoid": "^3.3.8",
-    "nanostores": "^0.9.5",
-    "superjson": "^1.9.1"
+    "morphdom": "2.7.2",
+    "patch-package": "^8.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
   }
 }

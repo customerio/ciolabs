@@ -1,0 +1,87 @@
+diff --git a/node_modules/morphdom/index.d.ts b/node_modules/morphdom/index.d.ts
+index fba27f5..dcf42ac 100644
+--- a/node_modules/morphdom/index.d.ts
++++ b/node_modules/morphdom/index.d.ts
+@@ -1,13 +1,18 @@
+ interface MorphDomOptions {
+     getNodeKey?: (node: Node) => any;
++    filterNode?: (node: Node) => boolean; // added via patch
+-    onBeforeNodeAdded?: (node: Node) => Node;
++    onBeforeNodeAdded?: (node: Node) => boolean;
++    addChild?: (parentNode: Node, newNode: Node) => void; // it existed but wasn't typed
+     onNodeAdded?: (node: Node) => Node;
+     onBeforeElUpdated?: (fromEl: HTMLElement, toEl: HTMLElement) => boolean;
++    updateEl?: (fromEl: HTMLElement, toEl: HTMLElement) => void; // added via patch
+     onElUpdated?: (el: HTMLElement) => void;
+     onBeforeNodeDiscarded?: (node: Node) => boolean;
++    discardChild?: (parentNode: Node, node: Node) => void; // added via patch
+     onNodeDiscarded?: (node: Node) => void;
+     onBeforeElChildrenUpdated?: (fromEl: HTMLElement, toEl: HTMLElement) => boolean;
+     childrenOnly?: boolean;
++    skipFromChildren?: (fromEl: HTMLElement, toEl: HTMLElement) => boolean; // it existed but wasn't typed
+ }
+ 
+ declare function morphdom(
+diff --git a/node_modules/morphdom/src/morphdom.js b/node_modules/morphdom/src/morphdom.js
+index dfd25f6..afc51a7 100644
+--- a/node_modules/morphdom/src/morphdom.js
++++ b/node_modules/morphdom/src/morphdom.js
+@@ -36,11 +36,14 @@ export default function morphdomFactory(morphAttrs) {
+     }
+ 
+     var getNodeKey = options.getNodeKey || defaultGetNodeKey;
++    var filterNode = options.filterNode || noop;
+     var onBeforeNodeAdded = options.onBeforeNodeAdded || noop;
+     var onNodeAdded = options.onNodeAdded || noop;
+     var onBeforeElUpdated = options.onBeforeElUpdated || noop;
++    var updateEl = options.updateEl || function(fromEl, toEl) { return morphAttrs(fromEl, toEl); };
+     var onElUpdated = options.onElUpdated || noop;
+     var onBeforeNodeDiscarded = options.onBeforeNodeDiscarded || noop;
++    var discardChild = options.discardChild || function(parent, child) { parent.removeChild(child); }
+     var onNodeDiscarded = options.onNodeDiscarded || noop;
+     var onBeforeElChildrenUpdated = options.onBeforeElChildrenUpdated || noop;
+     var skipFromChildren = options.skipFromChildren || noop;
+@@ -95,7 +98,7 @@ export default function morphdomFactory(morphAttrs) {
+       }
+ 
+       if (parentNode) {
+-        parentNode.removeChild(node);
++        discardChild(parentNode, node);
+       }
+ 
+       onNodeDiscarded(node);
+@@ -212,7 +215,7 @@ export default function morphdomFactory(morphAttrs) {
+         }
+ 
+         // update attributes on original DOM element first
+-        morphAttrs(fromEl, toEl);
++        updateEl(fromEl, toEl);
+         // optional
+         onElUpdated(fromEl);
+ 
+@@ -241,6 +244,11 @@ export default function morphdomFactory(morphAttrs) {
+ 
+       // walk the children
+       outer: while (curToNodeChild) {
++        if (filterNode(curToNodeChild) === false) {
++          curToNodeChild = curToNodeChild.nextSibling;
++          continue outer;
++        }
++
+         toNextSibling = curToNodeChild.nextSibling;
+         curToNodeKey = getNodeKey(curToNodeChild);
+ 
+@@ -248,6 +256,13 @@ export default function morphdomFactory(morphAttrs) {
+         while (!skipFrom && curFromNodeChild) {
+           fromNextSibling = curFromNodeChild.nextSibling;
+ 
++          
++          if (filterNode(curFromNodeChild) === false) {
++            curFromNodeChild = curFromNodeChild.nextSibling;
++            continue;
++          }
++    
++
+           if (curToNodeChild.isSameNode && curToNodeChild.isSameNode(curFromNodeChild)) {
+             curToNodeChild = toNextSibling;
+             curFromNodeChild = fromNextSibling;
