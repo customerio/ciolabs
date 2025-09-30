@@ -66,6 +66,11 @@ export type SourceElement = Omit<DomHandlerUtils.Element, 'children'> & {
   endIndex: number;
 };
 
+export type SourceText = DomHandlerUtils.Text & {
+  startIndex: number;
+  endIndex: number;
+};
+
 export declare type Options = ParserOptions & DomHandlerOptions & { autofix?: boolean };
 
 export function isCDATA(node: DomHandlerUtils.Node): node is DomHandlerUtils.CDATA {
@@ -89,7 +94,7 @@ export function isTag(node: DomHandlerUtils.Node): node is SourceElement {
   return DomHandlerUtils.isTag(node) && 'source' in node;
 }
 
-export function isText(node: DomHandlerUtils.Node): node is DomHandlerUtils.Text {
+export function isText(node: DomHandlerUtils.Node): node is SourceText {
   return DomHandlerUtils.isText(node);
 }
 
@@ -511,44 +516,6 @@ export function parseDocument(data: string, options?: Options): SourceDocument {
 
 // todo export most utils from domhandler (exclude isTag, DomHandler, Parser, etc etc)
 export * as DomUtils from 'domutils';
-
-export class SourceText {
-  constructor(private text: string) {}
-
-  slice(startIndex: number, endIndex: number): string {
-    return this.text.slice(startIndex, endIndex);
-  }
-
-  charAt(index: number): string {
-    return this.text.charAt(index);
-  }
-
-  length(): number {
-    return this.text.length;
-  }
-
-  toString(): string {
-    return this.text;
-  }
-
-  offsetToPosition(offset: number): { line: number; character: number } {
-    const lines = this.text.split('\n');
-    let containingLine = 0;
-
-    offset = Math.min(offset, this.text.length);
-    offset = Math.max(offset, 0);
-
-    while (lines.length > containingLine && offset > lines[containingLine].length) {
-      offset -= lines[containingLine].length + 1;
-      containingLine += 1;
-    }
-
-    return {
-      line: containingLine,
-      character: offset,
-    };
-  }
-}
 
 export function nodeToString(node: SourceChildNode): string {
   if (isDocument(node)) {

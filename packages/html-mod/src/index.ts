@@ -5,6 +5,7 @@ import {
   Options,
   DomUtils,
   nodeToString,
+  SourceText,
 } from '@ciolabs/htmlparser2-source';
 import { select } from 'cheerio-select';
 import escapeHtml from 'escape-html';
@@ -504,6 +505,37 @@ export class HtmlModElement {
     clone.__isClone = true;
 
     return clone;
+  }
+}
+
+export class HtmlModText {
+  __text: SourceText;
+  __htmlMod: HtmlMod;
+
+  constructor(text: SourceText, htmlModule: HtmlMod) {
+    this.__text = text;
+    this.__htmlMod = htmlModule;
+  }
+
+  get textContent() {
+    return decode(this.__text.data);
+  }
+
+  get innerHTML() {
+    return this.__text.data;
+  }
+
+  set textContent(text: string) {
+    if (!this.__text.endIndex) {
+      return;
+    }
+
+    this.__htmlMod.__s.overwrite(this.__text.startIndex, this.__text.endIndex + 1, escapeHtml(text));
+    this.__htmlMod.__flushed = false;
+  }
+
+  toString() {
+    return this.__text.data;
   }
 }
 
