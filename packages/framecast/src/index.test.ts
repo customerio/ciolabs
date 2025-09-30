@@ -88,7 +88,7 @@ describe('Framecast', () => {
       let receivedData: any;
 
       // Set up listener
-      framecast.on('broadcast', data => {
+      framecast.on('broadcast', (data: any) => {
         receivedData = data;
       });
 
@@ -112,7 +112,7 @@ describe('Framecast', () => {
 
       // More specific verification
       const call = mockTargetWindow.postMessage.mock.calls[0];
-      const parsedMessage = superjson.parse(call[0]);
+      const parsedMessage = superjson.parse(call[0]) as any;
       expect(parsedMessage.type).toBe('broadcast');
       expect(parsedMessage.channel).toBe('__framecast');
       expect(parsedMessage.data).toEqual(testData);
@@ -123,11 +123,11 @@ describe('Framecast', () => {
       const receivedData: any[] = [];
 
       // Set up multiple listeners
-      framecast.on('broadcast', data => {
+      framecast.on('broadcast', (data: any) => {
         receivedData.push({ listener: 1, data });
       });
 
-      framecast.on('broadcast', data => {
+      framecast.on('broadcast', (data: any) => {
         receivedData.push({ listener: 2, data });
       });
 
@@ -167,7 +167,7 @@ describe('Framecast', () => {
     it('prevents messages being received from the wrong origin', () => {
       let receivedData: any;
 
-      framecast.on('broadcast', data => {
+      framecast.on('broadcast', (data: any) => {
         receivedData = data;
       });
 
@@ -180,7 +180,7 @@ describe('Framecast', () => {
     it('prevents messages being received from the wrong channel', () => {
       let receivedData: any;
 
-      framecast.on('broadcast', data => {
+      framecast.on('broadcast', (data: any) => {
         receivedData = data;
       });
 
