@@ -1,0 +1,46 @@
+{
+  "name": "@ciolabs/framecast",
+  "version": "0.0.0",
+  "description": "TypeScript cross-frame communication library.",
+  "author": "Customer.io <win@customer.io>",
+  "license": "Apache-2.0 WITH Commons-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/framecast"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/framecast#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "broadcast",
+    "cross-frame",
+    "library",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "nanoid": "^3.3.8",
+    "nanostores": "^0.9.5",
+    "superjson": "^1.9.1"
+  }
+}
