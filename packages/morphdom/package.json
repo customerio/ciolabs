@@ -1,0 +1,51 @@
+{
+  "name": "@ciolabs/morphdom",
+  "version": "0.0.0",
+  "description": "A flexible wrapper around morphdom, a way to diff and patch DOM elements.",
+  "author": "Customer.io <win@customer.io>",
+  "license": "Apache-2.0 WITH Commons-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/morphdom"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/morphdom#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "patches"
+  ],
+  "keywords": [
+    "morphdom",
+    "dom",
+    "diffing",
+    "patching",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "postinstall": "patch-package && cd node_modules/morphdom && npm run build"
+  },
+  "dependencies": {
+    "morphdom": "^2.7.0",
+    "patch-package": "^8.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

@@ -13,6 +13,7 @@ Open source libraries and configurations used at [Customer.io](https://customer.
 - [@ciolabs/html-process-conditional-comments](./packages/html-process-conditional-comments) - Makes it easy to safely process HTML inside of conditional comments
 - [@ciolabs/htmlparser2-source](./packages/htmlparser2-source) - A wrapper around htmlparser2 that adds source range information to the AST
 - [@ciolabs/html-mod](./packages/html-mod) - Manipulate HTML strings with a Browser-like API
+- [@ciolabs/morphdom](./packages/morphdom) - A flexible wrapper around morphdom, a way to diff and patch DOM elements
 
 ## Development
 
