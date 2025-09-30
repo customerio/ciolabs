@@ -27,13 +27,6 @@
     "dist",
     "patches"
   ],
-  "keywords": [
-    "morphdom",
-    "dom",
-    "diffing",
-    "patching",
-    "typescript"
-  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -42,7 +35,7 @@
     "postinstall": "patch-package && cd node_modules/morphdom && npm run build"
   },
   "dependencies": {
-    "morphdom": "^2.7.0",
+    "morphdom": "2.7.2",
     "patch-package": "^8.0.0"
   },
   "devDependencies": {

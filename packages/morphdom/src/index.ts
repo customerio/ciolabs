@@ -95,9 +95,11 @@ function isEqualNode(fromNode: Node, toNode: Node, options: MorphOptions = {}) {
     return false;
   }
 
-  const fromAttributes = [...fromElement.attributes].filter(attribute => !ignoredAttributes.has(attribute.name));
+  // eslint-disable-next-line unicorn/prefer-spread
+  const fromAttributes = Array.from(fromElement.attributes).filter(attribute => !ignoredAttributes.has(attribute.name));
 
-  const toAttributes = [...toElement.attributes].filter(attribute => !ignoredAttributes.has(attribute.name));
+  // eslint-disable-next-line unicorn/prefer-spread
+  const toAttributes = Array.from(toElement.attributes).filter(attribute => !ignoredAttributes.has(attribute.name));
 
   if (fromAttributes.length !== toAttributes.length) {
     return false;
@@ -110,9 +112,11 @@ function isEqualNode(fromNode: Node, toNode: Node, options: MorphOptions = {}) {
     }
   }
 
-  const fromClasses = [...fromElement.classList].filter(className => !ignoredClasses.has(className));
+  // eslint-disable-next-line unicorn/prefer-spread
+  const fromClasses = Array.from(fromElement.classList).filter(className => !ignoredClasses.has(className)); // eslint-disable-next-line unicorn/prefer-spread
 
-  const toClasses = [...toElement.classList].filter(className => !ignoredClasses.has(className));
+  // eslint-disable-next-line unicorn/prefer-spread
+  const toClasses = Array.from(toElement.classList).filter(className => !ignoredClasses.has(className));
 
   if (fromClasses.length !== toClasses.length) {
     return false;
@@ -131,7 +135,8 @@ function isEqualNode(fromNode: Node, toNode: Node, options: MorphOptions = {}) {
     return false;
   }
 
-  for (const [index, fromChild] of fromChildren.entries()) {
+  // eslint-disable-next-line unicorn/prefer-spread
+  for (const [index, fromChild] of Array.from(fromChildren).entries()) {
     if (!isEqualNode(fromChild, toChildren[index], options)) {
       return false;
     }

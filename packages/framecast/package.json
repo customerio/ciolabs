@@ -26,12 +26,6 @@
   "files": [
     "dist"
   ],
-  "keywords": [
-    "broadcast",
-    "cross-frame",
-    "library",
-    "typescript"
-  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
