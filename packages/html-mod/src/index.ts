@@ -525,6 +525,15 @@ export class HtmlModText {
     return this.__text.data;
   }
 
+  set innerHTML(html: string) {
+    if (!this.__text.endIndex) {
+      return;
+    }
+
+    this.__htmlMod.__s.overwrite(this.__text.startIndex, this.__text.endIndex + 1, html);
+    this.__htmlMod.__flushed = false;
+  }
+
   set textContent(text: string) {
     if (!this.__text.endIndex) {
       return;

@@ -1392,6 +1392,70 @@ describe('HtmlModText', () => {
 
       expect(htmlModText.innerHTML).toBe(htmlModText.toString());
     });
+
+    test('should set raw HTML content without escaping', () => {
+      const html = new HtmlModule('<div>Hello world</div>');
+      const element = html.querySelector('div')!;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
+
+      htmlModText.innerHTML = 'New <span>content</span> &amp; more';
+
+      expect(html.toString()).toBe('<div>New <span>content</span> &amp; more</div>');
+      expect(html.isFlushed()).toBe(false);
+    });
+
+    test('should set HTML entities without decoding', () => {
+      const html = new HtmlModule('<div>Hello world</div>');
+      const element = html.querySelector('div')!;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
+
+      htmlModText.innerHTML = '&lt;test &amp; value&gt;';
+
+      expect(html.toString()).toBe('<div>&lt;test &amp; value&gt;</div>');
+      expect(html.isFlushed()).toBe(false);
+    });
+
+    test('should handle empty string', () => {
+      const html = new HtmlModule('<div>Hello world</div>');
+      const element = html.querySelector('div')!;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
+
+      htmlModText.innerHTML = '';
+
+      expect(html.toString()).toBe('<div></div>');
+      expect(html.isFlushed()).toBe(false);
+    });
+
+    test('should not modify if text node has no endIndex', () => {
+      const html = new HtmlModule('<div>Hello world</div>');
+      const element = html.querySelector('div')!;
+      const textNode = element.children[0] as SourceText;
+      // Remove endIndex to simulate a text node without position info
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (textNode as any).endIndex;
+      const htmlModText = new HtmlModText(textNode, html);
+
+      const originalHtml = html.toString();
+      htmlModText.innerHTML = '<span>New content</span>';
+
+      expect(html.toString()).toBe(originalHtml);
+      expect(html.isFlushed()).toBe(true); // Should remain flushed since no change
+    });
+
+    test('should allow setting complex HTML structures', () => {
+      const html = new HtmlModule('<div>Hello world</div>');
+      const element = html.querySelector('div')!;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
+
+      htmlModText.innerHTML = '<strong>Bold</strong> and <em>italic</em> text with &nbsp; space';
+
+      expect(html.toString()).toBe('<div><strong>Bold</strong> and <em>italic</em> text with &nbsp; space</div>');
+      expect(html.isFlushed()).toBe(false);
+    });
   });
 
   describe('toString', () => {
@@ -1425,6 +1489,52 @@ describe('HtmlModText', () => {
       const htmlModText = new HtmlModText(mockTextNode, html);
 
       expect(htmlModText.toString()).toBe('');
+    });
+  });
+
+  describe('innerHTML vs textContent setter comparison', () => {
+    test('should demonstrate different behavior between innerHTML and textContent setters', () => {
+      const html1 = new HtmlModule('<div>Hello world</div>');
+      const html2 = new HtmlModule('<div>Hello world</div>');
+
+      const element1 = html1.querySelector('div')!;
+      const element2 = html2.querySelector('div')!;
+      const textNode1 = element1.children[0] as SourceText;
+      const textNode2 = element2.children[0] as SourceText;
+      const htmlModText1 = new HtmlModText(textNode1, html1);
+      const htmlModText2 = new HtmlModText(textNode2, html2);
+
+      const testContent = '<span>Bold</span> & italic';
+
+      // innerHTML setter: preserves HTML and entities as-is
+      htmlModText1.innerHTML = testContent;
+      expect(html1.toString()).toBe('<div><span>Bold</span> & italic</div>');
+
+      // textContent setter: escapes HTML and entities
+      htmlModText2.textContent = testContent;
+      expect(html2.toString()).toBe('<div>&lt;span&gt;Bold&lt;/span&gt; &amp; italic</div>');
+    });
+
+    test('should handle entities differently in innerHTML vs textContent', () => {
+      const html1 = new HtmlModule('<div>Hello world</div>');
+      const html2 = new HtmlModule('<div>Hello world</div>');
+
+      const element1 = html1.querySelector('div')!;
+      const element2 = html2.querySelector('div')!;
+      const textNode1 = element1.children[0] as SourceText;
+      const textNode2 = element2.children[0] as SourceText;
+      const htmlModText1 = new HtmlModText(textNode1, html1);
+      const htmlModText2 = new HtmlModText(textNode2, html2);
+
+      const entityContent = '&lt;test&gt; &amp; &nbsp;';
+
+      // innerHTML setter: preserves entities
+      htmlModText1.innerHTML = entityContent;
+      expect(html1.toString()).toBe('<div>&lt;test&gt; &amp; &nbsp;</div>');
+
+      // textContent setter: escapes the entities again
+      htmlModText2.textContent = entityContent;
+      expect(html2.toString()).toBe('<div>&amp;lt;test&amp;gt; &amp;amp; &amp;nbsp;</div>');
     });
   });
 
