@@ -198,7 +198,7 @@ describe('Framecast', () => {
       });
 
       let receivedData: any;
-      wildcardFramecast.on('broadcast', data => {
+      wildcardFramecast.on('broadcast', (data: any) => {
         receivedData = data;
       });
 
@@ -225,7 +225,7 @@ describe('Framecast', () => {
 
       // Get the call ID from the sent message
       const call = mockTargetWindow.postMessage.mock.calls[0];
-      const sentMessage = superjson.parse(call[0]);
+      const sentMessage = superjson.parse(call[0]) as any;
       const callId = sentMessage.id;
 
       // Simulate the function result being received
@@ -244,7 +244,7 @@ describe('Framecast', () => {
 
       // Verify the message was sent with correct arguments
       const call = mockTargetWindow.postMessage.mock.calls[0];
-      const parsedMessage = superjson.parse(call[0]);
+      const parsedMessage = superjson.parse(call[0]) as any;
 
       expect(parsedMessage.type).toBe('function:testWithArgs');
       expect(parsedMessage.channel).toBe('__framecast');
@@ -299,7 +299,7 @@ describe('Framecast', () => {
 
       // Get the call ID from the sent message
       const call = mockTargetWindow.postMessage.mock.calls[0];
-      const sentMessage = superjson.parse(call[0]);
+      const sentMessage = superjson.parse(call[0]) as any;
       const callId = sentMessage.id;
 
       // Simulate error response
@@ -316,7 +316,7 @@ describe('Framecast', () => {
 
       // Get the call ID from the sent message
       const call = mockTargetWindow.postMessage.mock.calls[0];
-      const sentMessage = superjson.parse(call[0]);
+      const sentMessage = superjson.parse(call[0]) as any;
       const callId = sentMessage.id;
 
       // Simulate delayed response
@@ -368,7 +368,7 @@ describe('Framecast', () => {
 
       // Get the call ID from the sent message
       const call = newMockTargetWindow.postMessage.mock.calls[0];
-      const sentMessage = superjson.parse(call[0]);
+      const sentMessage = superjson.parse(call[0]) as any;
       const callId = sentMessage.id;
 
       // Simulate the evaluate call result
@@ -391,11 +391,6 @@ describe('Framecast', () => {
     });
 
     it('evaluates function with arguments', async () => {
-      const evaluateFramecast = new Framecast(mockTargetWindow as any, {
-        self: mockSelfWindow as any,
-        supportEvaluate: true,
-      });
-
       const testFunction = (a: number, b: number) => a + b;
 
       framecast.evaluate(testFunction, 5, 3);
@@ -419,8 +414,8 @@ describe('Framecast', () => {
 
       // Verify the message was sent with custom channel
       const calls = mockTargetWindow.postMessage.mock.calls;
-      const lastCall = calls.at(-1);
-      const parsedMessage = superjson.parse(lastCall[0]);
+      const lastCall = calls.at(-1)!;
+      const parsedMessage = superjson.parse(lastCall[0]) as any;
 
       expect(parsedMessage.type).toBe('broadcast');
       expect(parsedMessage.channel).toBe('__framecast_custom');
@@ -431,7 +426,7 @@ describe('Framecast', () => {
     it('filters messages by channel', () => {
       let receivedData: any;
 
-      framecast.on('broadcast', data => {
+      framecast.on('broadcast', (data: any) => {
         receivedData = data;
       });
 
@@ -468,8 +463,8 @@ describe('Framecast', () => {
 
       // Should send error response - verify the last call
       const calls = mockTargetWindow.postMessage.mock.calls;
-      const lastCall = calls.at(-1);
-      const parsedMessage = superjson.parse(lastCall[0]);
+      const lastCall = calls.at(-1)!;
+      const parsedMessage = superjson.parse(lastCall[0]) as any;
 
       expect(parsedMessage.type).toBe('functionResult');
       expect(parsedMessage.channel).toBe('__framecast');
@@ -493,7 +488,7 @@ describe('Framecast', () => {
       // Should have attempted to call state:get function
       const calls = mockTargetWindow.postMessage.mock.calls;
       const stateGetCall = calls.find(call => {
-        const message = superjson.parse(call[0]);
+        const message = superjson.parse(call[0]) as any;
         return message.type === 'function:state:get:syncState';
       });
 
