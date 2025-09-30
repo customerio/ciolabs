@@ -114,7 +114,3 @@ Formats HTML email content while preserving conditional comments.
 - `wrap_line_length` (number) - Line length before wrapping (default: 80)
 - `preserve_newlines` (boolean) - Whether to preserve existing newlines (default: true)
 - `max_preserve_newlines` (number) - Maximum consecutive newlines to preserve (default: 2)
-
-## License
-
-Apache-2.0 WITH Commons-Clause
