@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/morphdom",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A flexible wrapper around morphdom, a way to diff and patch DOM elements.",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",

@@ -1,5 +1,11 @@
 # @ciolabs/html-email-formatter
 
+## 0.0.2
+
+### Patch Changes
+
+- [#16](https://github.com/customerio/ciolabs/pull/16) [`a154a72`](https://github.com/customerio/ciolabs/commit/a154a723d8a7b5b177afc23607a62e8d4a961408) Thanks [@avigoldman](https://github.com/avigoldman)! - Added readme
+
 ## 0.0.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/framecast",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "TypeScript cross-frame communication library.",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",
