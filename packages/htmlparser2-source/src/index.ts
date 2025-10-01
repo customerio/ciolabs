@@ -66,6 +66,11 @@ export type SourceElement = Omit<DomHandlerUtils.Element, 'children'> & {
   endIndex: number;
 };
 
+export type SourceText = DomHandlerUtils.Text & {
+  startIndex: number;
+  endIndex: number;
+};
+
 export declare type Options = ParserOptions & DomHandlerOptions & { autofix?: boolean };
 
 export function isCDATA(node: DomHandlerUtils.Node): node is DomHandlerUtils.CDATA {
@@ -89,7 +94,7 @@ export function isTag(node: DomHandlerUtils.Node): node is SourceElement {
   return DomHandlerUtils.isTag(node) && 'source' in node;
 }
 
-export function isText(node: DomHandlerUtils.Node): node is DomHandlerUtils.Text {
+export function isText(node: DomHandlerUtils.Node): node is SourceText {
   return DomHandlerUtils.isText(node);
 }
 
