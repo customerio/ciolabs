@@ -221,6 +221,18 @@ export class HtmlModElement {
         html
       );
     }
+
+    if (this.__element.source.openTag.isSelfClosing) {
+      const hasSlash = this.__htmlMod.__source.charAt(this.__element.source.openTag.endIndex - 1) === '/';
+
+      if (hasSlash) {
+        // remove the slash
+        this.__htmlMod.__s.remove(this.__element.source.openTag.endIndex - 1, this.__element.source.openTag.endIndex);
+      }
+
+      // add the closing tag
+      this.__htmlMod.__s.appendRight(this.__element.source.openTag.endIndex + 1, `</${this.__element.tagName}>`);
+    }
     this.__htmlMod.__flushed = false;
   }
 
