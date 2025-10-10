@@ -1,5 +1,11 @@
 # @ciolabs/html-mod
 
+## 0.0.3
+
+### Patch Changes
+
+- [#21](https://github.com/customerio/ciolabs/pull/21) [`083e91f`](https://github.com/customerio/ciolabs/commit/083e91f429b22875da93997a41838fb5b8c02bab) Thanks [@avigoldman](https://github.com/avigoldman)! - Handle settinge the innerHTML of a self-closing tag
+
 ## 0.0.2
 
 ### Patch Changes
