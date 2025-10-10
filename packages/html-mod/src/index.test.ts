@@ -1456,6 +1456,16 @@ describe('HtmlModText', () => {
       expect(html.toString()).toBe('<div><strong>Bold</strong> and <em>italic</em> text with &nbsp; space</div>');
       expect(html.isFlushed()).toBe(false);
     });
+
+    test('should move from self-closing to standard tag when setting innerHTML', () => {
+      const html = new HtmlModule('<div/>');
+
+      const element = html.querySelector('div')!;
+      element.innerHTML = 'Content inside div';
+
+      expect(html.toString()).toBe('<div>Content inside div</div>');
+      expect(html.isFlushed()).toBe(false);
+    });
   });
 
   describe('toString', () => {
