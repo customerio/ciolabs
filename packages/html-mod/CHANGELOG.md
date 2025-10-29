@@ -1,5 +1,14 @@
 # @ciolabs/html-mod
 
+## 0.0.4
+
+### Patch Changes
+
+- [#23](https://github.com/customerio/ciolabs/pull/23) [`4b3dcad`](https://github.com/customerio/ciolabs/commit/4b3dcad877bb2cf95b87c0bd531ff3ee811af483) Thanks [@avigoldman](https://github.com/avigoldman)! - Fix valueless attribute source ranges
+
+- Updated dependencies [[`4b3dcad`](https://github.com/customerio/ciolabs/commit/4b3dcad877bb2cf95b87c0bd531ff3ee811af483)]:
+  - @ciolabs/htmlparser2-source@0.0.3
+
 ## 0.0.3
 
 ### Patch Changes

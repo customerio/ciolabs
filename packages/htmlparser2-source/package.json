@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/htmlparser2-source",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A wrapper around htmlparser2 that adds source range information to the AST",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",
