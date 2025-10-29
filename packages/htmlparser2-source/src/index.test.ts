@@ -648,4 +648,42 @@ describe('nodeToString', () => {
 
     expect(nodeToString(document)).toBe(source);
   });
+
+  test('should correctly calculate endIndex for valueless attributes', () => {
+    const source = `<div id="test" hidden class="test">content</div>`;
+    const document = parseDocument(source);
+    const [element] = document.children;
+
+    if (element.type !== ElementType.Tag) {
+      throw new Error('Expected element');
+    }
+
+    // First attribute: id="test"
+    expect(element.source.attributes[0].name.data).toBe('id');
+    expect(
+      source.slice(element.source.attributes[0].source.startIndex, element.source.attributes[0].source.endIndex + 1)
+    ).toBe('id="test"');
+
+    // Second attribute: hidden (valueless)
+    expect(element.source.attributes[1].name.data).toBe('hidden');
+    expect(element.source.attributes[1].value).toBe(null);
+
+    // The endIndex should NOT include the trailing space
+    expect(
+      source.slice(element.source.attributes[1].source.startIndex, element.source.attributes[1].source.endIndex + 1)
+    ).toBe('hidden');
+
+    // Third attribute: class="test"
+    expect(element.source.attributes[2].name.data).toBe('class');
+    expect(
+      source.slice(element.source.attributes[2].source.startIndex, element.source.attributes[2].source.endIndex + 1)
+    ).toBe('class="test"');
+
+    // Verify there's a space between hidden and class
+    const spaceBetween = source.slice(
+      element.source.attributes[1].source.endIndex + 1,
+      element.source.attributes[2].source.startIndex
+    );
+    expect(spaceBetween).toBe(' ');
+  });
 });

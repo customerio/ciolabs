@@ -362,7 +362,9 @@ export class SourceParser extends Parser {
   onattribend(quote: QuoteType, endIndex: number): void {
     // subtract 1 from the endIndex to be inclusive
     // if the quote is a double or single quote, then add 1 to the endIndex to include the quote
-    const endIndexWithQuote = endIndex - 1 + (quote === 3 || quote === 2 ? 1 : 0);
+    // For valueless attributes (quote === 0), use the name's endIndex to avoid including trailing whitespace
+    const endIndexWithQuote =
+      quote === 0 ? this.attributeSource!.name.endIndex : endIndex - 1 + (quote === 3 || quote === 2 ? 1 : 0);
 
     if (this.attributeSource) {
       this.attributeSource.source = {
