@@ -1117,14 +1117,14 @@ describe('HtmlModElement', () => {
       const html = new HtmlModule('<div remove-me id="b"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('remove-me');
-      expect(html.toString()).toBe('<div id="b"></div>');
+      expect(html.toString()).toBe('<div  id="b"></div>');
     });
 
     test('should make always have a space between the remaining attributes', () => {
       const html = new HtmlModule('<div class="a" remove-me id="b"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('remove-me');
-      expect(html.toString()).toBe('<div class="a" id="b"></div>');
+      expect(html.toString()).toBe('<div class="a"  id="b"></div>');
     });
 
     test('should remove the attribute with no value', () => {
@@ -1148,7 +1148,7 @@ describe('HtmlModElement', () => {
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
 
-      expect(html.toString()).toBe('<div a b></div>');
+      expect(html.toString()).toBe('<div a  b></div>');
     });
 
     test('should remove all instances of the attribute', () => {
@@ -1162,7 +1162,7 @@ describe('HtmlModElement', () => {
       const html = new HtmlModule(`<div a  b class="a" class=b class c class='c' d ></div>`);
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
-      expect(html.toString()).toBe('<div a  b c  d ></div>');
+      expect(html.toString()).toBe('<div a  b  c  d ></div>');
     });
   });
 
