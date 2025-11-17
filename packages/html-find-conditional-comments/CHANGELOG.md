@@ -1,5 +1,11 @@
 # @ciolabs/html-find-conditional-comments
 
+## 0.0.2
+
+### Patch Changes
+
+- [#25](https://github.com/customerio/ciolabs/pull/25) [`9be5018`](https://github.com/customerio/ciolabs/commit/9be50180861538ed04d6bf1965264e5c685ed723) Thanks [@avigoldman](https://github.com/avigoldman)! - Handle spaces in mso conditional comments
+
 ## 0.0.1
 
 ### Patch Changes
