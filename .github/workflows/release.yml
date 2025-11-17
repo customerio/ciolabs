@@ -4,13 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      test_mode:
-        description: 'Publish test versions (oidc-test-v0.0.0)'
-        required: false
-        type: boolean
-        default: false
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -48,22 +41,7 @@ jobs:
       - name: Build packages
         run: pnpm run build
 
-      - name: Set test versions if test mode
-        if: ${{ github.event.inputs.test_mode == 'true' }}
-        run: |
-          for pkg in packages/*/package.json; do
-            if [ -f "$pkg" ]; then
-              node -e "
-                const fs = require('fs');
-                const pkg = JSON.parse(fs.readFileSync('$pkg', 'utf8'));
-                pkg.version = 'oidc-test-v0.0.0';
-                fs.writeFileSync('$pkg', JSON.stringify(pkg, null, 2) + '\n');
-              "
-            fi
-          done
-
       - name: Create Release Pull Request or Publish to npm
-        if: ${{ github.event.inputs.test_mode != 'true' }}
         id: changesets
         uses: changesets/action@v1
         with:
@@ -73,14 +51,3 @@ jobs:
           title: 'chore: release packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish test versions
-        if: ${{ github.event.inputs.test_mode == 'true' }}
-        run: |
-          for pkg in packages/*; do
-            if [ -f "$pkg/package.json" ]; then
-              cd "$pkg"
-              npm publish --tag oidc-test --access public
-              cd ../..
-            fi
-          done
