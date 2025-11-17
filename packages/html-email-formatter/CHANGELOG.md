@@ -1,5 +1,12 @@
 # @ciolabs/html-email-formatter
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`9be5018`](https://github.com/customerio/ciolabs/commit/9be50180861538ed04d6bf1965264e5c685ed723)]:
+  - @ciolabs/html-find-conditional-comments@0.0.2
+
 ## 0.0.2
 
 ### Patch Changes
