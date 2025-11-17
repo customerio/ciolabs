@@ -87,6 +87,38 @@ describe('postprocess', () => {
   });
 });
 
+describe('new MSO comment format with spaces', () => {
+  it('should handle new format in getEmbeddedDocument', () => {
+    const source = `<div>
+    <!--[if !mso]><! -->some content<!-- <![endif]-->
+</div>`;
+
+    // The closing comment marker `<!-- <![endif]-->` (17 chars) is replaced with 17 spaces
+    expect(getEmbeddedDocument(source)).toBe(
+      `<div>
+                        some content` +
+        ' '.repeat(17) +
+        `
+</div>`
+    );
+  });
+
+  it('should handle old format in getEmbeddedDocument', () => {
+    const source = `<div>
+    <!--[if !mso]><!-->some content<!--<![endif]-->
+</div>`;
+
+    // The closing comment marker `<!--<![endif]-->` (16 chars) is replaced with 16 spaces
+    expect(getEmbeddedDocument(source)).toBe(
+      `<div>
+                       some content` +
+        ' '.repeat(16) +
+        `
+</div>`
+    );
+  });
+});
+
 describe('getEmbeddedDocument', () => {
   it('should do nothing if there are no conditional comments', () => {
     const source = `
