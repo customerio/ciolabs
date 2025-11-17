@@ -87,7 +87,7 @@ describe('postprocess', () => {
   });
 });
 
-describe('new MSO comment format with spaces (CON-5738)', () => {
+describe('new MSO comment format with spaces', () => {
   it('should handle new format in getEmbeddedDocument', () => {
     const source = `<div>
     <!--[if !mso]><! -->some content<!-- <![endif]-->

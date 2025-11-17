@@ -161,7 +161,7 @@ describe('findConditionalComments', () => {
     expect(result.length).toBe(0);
   });
 
-  test('handles new MSO comment format with spaces (CON-5738)', () => {
+  test('handles new MSO comment format with spaces', () => {
     // New format with space after <! and before -->
     const html = `<div>
     <!--[if !mso]><! -->some content<!-- <![endif]-->
