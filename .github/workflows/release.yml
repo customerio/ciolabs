@@ -47,12 +47,13 @@ jobs:
         run: |
           TEST_VERSION="0.0.0-oidc-test-$(date +%Y-%m-%d)"
           TEST_TAG="oidc-test-$(date +%Y-%m-%d)"
-          node -e "
-            const fs = require('fs');
-            const pkgPath = 'packages/framecast/package.json';
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            pkg.version = \"$TEST_VERSION\";
-            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-          "
+          # node -e "
+          #   const fs = require('fs');
+          #   const pkgPath = 'packages/framecast/package.json';
+          #   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          #   pkg.version = \"$TEST_VERSION\";
+          #   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          # "
           cd packages/framecast
-          npm publish --tag "$TEST_TAG" --access public
+          # npm publish --tag "$TEST_TAG" --access public
+          npm unpublish @ciolabs/framecast@"$TEST_VERSION"
