@@ -48,4 +48,4 @@ jobs:
           TEST_VERSION="0.0.0-oidc-test-$(date +%Y-%m-%d)"
           TEST_TAG="oidc-test-$(date +%Y-%m-%d)"
           cd packages/framecast
-          npm unpublish @ciolabs/framecast@"$TEST_VERSION"
+          npm unpublish @ciolabs/framecast@"$TEST_VERSION" --force || echo "Version may not exist or unpublish failed"
