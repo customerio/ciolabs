@@ -93,9 +93,14 @@ describe('new MSO comment format with spaces (CON-5738)', () => {
     <!--[if !mso]><! -->some content<!-- <![endif]-->
 </div>`;
 
-    expect(getEmbeddedDocument(source)).toBe(`<div>
-                     some content
-</div>`);
+    // The closing comment marker `<!-- <![endif]-->` (17 chars) is replaced with 17 spaces
+    expect(getEmbeddedDocument(source)).toBe(
+      `<div>
+                        some content` +
+        ' '.repeat(17) +
+        `
+</div>`
+    );
   });
 
   it('should handle old format in getEmbeddedDocument', () => {
@@ -103,9 +108,14 @@ describe('new MSO comment format with spaces (CON-5738)', () => {
     <!--[if !mso]><!-->some content<!--<![endif]-->
 </div>`;
 
-    expect(getEmbeddedDocument(source)).toBe(`<div>
-                    some content
-</div>`);
+    // The closing comment marker `<!--<![endif]-->` (16 chars) is replaced with 16 spaces
+    expect(getEmbeddedDocument(source)).toBe(
+      `<div>
+                       some content` +
+        ' '.repeat(16) +
+        `
+</div>`
+    );
   });
 });
 
