@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    types: [opened, synchronize, reopened]
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -43,9 +41,13 @@ jobs:
       - name: Build packages
         run: pnpm run build
 
-      - name: Publish test version
-        run: |
-          TEST_VERSION="0.0.0-oidc-test-$(date +%Y-%m-%d)"
-          TEST_TAG="oidc-test-$(date +%Y-%m-%d)"
-          cd packages/framecast
-          npm unpublish @ciolabs/framecast@"$TEST_VERSION" --force || echo "Version may not exist or unpublish failed"
+      - name: Create Release Pull Request or Publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: pnpm run changeset:publish
+          version: pnpm run changeset:version
+          commit: 'chore: release packages'
+          title: 'chore: release packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
