@@ -31,9 +31,9 @@ export interface ConditionalComment {
 }
 
 // Token regexes to support nested conditional comments
-const OPEN_REGEX = /<!(--)?\[if\s[\s\w!&()|]+]>(?:<!--+>)?/gi;
+const OPEN_REGEX = /<!(--)?\[if\s[\s\w!&()|]+]>(?:<!\s*--+>)?/gi;
 // Capture whether the close carries trailing dashes ("--") before '>' to enforce symmetry
-const CLOSE_REGEX = /(?:<!--)?<!\[endif](--)?>/gi;
+const CLOSE_REGEX = /(?:<!--\s*)?<!\[endif](--)?>/gi;
 
 /**
  * Finds the conditional comments in HTML.

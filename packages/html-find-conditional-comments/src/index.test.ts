@@ -160,4 +160,38 @@ describe('findConditionalComments', () => {
     const result = findConditionalComments(html);
     expect(result.length).toBe(0);
   });
+
+  test('handles new MSO comment format with spaces (CON-5738)', () => {
+    // New format with space after <! and before -->
+    const html = `<div>
+    <!--[if !mso]><! -->some content<!-- <![endif]-->
+</div>`;
+    const result = findConditionalComments(html);
+    expect(result.length).toBe(1);
+    expect(result[0]).toEqual({
+      bubble: true,
+      close: '<!-- <![endif]-->',
+      downlevel: 'revealed',
+      isComment: true,
+      open: '<!--[if !mso]><! -->',
+      range: [10, 59],
+    });
+  });
+
+  test('handles MSO comment format without spaces', () => {
+    // format without space
+    const html = `<div>
+    <!--[if !mso]><!-->some content<!--<![endif]-->
+</div>`;
+    const result = findConditionalComments(html);
+    expect(result.length).toBe(1);
+    expect(result[0]).toEqual({
+      bubble: true,
+      close: '<!--<![endif]-->',
+      downlevel: 'revealed',
+      isComment: true,
+      open: '<!--[if !mso]><!-->',
+      range: [10, 57],
+    });
+  });
 });

@@ -87,6 +87,28 @@ describe('postprocess', () => {
   });
 });
 
+describe('new MSO comment format with spaces (CON-5738)', () => {
+  it('should handle new format in getEmbeddedDocument', () => {
+    const source = `<div>
+    <!--[if !mso]><! -->some content<!-- <![endif]-->
+</div>`;
+
+    expect(getEmbeddedDocument(source)).toBe(`<div>
+                     some content
+</div>`);
+  });
+
+  it('should handle old format in getEmbeddedDocument', () => {
+    const source = `<div>
+    <!--[if !mso]><!-->some content<!--<![endif]-->
+</div>`;
+
+    expect(getEmbeddedDocument(source)).toBe(`<div>
+                    some content
+</div>`);
+  });
+});
+
 describe('getEmbeddedDocument', () => {
   it('should do nothing if there are no conditional comments', () => {
     const source = `
