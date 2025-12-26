@@ -190,7 +190,7 @@ results.push(
       const items = html.querySelectorAll('.item');
       items[0].dataset.first = 'true';
       html.flush();
-      html.querySelectorAll('.item'); // Re-query after flush
+      html.querySelectorAll('.item');
       items[50].dataset.middle = 'true';
       html.flush();
     },
@@ -198,7 +198,7 @@ results.push(
       const html = new HtmlModExperimental(complexHTML);
       const items = html.querySelectorAll('.item');
       items[0].dataset.first = 'true';
-      html.querySelectorAll('.item'); // Query after modification
+      html.querySelectorAll('.item');
       items[50].dataset.middle = 'true';
     },
     1000

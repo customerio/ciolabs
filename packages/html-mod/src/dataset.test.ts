@@ -10,7 +10,7 @@ describe('Dataset API', () => {
 
       div.dataset.userId = '123';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.userId).toBe('123');
       expect(html.toString()).toBe('<div data-user-id="123">content</div>');
@@ -29,7 +29,7 @@ describe('Dataset API', () => {
 
       delete div.dataset.userId;
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.userId).toBeNull();
       expect(html.toString()).toBe('<div>content</div>');
@@ -52,7 +52,7 @@ describe('Dataset API', () => {
       div.dataset.firstName = 'John';
       div.dataset.lastName = 'Doe';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.firstName).toBe('John');
       expect(div.dataset.lastName).toBe('Doe');
@@ -72,7 +72,7 @@ describe('Dataset API', () => {
 
       div.dataset.veryLongAttributeName = 'value';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.veryLongAttributeName).toBe('value');
     });
@@ -83,7 +83,7 @@ describe('Dataset API', () => {
 
       div.dataset.id = '123';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.id).toBe('123');
     });
@@ -98,7 +98,7 @@ describe('Dataset API', () => {
       div.dataset.name = 'test';
       div.dataset.active = 'true';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.id).toBe('123');
       expect(div.dataset.name).toBe('test');
@@ -125,7 +125,7 @@ describe('Dataset API', () => {
         div.dataset[`value${index}`] = String(index);
       }
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       for (let index = 0; index < 10; index++) {
         expect(div.dataset[`value${index}`]).toBe(String(index));
@@ -140,7 +140,7 @@ describe('Dataset API', () => {
 
       div.dataset.message = 'He said "hello"';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.message).toBe('He said "hello"');
     });
@@ -151,7 +151,7 @@ describe('Dataset API', () => {
 
       div.dataset.empty = '';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.empty).toBe('');
     });
@@ -162,7 +162,7 @@ describe('Dataset API', () => {
 
       div.dataset.count = '42';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.count).toBe('42');
     });
@@ -173,7 +173,7 @@ describe('Dataset API', () => {
 
       div.dataset.url = 'https://example.com?foo=bar&baz=qux';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.url).toBe('https://example.com?foo=bar&baz=qux');
     });
@@ -186,7 +186,7 @@ describe('Dataset API', () => {
 
       div.dataset.userId = '123';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.userId).toBe('123');
     });
@@ -197,7 +197,7 @@ describe('Dataset API', () => {
 
       div.dataset.userId = '123';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.userId).toBe('123');
     });
@@ -208,7 +208,7 @@ describe('Dataset API', () => {
 
       delete div.dataset.userId;
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.userId).toBeNull();
     });
@@ -243,7 +243,7 @@ describe('Dataset API', () => {
 
       div.dataset.count = '2';
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(div.dataset.count).toBe('2');
     });
@@ -255,13 +255,13 @@ describe('Dataset API', () => {
         let div = html.querySelector('div')!;
         div.dataset.temp = `value-${index}`;
         html.flush();
-        div = html.querySelector('div')!; // Re-query after flush
+        div = html.querySelector('div')!;
         expect(div.dataset.temp).toBe(`value-${index}`);
 
         div = html.querySelector('div')!;
         delete div.dataset.temp;
         html.flush();
-        div = html.querySelector('div')!; // Re-query after flush
+        div = html.querySelector('div')!;
         expect(div.dataset.temp).toBeNull();
       }
     });
@@ -282,7 +282,7 @@ describe('Dataset API', () => {
 
       const result = delete div.dataset.temp;
       html.flush();
-      div = html.querySelector('div')!; // Re-query after flush
+      div = html.querySelector('div')!;
 
       expect(result).toBe(true);
       expect(div.dataset.temp).toBeNull();
