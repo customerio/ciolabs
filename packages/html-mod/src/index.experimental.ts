@@ -316,7 +316,7 @@ export class HtmlModElement {
     return this.__element.attribs.class ?? '';
   }
 
-  get dataset() {
+  get dataset(): DOMStringMap {
     return new Proxy(
       {},
       {

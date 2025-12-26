@@ -382,7 +382,7 @@ export class HtmlModElement {
     return Object.keys(this.__element.attribs);
   }
 
-  get dataset() {
+  get dataset(): DOMStringMap {
     return new Proxy(
       {},
       {
