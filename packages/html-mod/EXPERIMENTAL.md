@@ -8,9 +8,9 @@ The **experimental auto-flush implementation** eliminates the need for manual `f
 
 - ✅ **4 benchmarks faster** than stable version
 - ✅ **Zero drift** over 10,000+ consecutive operations
-- ✅ **2.16x faster** for modify+query patterns (common in visual editors)
-- ✅ **598 tests passing** including adversarial and stress tests
-- ⚠️ **3.07x slower** for batched modifications (rare pattern)
+- ✅ **2.23x faster** for modify+query patterns (common in visual editors)
+- ✅ **661 tests passing** including adversarial and stress tests
+- ⚠️ **3.24x slower** for batched modifications (rare pattern)
 
 ---
 
@@ -119,18 +119,18 @@ AST updated instantly - no reparsing required!
 
 ### Benchmark Results (10,000 iterations each)
 
-| Benchmark                       | Stable      | Experimental | Winner                           |
-| ------------------------------- | ----------- | ------------ | -------------------------------- |
-| Parse simple HTML               | 6.43µs      | 5.48µs       | **Experimental 1.17x faster** ✅ |
-| Parse + setAttribute + flush    | 15.29µs     | 12.89µs      | **Experimental 1.19x faster** ✅ |
-| Parse + query (no mods)         | 6.87µs      | 6.79µs       | Tie (similar)                    |
-| **10 modifications + flush**    | **19.93µs** | **61.12µs**  | **Stable 3.07x faster** ⚠️       |
-| Parse complex HTML (100 elem)   | 291.40µs    | 279.64µs     | Tie (similar)                    |
-| **Modify + query pattern**      | **1.01ms**  | **466.74µs** | **Experimental 2.16x faster** ✅ |
-| innerHTML modification + flush  | 13.66µs     | 14.77µs      | Tie (similar)                    |
-| Remove element + flush          | 12.10µs     | 11.30µs      | Tie (similar)                    |
-| Parse deeply nested (50 levels) | 70.40µs     | 69.25µs      | Tie (similar)                    |
-| **Real-world template build**   | **43.84µs** | **34.05µs**  | **Experimental 1.29x faster** ✅ |
+| Benchmark                       | Stable       | Experimental | Winner                           |
+| ------------------------------- | ------------ | ------------ | -------------------------------- |
+| Parse simple HTML               | 6.62µs       | 5.35µs       | **Experimental 1.24x faster** ✅ |
+| Parse + setAttribute + flush    | 14.77µs      | 12.69µs      | **Experimental 1.16x faster** ✅ |
+| Parse + query (no mods)         | 7.07µs       | 6.55µs       | Tie (similar)                    |
+| **10 modifications + flush**    | **19.64µs**  | **63.67µs**  | **Stable 3.24x faster** ⚠️       |
+| Parse complex HTML (100 elem)   | 226.68µs     | 219.71µs     | Tie (similar)                    |
+| **Modify + query pattern**      | **788.69µs** | **352.88µs** | **Experimental 2.23x faster** ✅ |
+| innerHTML modification + flush  | 12.86µs      | 13.89µs      | Tie (similar)                    |
+| Remove element + flush          | 11.45µs      | 10.99µs      | Tie (similar)                    |
+| Parse deeply nested (50 levels) | 62.69µs      | 61.78µs      | Tie (similar)                    |
+| **Real-world template build**   | **36.58µs**  | **29.25µs**  | **Experimental 1.25x faster** ✅ |
 
 **Summary:**
 
@@ -142,19 +142,19 @@ AST updated instantly - no reparsing required!
 
 **Experimental is faster for:**
 
-- ✅ **Modify + query patterns** (2.16x faster) - Most common in visual editors
-- ✅ **Real-world templates** (1.29x faster) - Typical application usage
-- ✅ **Parse + setAttribute** (1.19x faster) - Common initialization pattern
-- ✅ **Simple parsing** (1.17x faster) - Faster initial load
+- ✅ **Modify + query patterns** (2.23x faster) - Most common in visual editors
+- ✅ **Real-world templates** (1.25x faster) - Typical application usage
+- ✅ **Simple parsing** (1.24x faster) - Faster initial load
+- ✅ **Parse + setAttribute** (1.16x faster) - Common initialization pattern
 
 **Stable is faster for:**
 
-- ⚠️ **Batched modifications** (3.07x faster) - 10 consecutive modifications without queries
-  - **Why?** Experimental updates AST after each modification; stable batches them
+- ⚠️ **Batched modifications** (3.24x faster) - 10 consecutive modifications without queries
+  - **Why?** Experimental updates AST and reconstructs openTag.data after each modification; stable batches them
   - **Frequency?** Rare in practice - visual editors interleave modifications with queries
   - **Workaround:** If truly needed, batch modifications then query
 
-**Key Insight:** The "modify + query" pattern is **2.16x faster** with experimental, and this is the **most common pattern** in visual editors:
+**Key Insight:** The "modify + query" pattern is **2.23x faster** with experimental, and this is the **most common pattern** in visual editors:
 
 ```javascript
 // Visual Editor Pattern (happens constantly)
@@ -171,7 +171,7 @@ With experimental: Each query uses already-synchronized AST (cheap).
 
 ## Reliability & Testing
 
-### Test Coverage: 598 Tests Passing ✅
+### Test Coverage: 661 Tests Passing ✅
 
 **Test Suites:**
 
@@ -179,10 +179,12 @@ With experimental: Each query uses already-synchronized AST (cheap).
 2. **Auto-flush edge cases** (159 tests) - Comprehensive edge case coverage
 3. **Dataset API** (58 tests) - Full dataset support (both versions now)
 4. **Adversarial tests** (84 tests) - Hostile input and stress testing
-5. **Drift prevention** (20 tests) - Long-running edit sequences (10,000 ops)
-6. **Quote handling** (30 tests) - All quote styles and edge cases
-7. **Data corruption prevention** (33 tests) - Multi-byte UTF-8, malformed HTML
-8. **Real-world scenarios** (22 tests) - ContentEditable, undo/redo, drag-drop
+5. **Source data synchronization** (37 tests) - Zero-drift guarantee with position validation
+6. **Drift prevention** (20 tests) - Long-running edit sequences (10,000 ops)
+7. **Quote handling** (30 tests) - All quote styles and edge cases
+8. **Data corruption prevention** (33 tests) - Multi-byte UTF-8, malformed HTML
+9. **Real-world scenarios** (22 tests) - ContentEditable, undo/redo, drag-drop
+10. **AST updater** (22 tests) - Position delta and AST synchronization
 
 ### Stress Testing
 
@@ -525,11 +527,11 @@ console.log(html.isFlushed()); // still true (always synchronized)
 | **Element references stay valid** | ❌ No (stale after flush) | ✅ Yes (always valid) |
 | **Dataset API**                   | ✅ Yes                    | ✅ Yes                |
 | **Malformed HTML support**        | ✅ Yes                    | ✅ Yes (better)       |
-| **Performance: Batched mods**     | ✅ 3.07x faster           | ⚠️ Slower             |
-| **Performance: Modify+query**     | ⚠️ Slower                 | ✅ 2.16x faster       |
-| **Performance: Real-world**       | ⚠️ Slower                 | ✅ 1.29x faster       |
-| **Zero drift guarantee**          | ✅ Yes                    | ✅ Yes                |
-| **Test coverage**                 | ✅ 196 tests              | ✅ 598 tests          |
+| **Performance: Batched mods**     | ✅ 3.24x faster           | ⚠️ Slower             |
+| **Performance: Modify+query**     | ⚠️ Slower                 | ✅ 2.23x faster       |
+| **Performance: Real-world**       | ⚠️ Slower                 | ✅ 1.25x faster       |
+| **Zero drift guarantee**          | ✅ Yes                    | ✅ Yes (enforced)     |
+| **Test coverage**                 | ✅ 196 tests              | ✅ 661 tests          |
 | **Visual editor support**         | ⚠️ Requires care          | ✅ Perfect fit        |
 | **Cognitive overhead**            | ⚠️ High                   | ✅ Zero               |
 
@@ -600,15 +602,16 @@ The **experimental auto-flush implementation** provides:
    - Zero cognitive overhead
 
 2. **✅ Better Performance for Real-World Usage**
-   - 2.16x faster for modify+query patterns
-   - 1.29x faster for real-world templates
+   - 2.23x faster for modify+query patterns
+   - 1.25x faster for real-world templates
    - Only slower for pure batch modifications (rare pattern)
 
 3. **✅ Production-Ready Quality**
-   - 598 tests passing
-   - Zero drift over 10,000+ operations
+   - 661 tests passing
+   - Zero drift over 10,000+ operations (enforced by architecture)
    - Handles malformed HTML gracefully
    - Comprehensive stress testing
+   - Source data always matches actual HTML (37 validation tests)
 
 4. **✅ Perfect Fit for Visual Editors**
    - ContentEditable support
