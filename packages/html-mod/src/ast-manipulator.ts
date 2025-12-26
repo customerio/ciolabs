@@ -4,10 +4,20 @@
  * This module provides functions to directly manipulate the AST structure
  * without reparsing, keeping the AST in sync with string modifications.
  */
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseDocument, SourceElement, SourceChildNode, isTag } from '@ciolabs/htmlparser2-source';
 import type { Options } from 'htmlparser2';
+
+/**
+ * Internal types for AST manipulation that expose mutable properties
+ * These properties exist at runtime but aren't in the public types
+ */
+type MutableNode = {
+  parent?: SourceElement;
+  children?: SourceChildNode[];
+};
+
+type MutableElement = SourceElement & MutableNode;
+type MutableChildNode = SourceChildNode & MutableNode;
 
 /**
  * Parse HTML string and create AST nodes positioned at a specific offset
@@ -76,52 +86,58 @@ function adjustNodePositions(nodes: SourceChildNode[], offset: number): void {
  * Replace all children of an element with new nodes
  */
 export function replaceChildren(element: SourceElement, newChildren: SourceChildNode[]): void {
+  const mutableElement = element as MutableElement;
+
   // Update parent references
   for (const child of newChildren) {
-    (child as any).parent = element;
+    (child as MutableChildNode).parent = element;
   }
 
   // Replace children array
-  element.children = newChildren as any;
+  mutableElement.children = newChildren;
 }
 
 /**
  * Append children to an element
  */
 export function appendChild(element: SourceElement, newChildren: SourceChildNode[]): void {
+  const mutableElement = element as MutableElement;
+
   // Update parent references
   for (const child of newChildren) {
-    (child as any).parent = element;
+    (child as MutableChildNode).parent = element;
   }
 
   // Append to children array
-  if (!element.children) {
-    element.children = [] as any;
+  if (!mutableElement.children) {
+    mutableElement.children = [];
   }
-  element.children.push(...(newChildren as any));
+  mutableElement.children.push(...newChildren);
 }
 
 /**
  * Prepend children to an element
  */
 export function prependChild(element: SourceElement, newChildren: SourceChildNode[]): void {
+  const mutableElement = element as MutableElement;
+
   // Update parent references
   for (const child of newChildren) {
-    (child as any).parent = element;
+    (child as MutableChildNode).parent = element;
   }
 
   // Prepend to children array
-  if (!element.children) {
-    element.children = [] as any;
+  if (!mutableElement.children) {
+    mutableElement.children = [];
   }
-  element.children.unshift(...(newChildren as any));
+  mutableElement.children.unshift(...newChildren);
 }
 
 /**
  * Insert children before a specific node in its parent
  */
 export function insertBefore(referenceNode: SourceChildNode, newChildren: SourceChildNode[]): void {
-  const parent = (referenceNode as any).parent;
+  const parent = (referenceNode as MutableChildNode).parent as MutableElement | undefined;
   if (!parent || !parent.children) {
     throw new Error('Cannot insert before node without parent');
   }
@@ -133,18 +149,18 @@ export function insertBefore(referenceNode: SourceChildNode, newChildren: Source
 
   // Update parent references
   for (const child of newChildren) {
-    (child as any).parent = parent;
+    (child as MutableChildNode).parent = parent;
   }
 
   // Insert at index
-  parent.children.splice(index, 0, ...(newChildren as any));
+  parent.children.splice(index, 0, ...newChildren);
 }
 
 /**
  * Insert children after a specific node in its parent
  */
 export function insertAfter(referenceNode: SourceChildNode, newChildren: SourceChildNode[]): void {
-  const parent = (referenceNode as any).parent;
+  const parent = (referenceNode as MutableChildNode).parent as MutableElement | undefined;
   if (!parent || !parent.children) {
     throw new Error('Cannot insert after node without parent');
   }
@@ -156,18 +172,18 @@ export function insertAfter(referenceNode: SourceChildNode, newChildren: SourceC
 
   // Update parent references
   for (const child of newChildren) {
-    (child as any).parent = parent;
+    (child as MutableChildNode).parent = parent;
   }
 
   // Insert after index
-  parent.children.splice(index + 1, 0, ...(newChildren as any));
+  parent.children.splice(index + 1, 0, ...newChildren);
 }
 
 /**
  * Remove a node from its parent
  */
 export function removeNode(node: SourceChildNode): void {
-  const parent = (node as any).parent;
+  const parent = (node as MutableChildNode).parent as MutableElement | undefined;
   if (!parent || !parent.children) {
     return;
   }
@@ -182,7 +198,7 @@ export function removeNode(node: SourceChildNode): void {
  * Replace a node with new children in its parent
  */
 export function replaceNode(oldNode: SourceChildNode, newChildren: SourceChildNode[]): void {
-  const parent = (oldNode as any).parent;
+  const parent = (oldNode as MutableChildNode).parent as MutableElement | undefined;
   if (!parent || !parent.children) {
     throw new Error('Cannot replace node without parent');
   }
@@ -194,11 +210,11 @@ export function replaceNode(oldNode: SourceChildNode, newChildren: SourceChildNo
 
   // Update parent references
   for (const child of newChildren) {
-    (child as any).parent = parent;
+    (child as MutableChildNode).parent = parent;
   }
 
   // Replace at index
-  parent.children.splice(index, 1, ...(newChildren as any));
+  parent.children.splice(index, 1, ...newChildren);
 }
 
 /**
@@ -216,10 +232,16 @@ export function setAttribute(
 ): void {
   if (!element.source) {
     element.source = {
-      openTag: { startIndex: element.startIndex, endIndex: element.startIndex },
+      openTag: {
+        startIndex: element.startIndex,
+        endIndex: element.startIndex,
+        data: `<${element.tagName}>`,
+        name: element.tagName,
+        isSelfClosing: false,
+      },
       closeTag: null,
       attributes: [],
-    } as any;
+    };
   }
 
   if (!element.source.attributes) {
@@ -312,6 +334,8 @@ export function convertToRegularTag(
     element.source.closeTag = {
       startIndex: closeTagStart,
       endIndex: closeTagEnd,
-    } as any;
+      data: `</${element.tagName}>`,
+      name: element.tagName,
+    };
   }
 }
