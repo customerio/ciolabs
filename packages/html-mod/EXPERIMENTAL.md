@@ -121,7 +121,8 @@ The experimental version is **100% API compatible** with the original:
 - All methods work identically
 - `flush()` is a no-op (kept for backwards compatibility)
 - `isFlushed()` always returns `true`
-- All tests pass (377/377)
+- All tests pass (457/457) ✅
+- Includes dataset API (browser-like data-\* attribute access)
 
 ## Implementation Details
 
@@ -144,7 +145,16 @@ After every modification:
 
 ## Testing
 
-All tests from the original implementation pass, plus 54 additional tests covering:
+### Comprehensive Test Coverage: 457 Tests ✅
+
+The experimental version includes extensive testing to ensure robustness:
+
+**Original Tests (196)**
+
+- Core functionality from original implementation
+- All existing behavior preserved
+
+**Auto-Flush Edge Cases (181)**
 
 - Clone behavior with modifications
 - replaceWith edge cases
@@ -155,10 +165,41 @@ All tests from the original implementation pass, plus 54 additional tests coveri
 - Cascading modifications
 - Document-level operations
 
+**Dataset API (32)**
+
+- Basic operations (get, set, delete, has)
+- CamelCase ↔ kebab-case conversion
+- Multiple attributes & enumeration
+- Type coercion
+- Special characters & unicode
+- Integration with setAttribute/getAttribute
+- Real-world patterns
+- Performance scenarios
+
+**Adversarial Tests (48)** 🔥
+
+- **Extreme Values**: 1MB attributes, 500KB innerHTML, 1000 attributes, 200 nesting levels, 10,000 siblings
+- **Malformed HTML**: Unclosed tags, mismatched tags, broken attributes, invalid nesting
+- **Rapid Sequential Operations**: 1000 setAttribute calls, 100 innerHTML changes, 500 add/remove cycles
+- **Edge Cases with Position Tracking**: Document boundaries, zero-length replacements, overlapping modifications
+- **Boundary Conditions**: Null-like values, empty attributes, whitespace-only content
+- **Stale Reference Handling**: Operations on removed elements and their siblings
+- **Unicode and Special Characters**: Complex unicode, emoji, RTL text, zero-width characters, surrogate pairs
+- **Memory and Performance Stress**: 1000 create/destroy cycles, 100 large documents
+- **AST Corruption Detection**: Complex operations maintaining AST integrity
+- **Dataset API Edge Cases**: 1000 attributes via dataset, extreme names, rapid changes
+- **Pathological Cases**: 1000 nesting levels, circular modification patterns
+
 Run tests:
 
 ```bash
 npm test
+```
+
+Run adversarial tests specifically:
+
+```bash
+npm test src/adversarial.experimental.test.ts
 ```
 
 ## Production Readiness

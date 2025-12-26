@@ -241,6 +241,7 @@ export function setAttribute(
     source: {
       startIndex: sourceStart,
       endIndex: sourceEnd,
+      data: '', // Empty string for now, not critical for functionality
     },
     quote,
   };

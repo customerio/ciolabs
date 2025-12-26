@@ -898,7 +898,8 @@ export class HtmlModElement {
       nameStart = contentStart + (hasLeadingSpace ? 1 : 0);
       valueStart = nameStart + name.length + 1 + (quoteChar ? 1 : 1); // +1 for =, +1 for quote
       sourceStart = contentStart + (hasLeadingSpace ? 1 : 0);
-      sourceEnd = contentStart + content.length - (hasTrailingSpace ? 1 : 0);
+      // sourceEnd should point to the LAST character of the attribute (inclusive), not past it
+      sourceEnd = contentStart + content.length - 1 - (hasTrailingSpace ? 1 : 0);
     }
 
     // 3. Apply deltas first

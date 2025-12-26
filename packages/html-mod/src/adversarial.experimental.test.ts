@@ -615,4 +615,541 @@ describe('Adversarial Tests - Experimental Auto-Flush', () => {
       expect(html.querySelector('#outer')).not.toBeNull();
     });
   });
+
+  describe('Position Tracking Hell - Same Position Operations', () => {
+    test('should handle modifying exact same attribute 1000 times', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      for (let index = 0; index < 1000; index++) {
+        div.setAttribute('id', `value-${index}`);
+      }
+
+      expect(div.getAttribute('id')).toBe('value-999');
+      expect(html.querySelector('#value-999')).not.toBeNull();
+    });
+
+    test('should handle rapid toggle of same attribute', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      for (let index = 0; index < 1000; index++) {
+        div.toggleAttribute('data-active');
+      }
+
+      // Should be false after even number of toggles
+      expect(div.hasAttribute('data-active')).toBe(false);
+    });
+
+    test('should handle multiple attributes added/removed at same position', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      // Add multiple attributes
+      div.setAttribute('a', '1');
+      div.setAttribute('b', '2');
+      div.setAttribute('c', '3');
+
+      // Remove in different order
+      div.removeAttribute('b');
+      div.setAttribute('d', '4');
+      div.removeAttribute('a');
+      div.setAttribute('e', '5');
+
+      expect(div.getAttribute('c')).toBe('3');
+      expect(div.getAttribute('d')).toBe('4');
+      expect(div.getAttribute('e')).toBe('5');
+      expect(div.hasAttribute('a')).toBe(false);
+      expect(div.hasAttribute('b')).toBe(false);
+    });
+
+    test('should handle zero-width operations at same position', () => {
+      const html = new HtmlMod('<div id="test">content</div>');
+      const div = html.querySelector('#test')!;
+
+      // These operations happen at almost the same position
+      div.setAttribute('a', '');
+      div.setAttribute('b', '');
+      div.setAttribute('c', '');
+
+      expect(div.hasAttribute('a')).toBe(true);
+      expect(div.hasAttribute('b')).toBe(true);
+      expect(div.hasAttribute('c')).toBe(true);
+    });
+  });
+
+  describe('Iterator Invalidation - Modify While Iterating', () => {
+    test('should handle modifying elements while iterating querySelectorAll', () => {
+      const html = new HtmlMod('<div><p>1</p><p>2</p><p>3</p><p>4</p><p>5</p></div>');
+      const paragraphs = html.querySelectorAll('p');
+
+      // Modify each element during iteration
+      for (const [index, p] of paragraphs.entries()) {
+        p.setAttribute('data-index', String(index));
+        p.innerHTML = `modified-${index}`;
+      }
+
+      // All modifications should succeed
+      expect(html.querySelector('[data-index="0"]')!.innerHTML).toBe('modified-0');
+      expect(html.querySelector('[data-index="4"]')!.innerHTML).toBe('modified-4');
+    });
+
+    test('should handle removing elements while iterating', () => {
+      const html = new HtmlMod('<div><span>1</span><span>2</span><span>3</span></div>');
+      const spans = html.querySelectorAll('span');
+
+      // Remove every other element
+      for (const [index, span] of spans.entries()) {
+        if (index % 2 === 0) {
+          span.remove();
+        }
+      }
+
+      expect(html.querySelectorAll('span').length).toBe(1);
+    });
+
+    test('should handle adding siblings while iterating', () => {
+      const html = new HtmlMod('<ul><li>1</li><li>2</li></ul>');
+      const ul = html.querySelector('ul')!;
+      const items = html.querySelectorAll('li');
+
+      // This changes the document structure during iteration
+      for (const item of items) {
+        item.after('<li>inserted</li>');
+      }
+
+      // Original 2 + 2 inserted = 4
+      expect(html.querySelectorAll('li').length).toBe(4);
+    });
+  });
+
+  describe('Position 0 and Boundary Edge Cases', () => {
+    test('should handle operations at exact position 0', () => {
+      const html = new HtmlMod('<div>content</div>');
+
+      // Operations at document start
+      html.trim();
+      const div = html.querySelector('div')!;
+      div.setAttribute('id', 'first');
+
+      expect(html.toString().startsWith('<div id="first">')).toBe(true);
+    });
+
+    test('should handle prepend on first element multiple times', () => {
+      const html = new HtmlMod('<div>original</div>');
+      const div = html.querySelector('div')!;
+
+      div.prepend('first');
+      div.prepend('second');
+      div.prepend('third');
+
+      expect(div.innerHTML).toBe('thirdsecondfirstoriginal');
+    });
+
+    test('should handle document-level trim operations', () => {
+      const html = new HtmlMod('   <div>content</div>   ');
+
+      html.trim();
+      expect(html.toString()).toBe('<div>content</div>');
+
+      const div = html.querySelector('div')!;
+      div.setAttribute('id', 'test');
+
+      expect(html.querySelector('#test')).not.toBeNull();
+    });
+
+    test('should handle operations at exact document end', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      div.after('<p>after</p>');
+      div.after('<span>more</span>');
+
+      // Second after() inserts between div and first insertion
+      expect(html.toString()).toBe('<div>content</div><span>more</span><p>after</p>');
+      expect(html.toString().endsWith('</p>')).toBe(true);
+    });
+  });
+
+  describe('Off-by-One and Boundary Errors', () => {
+    test('should handle overlapping modifications in parent and child', () => {
+      const html = new HtmlMod('<div><span>text</span></div>');
+      const div = html.querySelector('div')!;
+      const span = html.querySelector('span')!;
+
+      // Modify child
+      span.setAttribute('id', 'child');
+
+      // Then modify parent in a way that shifts child's position
+      div.prepend('<header>top</header>');
+
+      // Child should still be queryable with correct attributes
+      const foundSpan = html.querySelector('#child');
+      expect(foundSpan).not.toBeNull();
+      expect(foundSpan!.textContent).toBe('text');
+    });
+
+    test('should handle setAttribute with exact boundary values', () => {
+      const html = new HtmlMod('<div id="old">content</div>');
+      const div = html.querySelector('div')!;
+
+      // Replace attribute value with same length
+      div.setAttribute('id', 'new');
+      expect(div.getAttribute('id')).toBe('new');
+
+      // Replace with longer
+      div.setAttribute('id', 'muchlonger');
+      expect(div.getAttribute('id')).toBe('muchlonger');
+
+      // Replace with shorter
+      div.setAttribute('id', 'x');
+      expect(div.getAttribute('id')).toBe('x');
+    });
+
+    test('should handle innerHTML that changes element length dramatically', () => {
+      const html = new HtmlMod('<div><p>x</p></div>');
+      const p = html.querySelector('p')!;
+
+      // Shrink
+      p.innerHTML = '';
+      expect(html.toString()).toBe('<div><p></p></div>');
+
+      // Expand massively
+      p.innerHTML = 'x'.repeat(1000);
+      expect(p.innerHTML.length).toBe(1000);
+
+      // Shrink again
+      p.innerHTML = 'y';
+      expect(p.innerHTML).toBe('y');
+    });
+
+    test('should handle removing first vs last vs middle sibling', () => {
+      const html = new HtmlMod('<div><a>1</a><b>2</b><c>3</c><d>4</d><e>5</e></div>');
+
+      // Remove first
+      html.querySelector('a')!.remove();
+      expect(html.querySelectorAll('*').length).toBe(5); // div + 4 children
+
+      // Remove last
+      html.querySelector('e')!.remove();
+      expect(html.querySelectorAll('*').length).toBe(4);
+
+      // Remove middle
+      html.querySelector('c')!.remove();
+      expect(html.querySelectorAll('*').length).toBe(3);
+
+      // Remaining should be queryable
+      expect(html.querySelector('b')).not.toBeNull();
+      expect(html.querySelector('d')).not.toBeNull();
+    });
+  });
+
+  describe('Malicious Attribute Values', () => {
+    test('should handle attribute values with HTML-like content', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      div.setAttribute('data-html', '<script>alert("xss")</script>');
+      expect(div.getAttribute('data-html')).toBe('<script>alert("xss")</script>');
+    });
+
+    test('should handle attribute values with quotes and escapes', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      div.setAttribute('data-quotes', 'He said "hello" and \'goodbye\'');
+      expect(div.getAttribute('data-quotes')).toBe('He said "hello" and \'goodbye\'');
+    });
+
+    test('should handle attribute values with newlines and special chars', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      div.setAttribute('data-special', 'line1\nline2\ttab\rcarriage');
+      expect(div.getAttribute('data-special')).toContain('line1');
+      expect(div.getAttribute('data-special')).toContain('line2');
+    });
+
+    test('should handle attribute values that could break position tracking', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      // Value that looks like position indices
+      div.setAttribute('data-pos', '0:100:200:300');
+      expect(div.getAttribute('data-pos')).toBe('0:100:200:300');
+    });
+  });
+
+  describe('Self-Closing Tag Conversion Hell', () => {
+    test('should handle nested self-closing conversions', () => {
+      const html = new HtmlMod('<div/><span/><p/>');
+
+      const div = html.querySelector('div')!;
+      const span = html.querySelector('span')!;
+      const p = html.querySelector('p')!;
+
+      // Convert all to non-self-closing by adding content
+      div.innerHTML = 'div content';
+      span.innerHTML = 'span content';
+      p.innerHTML = 'p content';
+
+      expect(html.toString()).toBe('<div>div content</div><span>span content</span><p>p content</p>');
+
+      // All should still be queryable
+      expect(html.querySelector('div')!.innerHTML).toBe('div content');
+      expect(html.querySelector('span')!.innerHTML).toBe('span content');
+      expect(html.querySelector('p')!.innerHTML).toBe('p content');
+    });
+
+    test('should handle converting self-closing to non-self-closing back to self-closing', () => {
+      const html = new HtmlMod('<br/>');
+      const br = html.querySelector('br')!;
+
+      // Add content (converts to non-self-closing)
+      br.innerHTML = 'content';
+      expect(html.toString()).toContain('content');
+
+      // Empty it (might convert back depending on implementation)
+      br.innerHTML = '';
+
+      // Should still be queryable
+      expect(html.querySelector('br')).not.toBeNull();
+    });
+
+    test('should handle prepend on self-closing tag', () => {
+      const html = new HtmlMod('<div/>');
+      const div = html.querySelector('div')!;
+
+      // This should convert to non-self-closing
+      div.prepend('<span>prepended</span>');
+
+      expect(html.toString()).toContain('prepended');
+      expect(html.querySelector('span')).not.toBeNull();
+    });
+
+    test('should handle append on self-closing tag', () => {
+      const html = new HtmlMod('<div/>');
+      const div = html.querySelector('div')!;
+
+      div.append('<span>appended</span>');
+
+      expect(html.toString()).toContain('appended');
+      expect(html.querySelector('span')).not.toBeNull();
+    });
+  });
+
+  describe('Parent-Child Reference Chaos', () => {
+    test("should handle modifying removed element's former siblings", () => {
+      const html = new HtmlMod('<div><a>1</a><b>2</b><c>3</c></div>');
+      const b = html.querySelector('b')!;
+      const c = html.querySelector('c')!;
+
+      // Remove middle element
+      b.remove();
+
+      // Modify its former sibling
+      c.setAttribute('id', 'modified');
+
+      expect(html.querySelector('#modified')).not.toBeNull();
+      expect(html.toString()).toBe('<div><a>1</a><c id="modified">3</c></div>');
+    });
+
+    test('should handle removing parent while holding child reference', () => {
+      const html = new HtmlMod('<div><p><span>text</span></p></div>');
+      const p = html.querySelector('p')!;
+      const span = html.querySelector('span')!;
+
+      // Remove parent
+      p.remove();
+
+      // Try to query for child - should not find it
+      expect(html.querySelector('span')).toBeNull();
+
+      // But we can still read the removed element's properties
+      expect(span.textContent).toBe('text');
+    });
+
+    test('should handle deeply nested removal and sibling modification', () => {
+      const html = new HtmlMod('<div><section><article><p>1</p><p>2</p></article></section></div>');
+      const article = html.querySelector('article')!;
+      const p2 = html.querySelectorAll('p')[1];
+
+      // Remove container
+      article.remove();
+
+      // Add something new where article was
+      const section = html.querySelector('section')!;
+      section.innerHTML = '<p id="new">new</p>';
+
+      expect(html.querySelector('#new')).not.toBeNull();
+      expect(html.querySelectorAll('p').length).toBe(1);
+    });
+  });
+
+  describe('Extreme Text Content Edge Cases', () => {
+    test('should handle textContent with only whitespace variations', () => {
+      const html = new HtmlMod('<p>original</p>');
+      const p = html.querySelector('p')!;
+
+      p.textContent = '   ';
+      expect(p.textContent).toBe('   ');
+
+      p.textContent = '\n\n\n';
+      expect(p.textContent).toBe('\n\n\n');
+
+      p.textContent = '\t\t\t';
+      expect(p.textContent).toBe('\t\t\t');
+    });
+
+    test('should handle textContent with null bytes', () => {
+      const html = new HtmlMod('<p>original</p>');
+      const p = html.querySelector('p')!;
+
+      p.textContent = 'before\u0000after';
+      expect(p.textContent).toContain('before');
+    });
+
+    test('should handle innerHTML with incomplete tags', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      // Parser should handle this gracefully
+      div.innerHTML = '<p>text';
+
+      // Should not crash
+      expect(html.toString()).toContain('text');
+    });
+  });
+
+  describe('Query After Chaos', () => {
+    test('should correctly query after 100 mixed operations', () => {
+      const html = new HtmlMod('<div id="root"><p>start</p></div>');
+      const root = html.querySelector('#root')!;
+
+      for (let index = 0; index < 100; index++) {
+        if (index % 5 === 0) {
+          root.setAttribute(`data-${index}`, String(index));
+        } else if (index % 5 === 1) {
+          root.prepend(`<span class="pre-${index}">pre</span>`);
+        } else if (index % 5 === 2) {
+          root.append(`<span class="post-${index}">post</span>`);
+        } else if (index % 5 === 3) {
+          const spans = html.querySelectorAll('span');
+          if (spans.length > 0) {
+            spans[0].remove();
+          }
+        } else {
+          const p = html.querySelector('p');
+          if (p) {
+            p.innerHTML = `iteration-${index}`;
+          }
+        }
+      }
+
+      // Should still be able to query
+      expect(html.querySelector('#root')).not.toBeNull();
+      expect(html.querySelectorAll('span').length).toBeGreaterThan(0);
+    });
+
+    test('should handle complex selector after extreme modifications', () => {
+      const html = new HtmlMod(
+        '<div><section><article class="post" data-id="1"><h1>Title</h1></article></section></div>'
+      );
+
+      const article = html.querySelector('article.post[data-id="1"]')!;
+      article.setAttribute('data-modified', 'true');
+
+      const h1 = html.querySelector('h1')!;
+      h1.innerHTML = 'Modified Title';
+
+      // Complex selector should still work
+      expect(html.querySelector('section > article.post[data-modified="true"] > h1')).not.toBeNull();
+    });
+  });
+
+  describe('Dataset API Under Stress', () => {
+    test('should handle dataset during rapid innerHTML changes', () => {
+      const html = new HtmlMod('<div data-id="1">content</div>');
+      const div = html.querySelector('div')!;
+
+      for (let index = 0; index < 100; index++) {
+        div.innerHTML = `content-${index}`;
+        div.dataset.iteration = String(index);
+      }
+
+      expect(div.dataset.iteration).toBe('99');
+      expect(div.dataset.id).toBe('1');
+    });
+
+    test('should handle dataset with camelCase edge cases', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      // Edge cases for camelCase conversion
+      div.dataset.a = '1';
+      div.dataset.aB = '2';
+      div.dataset.aBc = '3';
+      div.dataset.aBcD = '4';
+
+      expect(div.getAttribute('data-a')).toBe('1');
+      expect(div.getAttribute('data-a-b')).toBe('2');
+      expect(div.getAttribute('data-a-bc')).toBe('3');
+      expect(div.getAttribute('data-a-bc-d')).toBe('4');
+    });
+
+    test('should handle mixing dataset and setAttribute on same attributes', () => {
+      const html = new HtmlMod('<div>content</div>');
+      const div = html.querySelector('div')!;
+
+      div.dataset.id = '1';
+      div.setAttribute('data-id', '2');
+      expect(div.dataset.id).toBe('2');
+
+      div.setAttribute('data-name', 'foo');
+      expect(div.dataset.name).toBe('foo');
+
+      div.dataset.name = 'bar';
+      expect(div.getAttribute('data-name')).toBe('bar');
+    });
+  });
+
+  describe('Memory Leak Potential', () => {
+    test('should not leak with circular-like innerHTML operations', () => {
+      const html = new HtmlMod('<div id="a"><div id="b">content</div></div>');
+
+      for (let index = 0; index < 100; index++) {
+        const a = html.querySelector('#a')!;
+        const b = html.querySelector('#b')!;
+
+        // Create circular-like pattern
+        const aHtml = a.outerHTML;
+        const bHtml = b.outerHTML;
+
+        b.innerHTML = 'updated';
+        a.setAttribute('data-iter', String(index));
+      }
+
+      // Should not crash or leak
+      expect(html.querySelector('#a')).not.toBeNull();
+    });
+
+    test('should handle holding references to 1000 removed elements', () => {
+      const html = new HtmlMod('<div></div>');
+      const div = html.querySelector('div')!;
+
+      const removedElements = [];
+
+      for (let index = 0; index < 1000; index++) {
+        div.innerHTML = `<p id="p-${index}">text</p>`;
+        const p = html.querySelector('p')!;
+        removedElements.push(p);
+        p.remove();
+      }
+
+      // All removed elements should still have their cached content
+      for (let index = 0; index < 1000; index++) {
+        expect(removedElements[index].textContent).toBe('text');
+      }
+    });
+  });
 });
