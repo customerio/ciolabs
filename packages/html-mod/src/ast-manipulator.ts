@@ -4,7 +4,7 @@
  * This module provides functions to directly manipulate the AST structure
  * without reparsing, keeping the AST in sync with string modifications.
  */
-import { parseDocument, SourceElement, SourceChildNode, isTag } from '@ciolabs/htmlparser2-source';
+import { parseDocument, SourceElement, SourceChildNode, SourceText, isTag } from '@ciolabs/htmlparser2-source';
 import type { Options } from 'htmlparser2';
 
 /**
@@ -251,6 +251,7 @@ export function setAttribute(
   // Find existing attribute
   const existingIndex = element.source.attributes.findIndex(a => a.name.data === name);
 
+  const quoteChar = quote === '"' ? '"' : quote === "'" ? "'" : '';
   const attribute = {
     name: {
       data: name,
@@ -265,6 +266,7 @@ export function setAttribute(
     source: {
       startIndex: sourceStart,
       endIndex: sourceEnd,
+      data: `${name}=${quoteChar}${value}${quoteChar}`,
     },
     quote,
   };
@@ -312,7 +314,7 @@ export function setTagName(element: SourceElement, tagName: string): void {
 /**
  * Update text node data
  */
-export function setTextData(text: any, data: string): void {
+export function setTextData(text: SourceText, data: string): void {
   text.data = data;
 }
 
