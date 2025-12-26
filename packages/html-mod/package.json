@@ -30,7 +30,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "benchmark": "npm run build && node dist/benchmark.mjs"
   },
   "dependencies": {
     "@ciolabs/htmlparser2-source": "workspace:*",

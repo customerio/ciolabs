@@ -1,6 +1,7 @@
-import { describe, expect, test } from 'vitest';
 import { parseDocument } from '@ciolabs/htmlparser2-source';
-import { AstUpdater } from './ast-updater.js';
+import { describe, expect, test } from 'vitest';
+
+import { AstUpdater } from './ast-updater.experimental.js';
 import {
   calculateOverwriteDelta,
   calculateAppendRightDelta,
@@ -8,7 +9,7 @@ import {
   calculateRemoveDelta,
   shouldUpdatePosition,
   applyDeltaToPosition,
-} from './position-delta.js';
+} from './position-delta.experimental.js';
 
 describe('position-delta', () => {
   describe('calculateOverwriteDelta', () => {
@@ -66,7 +67,7 @@ describe('position-delta', () => {
       expect(shouldUpdatePosition(10, delta)).toBe(false);
       expect(shouldUpdatePosition(11, delta)).toBe(false); // Within overwritten region
       expect(shouldUpdatePosition(14, delta)).toBe(false); // Within overwritten region
-      expect(shouldUpdatePosition(15, delta)).toBe(true);  // At end of overwritten region
+      expect(shouldUpdatePosition(15, delta)).toBe(true); // At end of overwritten region
       expect(shouldUpdatePosition(20, delta)).toBe(true);
     });
 
@@ -154,17 +155,17 @@ describe('AstUpdater', () => {
       const updater = new AstUpdater();
 
       const div = doc.children[0];
-      const classAttr = div.source.attributes.find(a => a.name.data === 'class')!;
+      const classAttribute = div.source.attributes.find(a => a.name.data === 'class')!;
 
-      const originalNameStart = classAttr.name.startIndex;
-      const originalValueStart = classAttr.value!.startIndex;
+      const originalNameStart = classAttribute.name.startIndex;
+      const originalValueStart = classAttribute.value!.startIndex;
 
       // Simulate insertion before the div
       const delta = calculatePrependLeftDelta(0, 'XX');
       updater.updateNodePositions(doc, delta);
 
-      expect(classAttr.name.startIndex).toBe(originalNameStart + 2);
-      expect(classAttr.value!.startIndex).toBe(originalValueStart + 2);
+      expect(classAttribute.name.startIndex).toBe(originalNameStart + 2);
+      expect(classAttribute.value!.startIndex).toBe(originalValueStart + 2);
     });
 
     test('updates text node positions', () => {

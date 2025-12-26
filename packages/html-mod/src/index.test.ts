@@ -178,32 +178,28 @@ describe('HtmlMod', () => {
 
     test('trim()', () => {
       const html = new HtmlModule('   <div>invalid html  ');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.trim().isFlushed()).toBe(true);
+      expect(html.trim().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trimStart()', () => {
       const html = new HtmlModule('   <div>invalid html  ');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.trimStart().isFlushed()).toBe(true);
+      expect(html.trimStart().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trimEnd()', () => {
       const html = new HtmlModule('   <div>invalid html  ');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.trimEnd().isFlushed()).toBe(true);
+      expect(html.trimEnd().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
 
     test('trimLines()', () => {
       const html = new HtmlModule('\n  <div>invalid html  \n');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.trimLines().isFlushed()).toBe(true);
+      expect(html.trimLines().isFlushed()).toBe(false);
       html.flush();
       expect(html.isFlushed()).toBe(true);
     });
@@ -212,8 +208,7 @@ describe('HtmlMod', () => {
       const html = new HtmlModule('  <div>invalid html');
       html.trim();
       const html2 = html.clone();
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
       expect(html2.isFlushed()).toBe(true);
     });
   });
@@ -548,13 +543,11 @@ describe('HtmlModElement', () => {
       expect(element.children).toEqual([]);
     });
 
-    test('should return wrapped children instances', () => {
+    test('should be a raw pass-through to the children array', () => {
       const html = new HtmlModule('<div><span></span></div>');
       const element = html.querySelector('div')!;
       expect(element.children).toBeInstanceOf(Array);
-      expect(element.children.length).toBe(1);
-      expect(element.children[0]).toBeInstanceOf(HtmlModuleElement);
-      expect((element.children[0] as HtmlModuleElement).__element).toBe(html.querySelector('span')!.__element);
+      expect(element.children).toEqual([html.querySelector('span')!.__element]);
     });
   });
 
@@ -1124,14 +1117,14 @@ describe('HtmlModElement', () => {
       const html = new HtmlModule('<div remove-me id="b"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('remove-me');
-      expect(html.toString()).toBe('<div id="b"></div>');
+      expect(html.toString()).toBe('<div  id="b"></div>');
     });
 
     test('should make always have a space between the remaining attributes', () => {
       const html = new HtmlModule('<div class="a" remove-me id="b"></div>');
       const element = html.querySelector('div')!;
       element.removeAttribute('remove-me');
-      expect(html.toString()).toBe('<div class="a" id="b"></div>');
+      expect(html.toString()).toBe('<div class="a"  id="b"></div>');
     });
 
     test('should remove the attribute with no value', () => {
@@ -1155,7 +1148,7 @@ describe('HtmlModElement', () => {
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
 
-      expect(html.toString()).toBe('<div a b></div>');
+      expect(html.toString()).toBe('<div a  b></div>');
     });
 
     test('should remove all instances of the attribute', () => {
@@ -1169,7 +1162,7 @@ describe('HtmlModElement', () => {
       const html = new HtmlModule(`<div a  b class="a" class=b class c class='c' d ></div>`);
       const element = html.querySelector('div')!;
       element.removeAttribute('class');
-      expect(html.toString()).toBe('<div a  b c d ></div>');
+      expect(html.toString()).toBe('<div a  b  c  d ></div>');
     });
   });
 
@@ -1259,10 +1252,11 @@ describe('HtmlModText', () => {
     test('should create a HtmlModText instance', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText; // Access the raw text node
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText).toBeInstanceOf(HtmlModText);
-      expect(htmlModText.__text.type).toBe('text');
+      expect(htmlModText.__text).toBe(textNode);
       expect(htmlModText.__htmlMod).toBe(html);
     });
   });
@@ -1271,7 +1265,8 @@ describe('HtmlModText', () => {
     test('should get the decoded text content', () => {
       const html = new HtmlModule('<div>Hello &amp; world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.textContent).toBe('Hello & world');
     });
@@ -1279,7 +1274,8 @@ describe('HtmlModText', () => {
     test('should get plain text content', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.textContent).toBe('Hello world');
     });
@@ -1287,7 +1283,8 @@ describe('HtmlModText', () => {
     test('should decode multiple HTML entities', () => {
       const html = new HtmlModule('<div>&lt;test &amp; value&gt;</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.textContent).toBe('<test & value>');
     });
@@ -1295,46 +1292,47 @@ describe('HtmlModText', () => {
     test('should set the text content and escape HTML', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.textContent = 'New <text> & content';
 
       expect(html.toString()).toBe('<div>New &lt;text&gt; &amp; content</div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should set plain text content', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.textContent = 'New content';
 
       expect(html.toString()).toBe('<div>New content</div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should handle empty string', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.textContent = '';
 
       expect(html.toString()).toBe('<div></div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should not modify if text node has no endIndex', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
       // Remove endIndex to simulate a text node without position info
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (htmlModText.__text as any).endIndex;
+      delete (textNode as any).endIndex;
+      const htmlModText = new HtmlModText(textNode, html);
 
       const originalHtml = html.toString();
       htmlModText.textContent = 'New content';
@@ -1348,7 +1346,8 @@ describe('HtmlModText', () => {
     test('should return the raw text data with entities', () => {
       const html = new HtmlModule('<div>Hello &amp; world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.innerHTML).toBe('Hello &amp; world');
     });
@@ -1356,7 +1355,8 @@ describe('HtmlModText', () => {
     test('should return plain text', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.innerHTML).toBe('Hello world');
     });
@@ -1364,7 +1364,8 @@ describe('HtmlModText', () => {
     test('should return text with multiple entities unchanged', () => {
       const html = new HtmlModule('<div>&lt;test &amp; value&gt;</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.innerHTML).toBe('&lt;test &amp; value&gt;');
     });
@@ -1386,7 +1387,8 @@ describe('HtmlModText', () => {
     test('should be identical to toString()', () => {
       const html = new HtmlModule('<div>Hello &nbsp; &amp; world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.innerHTML).toBe(htmlModText.toString());
     });
@@ -1394,46 +1396,47 @@ describe('HtmlModText', () => {
     test('should set raw HTML content without escaping', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.innerHTML = 'New <span>content</span> &amp; more';
 
       expect(html.toString()).toBe('<div>New <span>content</span> &amp; more</div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should set HTML entities without decoding', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.innerHTML = '&lt;test &amp; value&gt;';
 
       expect(html.toString()).toBe('<div>&lt;test &amp; value&gt;</div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should handle empty string', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.innerHTML = '';
 
       expect(html.toString()).toBe('<div></div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should not modify if text node has no endIndex', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
       // Remove endIndex to simulate a text node without position info
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (htmlModText.__text as any).endIndex;
+      delete (textNode as any).endIndex;
+      const htmlModText = new HtmlModText(textNode, html);
 
       const originalHtml = html.toString();
       htmlModText.innerHTML = '<span>New content</span>';
@@ -1445,13 +1448,13 @@ describe('HtmlModText', () => {
     test('should allow setting complex HTML structures', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.innerHTML = '<strong>Bold</strong> and <em>italic</em> text with &nbsp; space';
 
       expect(html.toString()).toBe('<div><strong>Bold</strong> and <em>italic</em> text with &nbsp; space</div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
 
     test('should move from self-closing to standard tag when setting innerHTML', () => {
@@ -1461,8 +1464,7 @@ describe('HtmlModText', () => {
       element.innerHTML = 'Content inside div';
 
       expect(html.toString()).toBe('<div>Content inside div</div>');
-      // AST is automatically kept in sync, so isFlushed() always returns true
-      expect(html.isFlushed()).toBe(true);
+      expect(html.isFlushed()).toBe(false);
     });
   });
 
@@ -1470,7 +1472,8 @@ describe('HtmlModText', () => {
     test('should return the raw text data', () => {
       const html = new HtmlModule('<div>Hello &amp; world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.toString()).toBe('Hello &amp; world');
     });
@@ -1478,7 +1481,8 @@ describe('HtmlModText', () => {
     test('should return plain text', () => {
       const html = new HtmlModule('<div>Hello world</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       expect(htmlModText.toString()).toBe('Hello world');
     });
@@ -1505,8 +1509,10 @@ describe('HtmlModText', () => {
 
       const element1 = html1.querySelector('div')!;
       const element2 = html2.querySelector('div')!;
-      const htmlModText1 = element1.children[0] as HtmlModText;
-      const htmlModText2 = element2.children[0] as HtmlModText;
+      const textNode1 = element1.children[0] as SourceText;
+      const textNode2 = element2.children[0] as SourceText;
+      const htmlModText1 = new HtmlModText(textNode1, html1);
+      const htmlModText2 = new HtmlModText(textNode2, html2);
 
       const testContent = '<span>Bold</span> & italic';
 
@@ -1525,8 +1531,10 @@ describe('HtmlModText', () => {
 
       const element1 = html1.querySelector('div')!;
       const element2 = html2.querySelector('div')!;
-      const htmlModText1 = element1.children[0] as HtmlModText;
-      const htmlModText2 = element2.children[0] as HtmlModText;
+      const textNode1 = element1.children[0] as SourceText;
+      const textNode2 = element2.children[0] as SourceText;
+      const htmlModText1 = new HtmlModText(textNode1, html1);
+      const htmlModText2 = new HtmlModText(textNode2, html2);
 
       const entityContent = '&lt;test&gt; &amp; &nbsp;';
 
@@ -1544,7 +1552,8 @@ describe('HtmlModText', () => {
     test('should work with text nodes containing special characters', () => {
       const html = new HtmlModule('<div>Hello\nworld\ttab &nbsp; space</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       // &nbsp; gets decoded to a non-breaking space character (\u00a0)
       expect(htmlModText.textContent).toBe('Hello\nworld\ttab \u00A0 space');
@@ -1555,7 +1564,8 @@ describe('HtmlModText', () => {
       const html = new HtmlModule('<div>Before <span>middle</span> after</div>');
       const element = html.querySelector('div')!;
       // Get the first text node (before the span)
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.textContent = 'Start ';
 
@@ -1565,7 +1575,8 @@ describe('HtmlModText', () => {
     test('should work with multiple text modifications', () => {
       const html = new HtmlModule('<div>First text</div>');
       const element = html.querySelector('div')!;
-      const htmlModText = element.children[0] as HtmlModText;
+      const textNode = element.children[0] as SourceText;
+      const htmlModText = new HtmlModText(textNode, html);
 
       htmlModText.textContent = 'Second text';
       expect(html.toString()).toBe('<div>Second text</div>');

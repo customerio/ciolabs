@@ -1,5 +1,7 @@
+/* eslint-disable unicorn/prefer-dom-node-dataset */
 import { describe, expect, test } from 'vitest';
-import { HtmlMod, HtmlModText } from './index.js';
+
+import { HtmlMod, HtmlModText } from './index.experimental.js';
 
 describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
   describe('Chained Modifications with Queries', () => {
@@ -25,10 +27,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should handle deep modification chains', () => {
       const html = new HtmlMod('<div><p><span>text</span></p></div>');
 
-      for (let i = 0; i < 10; i++) {
+      for (let index = 0; index < 10; index++) {
         const span = html.querySelector('span')!;
-        span.innerHTML = `iteration-${i}`;
-        expect(html.querySelector('span')!.innerHTML).toBe(`iteration-${i}`);
+        span.innerHTML = `iteration-${index}`;
+        expect(html.querySelector('span')!.innerHTML).toBe(`iteration-${index}`);
       }
 
       expect(html.toString()).toBe('<div><p><span>iteration-9</span></p></div>');
@@ -199,7 +201,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       html.querySelector('section')!.innerHTML = 'section-content';
       html.querySelector('article')!.innerHTML = 'article-content';
 
-      expect(html.toString()).toBe('<div>div-content</div><section>section-content</section><article>article-content</article>');
+      expect(html.toString()).toBe(
+        '<div>div-content</div><section>section-content</section><article>article-content</article>'
+      );
     });
   });
 
@@ -334,7 +338,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     });
 
     test('should handle very long string modifications', () => {
-      const longContent = 'x'.repeat(10000);
+      const longContent = 'x'.repeat(10_000);
       const html = new HtmlMod('<div>short</div>');
 
       const div = html.querySelector('div')!;
@@ -458,35 +462,35 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
   describe('Large Document Performance and Correctness', () => {
     test('should handle large documents with many modifications', () => {
-      const items = Array.from({ length: 100 }, (_, i) => `<li>${i}</li>`).join('');
+      const items = Array.from({ length: 100 }, (_, index) => `<li>${index}</li>`).join('');
       const html = new HtmlMod(`<ul>${items}</ul>`);
 
       const listItems = html.querySelectorAll('li');
       expect(listItems.length).toBe(100);
 
       // Modify every 10th item
-      for (let i = 0; i < 100; i += 10) {
-        listItems[i].innerHTML = `modified-${i}`;
+      for (let index = 0; index < 100; index += 10) {
+        listItems[index].innerHTML = `modified-${index}`;
       }
 
       // Verify modifications
-      for (let i = 0; i < 100; i += 10) {
-        expect(html.querySelectorAll('li')[i].innerHTML).toBe(`modified-${i}`);
+      for (let index = 0; index < 100; index += 10) {
+        expect(html.querySelectorAll('li')[index].innerHTML).toBe(`modified-${index}`);
       }
     });
 
     test('should handle deeply nested structure modifications', () => {
-      let htmlStr = '<div>';
-      for (let i = 0; i < 10; i++) {
-        htmlStr += `<section data-level="${i}">`;
+      let htmlString = '<div>';
+      for (let index = 0; index < 10; index++) {
+        htmlString += `<section data-level="${index}">`;
       }
-      htmlStr += 'deep content';
-      for (let i = 0; i < 10; i++) {
-        htmlStr += '</section>';
+      htmlString += 'deep content';
+      for (let index = 0; index < 10; index++) {
+        htmlString += '</section>';
       }
-      htmlStr += '</div>';
+      htmlString += '</div>';
 
-      const html = new HtmlMod(htmlStr);
+      const html = new HtmlMod(htmlString);
 
       const sections = html.querySelectorAll('section');
       expect(sections.length).toBe(10);
@@ -548,9 +552,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       expect(html.querySelectorAll('a, b, c, d, e').length).toBe(5);
 
       const elements = html.querySelectorAll('a, b, c, d, e');
-      elements.forEach((el, i) => {
-        el.innerHTML = `${i + 1}`;
-      });
+      for (const [index, element] of elements.entries()) {
+        element.innerHTML = `${index + 1}`;
+      }
 
       expect(html.toString()).toBe('<div><a>1</a><b>2</b><c>3</c><d>4</d><e>5</e></div>');
     });
@@ -561,9 +565,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div>0</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 1; i <= 100; i++) {
-        div.innerHTML = `${i}`;
-        expect(html.querySelector('div')!.innerHTML).toBe(`${i}`);
+      for (let index = 1; index <= 100; index++) {
+        div.innerHTML = `${index}`;
+        expect(html.querySelector('div')!.innerHTML).toBe(`${index}`);
       }
 
       expect(html.toString()).toBe('<div>100</div>');
@@ -573,31 +577,31 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div></div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 50; i++) {
-        div.innerHTML = `<span>content-${i}</span>`;
-        expect(html.querySelector('span')!.innerHTML).toBe(`content-${i}`);
+      for (let index = 0; index < 50; index++) {
+        div.innerHTML = `<span>content-${index}</span>`;
+        expect(html.querySelector('span')!.innerHTML).toBe(`content-${index}`);
 
-        div.setAttribute(`attr-${i}`, `value-${i}`);
-        expect(div.getAttribute(`attr-${i}`)).toBe(`value-${i}`);
+        div.setAttribute(`attr-${index}`, `value-${index}`);
+        expect(div.getAttribute(`attr-${index}`)).toBe(`value-${index}`);
       }
     });
 
     test('should handle complex nested modifications', () => {
       const html = new HtmlMod('<div><section><article><p>text</p></article></section></div>');
 
-      for (let i = 0; i < 20; i++) {
+      for (let index = 0; index < 20; index++) {
         const p = html.querySelector('p')!;
-        p.innerHTML = `iteration-${i}`;
+        p.innerHTML = `iteration-${index}`;
 
         const article = html.querySelector('article')!;
-        article.setAttribute(`data-iteration`, `${i}`);
+        article.setAttribute(`data-iteration`, `${index}`);
 
         const section = html.querySelector('section')!;
-        section.setAttribute(`data-count`, `${i}`);
+        section.setAttribute(`data-count`, `${index}`);
 
-        expect(html.querySelector('p')!.innerHTML).toBe(`iteration-${i}`);
-        expect(html.querySelector('article')!.getAttribute('data-iteration')).toBe(`${i}`);
-        expect(html.querySelector('section')!.getAttribute('data-count')).toBe(`${i}`);
+        expect(html.querySelector('p')!.innerHTML).toBe(`iteration-${index}`);
+        expect(html.querySelector('article')!.getAttribute('data-iteration')).toBe(`${index}`);
+        expect(html.querySelector('section')!.getAttribute('data-count')).toBe(`${index}`);
       }
     });
   });
@@ -837,7 +841,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       expect(html.querySelector('#p1')!.innerHTML).toBe('final1');
 
       // Verify all are correct
-      expect(html.toString()).toBe('<div><p id="p1" data="value1">final1</p><p id="p2" data="value2">modified2</p><p id="p3" data="value3">modified3</p></div>');
+      expect(html.toString()).toBe(
+        '<div><p id="p1" data="value1">final1</p><p id="p2" data="value2">modified2</p><p id="p3" data="value3">modified3</p></div>'
+      );
     });
 
     test('should handle very large attribute values', () => {
@@ -845,7 +851,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const div = html.querySelector('div')!;
 
       // Create a large attribute value (10KB)
-      const largeValue = 'x'.repeat(10000);
+      const largeValue = 'x'.repeat(10_000);
       div.setAttribute('data', largeValue);
 
       expect(html.toString()).toContain(`data="${largeValue}"`);
@@ -1097,9 +1103,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const a = html.querySelector('#a')!;
       const b = html.querySelector('#b')!;
 
-      const tempA = a.innerHTML;
+      const temporaryA = a.innerHTML;
       a.innerHTML = b.innerHTML;
-      b.innerHTML = tempA;
+      b.innerHTML = temporaryA;
 
       expect(html.querySelector('#a')!.innerHTML).toBe('contentB');
       expect(html.querySelector('#b')!.innerHTML).toBe('contentA');
@@ -1107,11 +1113,11 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should handle deeply nested modifications (20 levels)', () => {
       let nested = '<div>';
-      for (let i = 0; i < 20; i++) {
-        nested += `<div class="level-${i}">`;
+      for (let index = 0; index < 20; index++) {
+        nested += `<div class="level-${index}">`;
       }
       nested += 'deep content';
-      for (let i = 0; i < 20; i++) {
+      for (let index = 0; index < 20; index++) {
         nested += '</div>';
       }
       nested += '</div>';
@@ -1278,7 +1284,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const body = html.querySelector('body')!;
       body.innerHTML = '<div id="app"><h1>Hello</h1><p>World</p></div>';
 
-      expect(html.toString()).toBe('<html><head><title>Test</title></head><body><div id="app"><h1>Hello</h1><p>World</p></div></body></html>');
+      expect(html.toString()).toBe(
+        '<html><head><title>Test</title></head><body><div id="app"><h1>Hello</h1><p>World</p></div></body></html>'
+      );
     });
 
     test('should handle template rendering pattern', () => {
@@ -1357,7 +1365,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
   describe('Performance Edge Cases', () => {
     test('should handle 1000 elements with modifications', () => {
-      const items = Array.from({ length: 1000 }, (_, i) => `<div class="item-${i}">${i}</div>`).join('');
+      const items = Array.from({ length: 1000 }, (_, index) => `<div class="item-${index}">${index}</div>`).join('');
       const html = new HtmlMod(`<div id="container">${items}</div>`);
 
       const container = html.querySelector('#container')!;
@@ -1369,11 +1377,11 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should handle 50 levels of nesting', () => {
       let nested = '';
-      for (let i = 0; i < 50; i++) {
-        nested += `<div class="level-${i}">`;
+      for (let index = 0; index < 50; index++) {
+        nested += `<div class="level-${index}">`;
       }
       nested += 'deep content';
-      for (let i = 0; i < 50; i++) {
+      for (let index = 0; index < 50; index++) {
         nested += '</div>';
       }
 
@@ -1388,19 +1396,19 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div>content</div>');
       const div = html.querySelector('div')!;
 
-      const largeValue = 'x'.repeat(50000);
+      const largeValue = 'x'.repeat(50_000);
       div.setAttribute('data-large', largeValue);
 
       expect(div.getAttribute('data-large')).toBe(largeValue);
-      expect(html.toString().length).toBeGreaterThan(50000);
+      expect(html.toString().length).toBeGreaterThan(50_000);
     });
 
     test('should handle 1000 rapid sequential modifications', () => {
       const html = new HtmlMod('<div>content</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 1000; i++) {
-        div.setAttribute(`data-${i}`, `value-${i}`);
+      for (let index = 0; index < 1000; index++) {
+        div.setAttribute(`data-${index}`, `value-${index}`);
       }
 
       expect(div.getAttribute('data-0')).toBe('value-0');
@@ -1411,9 +1419,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div>initial</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 500; i++) {
-        div.innerHTML = `content-${i}`;
-        div.setAttribute('data-iteration', `${i}`);
+      for (let index = 0; index < 500; index++) {
+        div.innerHTML = `content-${index}`;
+        div.setAttribute('data-iteration', `${index}`);
       }
 
       expect(div.innerHTML).toBe('content-499');
@@ -1466,10 +1474,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div>short</div>');
       const div = html.querySelector('div')!;
 
-      const longText = 'a'.repeat(100000);
+      const longText = 'a'.repeat(100_000);
       div.innerHTML = longText;
 
-      expect(div.innerHTML.length).toBe(100000);
+      expect(div.innerHTML.length).toBe(100_000);
     });
 
     test('should handle consecutive identical modifications', () => {
@@ -1674,7 +1682,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const div = html.querySelector('div')!;
       const textNode = div.children[0] as any;
 
-      if (textNode && typeof textNode.textContent !== 'undefined') {
+      if (textNode && textNode.textContent !== undefined) {
         textNode.textContent = 'modified text';
         expect(html.toString()).toBe('<div>modified text</div>');
       }
@@ -1693,7 +1701,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const div = html.querySelector('div')!;
       const textNode = div.children[0] as any;
 
-      if (textNode && typeof textNode.innerHTML !== 'undefined') {
+      if (textNode && textNode.innerHTML !== undefined) {
         textNode.innerHTML = '<b>bold</b>';
         // After modifying text node innerHTML, check the div contains the new content
         expect(html.toString()).toContain('<b>bold</b>');
@@ -1900,7 +1908,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should query after removing and adding elements', () => {
       const html = new HtmlMod('<div><p class="old">1</p><p class="old">2</p></div>');
 
-      html.querySelectorAll('.old').forEach(el => el.remove());
+      for (const element of html.querySelectorAll('.old')) element.remove();
 
       const div = html.querySelector('div')!;
       div.innerHTML = '<p class="new">1</p><p class="new">2</p>';
@@ -2015,7 +2023,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     });
 
     test('should handle interleaved modifications at different depths', () => {
-      const html = new HtmlMod('<div id="root"><section id="s1"><p id="p1">1</p></section><section id="s2"><p id="p2">2</p></section></div>');
+      const html = new HtmlMod(
+        '<div id="root"><section id="s1"><p id="p1">1</p></section><section id="s2"><p id="p2">2</p></section></div>'
+      );
 
       const p1 = html.querySelector('#p1')!;
       p1.innerHTML = 'modified-1';
@@ -2036,17 +2046,19 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     });
 
     test('should handle 10 sequential modifications across tree', () => {
-      const html = new HtmlMod('<div><p id="1">1</p><p id="2">2</p><p id="3">3</p><p id="4">4</p><p id="5">5</p></div>');
+      const html = new HtmlMod(
+        '<div><p id="1">1</p><p id="2">2</p><p id="3">3</p><p id="4">4</p><p id="5">5</p></div>'
+      );
 
-      for (let i = 1; i <= 5; i++) {
-        const p = html.querySelector(`#${i}`)!;
-        p.setAttribute('data-index', `${i}`);
-        p.innerHTML = `modified-${i}`;
+      for (let index = 1; index <= 5; index++) {
+        const p = html.querySelector(`#${index}`)!;
+        p.setAttribute('data-index', `${index}`);
+        p.innerHTML = `modified-${index}`;
       }
 
-      for (let i = 1; i <= 5; i++) {
-        expect(html.querySelector(`#${i}`)!.getAttribute('data-index')).toBe(`${i}`);
-        expect(html.querySelector(`#${i}`)!.innerHTML).toBe(`modified-${i}`);
+      for (let index = 1; index <= 5; index++) {
+        expect(html.querySelector(`#${index}`)!.getAttribute('data-index')).toBe(`${index}`);
+        expect(html.querySelector(`#${index}`)!.innerHTML).toBe(`modified-${index}`);
       }
     });
   });
