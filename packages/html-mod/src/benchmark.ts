@@ -21,7 +21,7 @@ function formatTime(ms: number): string {
   return `${ms.toFixed(2)}ms`;
 }
 
-function benchmark(name: string, function_: () => void, iterations = 1000): number {
+function benchmark(_name: string, function_: () => void, iterations = 1000): number {
   // Warmup
   for (let index = 0; index < 10; index++) {
     function_();
@@ -190,7 +190,7 @@ results.push(
       const items = html.querySelectorAll('.item');
       items[0].dataset.first = 'true';
       html.flush();
-      const updated = html.querySelectorAll('.item');
+      html.querySelectorAll('.item'); // Re-query after flush
       items[50].dataset.middle = 'true';
       html.flush();
     },
@@ -198,7 +198,7 @@ results.push(
       const html = new HtmlModExperimental(complexHTML);
       const items = html.querySelectorAll('.item');
       items[0].dataset.first = 'true';
-      const updated = html.querySelectorAll('.item');
+      html.querySelectorAll('.item'); // Query after modification
       items[50].dataset.middle = 'true';
     },
     1000
