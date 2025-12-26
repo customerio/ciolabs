@@ -788,6 +788,10 @@ export class HtmlModElement {
     let sourceStart: number;
     let sourceEnd: number;
 
+    // Track the actual quote character used in the source
+    // (may differ from quoteChar due to fallback logic)
+    let actualQuoteUsed = quoteChar;
+
     // 1. Do ALL MagicString operations and 2. Queue ALL deltas
     if (attribute) {
       /**
@@ -848,14 +852,15 @@ export class HtmlModElement {
         /**
          * No value is set, so we need to add it
          */
+        actualQuoteUsed = quoteChar || '"';
         const insertPos = attribute.name.endIndex + 1;
-        const content = `=${quoteChar || '"'}${escapedValue}${quoteChar || '"'}`;
+        const content = `=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
         this.__htmlMod.__s.appendRight(insertPos, content);
         this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, content));
 
         nameStart = attribute.name.startIndex;
-        valueStart = insertPos + 1 + (quoteChar ? 1 : 1);
+        valueStart = insertPos + 1 + (actualQuoteUsed ? 1 : 1);
         sourceStart = attribute.source.startIndex;
         sourceEnd = attribute.source.endIndex + content.length;
       }
@@ -863,9 +868,10 @@ export class HtmlModElement {
       /**
        * No attribute is set, so we need to add it
        */
+      actualQuoteUsed = quoteChar || '"';
       // Insert before the '>' of the opening tag
       let insertPos = this.__element.source.openTag.endIndex;
-      let content = ` ${name}=${quoteChar || '"'}${escapedValue}${quoteChar || '"'}`;
+      let content = ` ${name}=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
       // For self-closing tags with trailing slash, insert before the '/' and add space after attribute
       const isSelfClosing = this.__element.source.openTag.isSelfClosing;
@@ -876,11 +882,11 @@ export class HtmlModElement {
           const charBeforeSlash = this.__htmlMod.__source.charAt(insertPos - 2);
           if (charBeforeSlash === ' ') {
             // There's already a space, don't add another leading space
-            content = `${name}=${quoteChar || '"'}${escapedValue}${quoteChar || '"'} `;
+            content = `${name}=${actualQuoteUsed}${escapedValue}${actualQuoteUsed} `;
             insertPos = insertPos - 1; // Insert before the '/'
           } else {
             // No space before '/', keep the leading space and add trailing space
-            content = ` ${name}=${quoteChar || '"'}${escapedValue}${quoteChar || '"'} `;
+            content = ` ${name}=${actualQuoteUsed}${escapedValue}${actualQuoteUsed} `;
             insertPos = insertPos - 1; // Insert before the '/'
           }
         }
@@ -896,7 +902,7 @@ export class HtmlModElement {
       const hasTrailingSpace = content.endsWith(' ');
 
       nameStart = contentStart + (hasLeadingSpace ? 1 : 0);
-      valueStart = nameStart + name.length + 1 + (quoteChar ? 1 : 1); // +1 for =, +1 for quote
+      valueStart = nameStart + name.length + 1 + (actualQuoteUsed ? 1 : 1); // +1 for =, +1 for quote
       sourceStart = contentStart + (hasLeadingSpace ? 1 : 0);
       // sourceEnd should point to the LAST character of the attribute (inclusive), not past it
       sourceEnd = contentStart + content.length - 1 - (hasTrailingSpace ? 1 : 0);
@@ -907,15 +913,17 @@ export class HtmlModElement {
 
     // 4. Modify AST: Update attribute in element AFTER deltas are applied
     // Positions are already correct since they were calculated before the operation
+    // Pass escapedValue for source.data (HTML), value for attribs (JavaScript)
     AstManipulator.setAttribute(
       this.__element,
       name,
-      value,
-      quoteChar as '"' | "'" | null,
+      escapedValue,
+      actualQuoteUsed as '"' | "'" | null,
       nameStart,
       valueStart,
       sourceStart,
-      sourceEnd
+      sourceEnd,
+      value // unescaped value for attribs
     );
 
     return this;

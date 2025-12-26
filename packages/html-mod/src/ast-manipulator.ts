@@ -309,6 +309,17 @@ export function removeAttribute(element: SourceElement, name: string): void {
 export function setTagName(element: SourceElement, tagName: string): void {
   element.tagName = tagName;
   element.name = tagName;
+
+  // Keep source data in sync
+  if (element.source) {
+    element.source.openTag.name = tagName;
+    element.source.openTag.data = element.source.openTag.isSelfClosing ? `<${tagName}/>` : `<${tagName}>`;
+
+    if (element.source.closeTag) {
+      element.source.closeTag.name = tagName;
+      element.source.closeTag.data = `</${tagName}>`;
+    }
+  }
 }
 
 /**

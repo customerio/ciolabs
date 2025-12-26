@@ -227,7 +227,8 @@ export function setAttribute(
   nameStart: number,
   valueStart: number,
   sourceStart: number,
-  sourceEnd: number
+  sourceEnd: number,
+  unescapedValue?: string
 ): void {
   if (!element.source) {
     element.source = {
@@ -279,10 +280,23 @@ export function setAttribute(
   }
 
   // Also update the attribs object
+  // Use unescapedValue for attribs (JavaScript consumption), escaped value for source (HTML)
   if (!element.attribs) {
     element.attribs = {};
   }
-  element.attribs[name] = value;
+  element.attribs[name] = unescapedValue === undefined ? value : unescapedValue;
+
+  // Update openTag.data to include all attributes
+  if (element.source) {
+    let openTagData = `<${element.tagName}`;
+    if (element.source.attributes && element.source.attributes.length > 0) {
+      for (const attribute_ of element.source.attributes) {
+        openTagData += ` ${attribute_.source.data}`;
+      }
+    }
+    openTagData += element.source.openTag.isSelfClosing ? '/>' : '>';
+    element.source.openTag.data = openTagData;
+  }
 }
 
 /**
@@ -300,6 +314,18 @@ export function removeAttribute(element: SourceElement, name: string): void {
   if (element.attribs) {
     delete element.attribs[name];
   }
+
+  // Update openTag.data to reflect removed attribute
+  if (element.source) {
+    let openTagData = `<${element.tagName}`;
+    if (element.source.attributes && element.source.attributes.length > 0) {
+      for (const attribute of element.source.attributes) {
+        openTagData += ` ${attribute.source.data}`;
+      }
+    }
+    openTagData += element.source.openTag.isSelfClosing ? '/>' : '>';
+    element.source.openTag.data = openTagData;
+  }
 }
 
 /**
@@ -308,6 +334,26 @@ export function removeAttribute(element: SourceElement, name: string): void {
 export function setTagName(element: SourceElement, tagName: string): void {
   element.tagName = tagName;
   element.name = tagName;
+
+  // Keep source data in sync
+  if (element.source) {
+    element.source.openTag.name = tagName;
+
+    // Reconstruct openTag.data with tagName and all attributes
+    let openTagData = `<${tagName}`;
+    if (element.source.attributes && element.source.attributes.length > 0) {
+      for (const attribute of element.source.attributes) {
+        openTagData += ` ${attribute.source.data}`;
+      }
+    }
+    openTagData += element.source.openTag.isSelfClosing ? '/>' : '>';
+    element.source.openTag.data = openTagData;
+
+    if (element.source.closeTag) {
+      element.source.closeTag.name = tagName;
+      element.source.closeTag.data = `</${tagName}>`;
+    }
+  }
 }
 
 /**
