@@ -9,7 +9,7 @@
 import { parseDocument } from '@ciolabs/htmlparser2-source';
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.experimental.js';
+import { HtmlMod } from './index.js';
 
 describe('CRITICAL - Real Visual Editor Scenarios', () => {
   describe('ContentEditable Cursor Position Tracking', () => {

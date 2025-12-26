@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.experimental.js';
+import { HtmlMod } from './index.js';
 
 describe('Dataset API (Experimental)', () => {
   describe('Basic Operations', () => {

@@ -12,15 +12,15 @@ import escapeHtml from 'escape-html';
 import { decode } from 'html-entities';
 import MagicString from 'magic-string';
 
-import * as AstManipulator from './ast-manipulator.experimental.js';
-import { AstUpdater } from './ast-updater.experimental.js';
+import * as AstManipulator from './ast-manipulator.js';
+import { AstUpdater } from './ast-updater.js';
 import {
   calculateOverwriteDelta,
   calculateAppendRightDelta,
   calculatePrependLeftDelta,
   calculateRemoveDelta,
   type PositionDelta,
-} from './position-delta.experimental.js';
+} from './position-delta.js';
 
 export type HtmlModOptions = Options & {
   HtmlModElement?: typeof HtmlModElement; // allow for custom HtmlModElement

@@ -3,7 +3,7 @@
  */
 
 /* eslint-disable unicorn/no-array-push-push, unused-imports/no-unused-vars, import/order */
-import { HtmlMod as HtmlModExperimental } from './index.experimental.js';
+import { HtmlMod as HtmlModExperimental } from './experimental/index.js';
 import { HtmlMod as HtmlModOriginal } from './index.js';
 
 interface BenchmarkResult {

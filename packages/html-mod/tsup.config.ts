@@ -6,10 +6,10 @@ export default defineConfig({
   ...baseConfig,
   entry: [
     'src/index.ts',
-    'src/index.experimental.ts',
-    'src/ast-updater.experimental.ts',
-    'src/ast-manipulator.experimental.ts',
-    'src/position-delta.experimental.ts',
+    'src/experimental/index.ts',
+    'src/experimental/ast-updater.ts',
+    'src/experimental/ast-manipulator.ts',
+    'src/experimental/position-delta.ts',
     'src/benchmark.ts',
   ],
 });

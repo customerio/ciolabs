@@ -23,9 +23,9 @@
       "require": "./dist/index.js"
     },
     "./experimental": {
-      "types": "./dist/index.experimental.d.ts",
-      "import": "./dist/index.experimental.mjs",
-      "require": "./dist/index.experimental.js"
+      "types": "./dist/experimental/index.d.ts",
+      "import": "./dist/experimental/index.mjs",
+      "require": "./dist/experimental/index.js"
     }
   },
   "files": [

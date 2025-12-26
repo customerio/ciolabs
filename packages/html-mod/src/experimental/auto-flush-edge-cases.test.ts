@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/prefer-dom-node-dataset */
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod, HtmlModElement, HtmlModText } from './index.experimental.js';
+import { HtmlMod, HtmlModElement, HtmlModText } from './index.js';
 
 describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
   describe('Chained Modifications with Queries', () => {

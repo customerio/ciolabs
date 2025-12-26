@@ -8,7 +8,7 @@
 /* eslint-disable unicorn/prefer-dom-node-dataset */
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.experimental.js';
+import { HtmlMod } from './index.js';
 
 describe('Adversarial Tests - Experimental Auto-Flush', () => {
   describe('Extreme Values', () => {
