@@ -2,7 +2,7 @@
  * Benchmark comparing original (manual flush) vs experimental (auto-flush) implementations
  */
 
-/* eslint-disable unicorn/no-array-push-push, unused-imports/no-unused-vars */
+/* eslint-disable unicorn/no-array-push-push, unused-imports/no-unused-vars, import/order */
 import { HtmlMod as HtmlModExperimental } from './index.experimental.js';
 import { HtmlMod as HtmlModOriginal } from './index.js';
 

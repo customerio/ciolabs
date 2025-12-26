@@ -423,7 +423,6 @@ describe('CRITICAL - Data Corruption Prevention', () => {
       const parent = html.querySelector('#parent')!;
 
       for (let index = 0; index < 10; index++) {
-        const currentHTML = html.toString();
         parent.innerHTML = `<span>iteration-${index}</span>`;
       }
 

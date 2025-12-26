@@ -4,6 +4,8 @@
  * This module provides functions to directly manipulate the AST structure
  * without reparsing, keeping the AST in sync with string modifications.
  */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseDocument, SourceElement, SourceChildNode, isTag, Options } from '@ciolabs/htmlparser2-source';
 
 /**

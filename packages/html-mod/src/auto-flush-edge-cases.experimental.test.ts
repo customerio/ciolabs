@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/prefer-dom-node-dataset */
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod, HtmlModText } from './index.experimental.js';
+import { HtmlMod, HtmlModElement, HtmlModText } from './index.experimental.js';
 
 describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
   describe('Chained Modifications with Queries', () => {
@@ -257,14 +257,14 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
       const p = html.querySelector('p')!;
       const pText = p.children[0];
-      if (pText && 'textContent' in pText) {
-        (pText as any).textContent = 'modified-text1';
+      if (pText instanceof HtmlModText) {
+        pText.textContent = 'modified-text1';
       }
 
       const span = html.querySelector('span')!;
       const spanText = span.children[0];
-      if (spanText && 'textContent' in spanText) {
-        (spanText as any).textContent = 'modified-text2';
+      if (spanText instanceof HtmlModText) {
+        spanText.textContent = 'modified-text2';
       }
 
       expect(html.querySelector('p')!.textContent).toBe('modified-text1');
@@ -1068,7 +1068,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should handle style tags with inline CSS', () => {
       const html = new HtmlMod('<div><style>.test { color: red; }</style><p>text</p></div>');
-      const div = html.querySelector('div')!;
+      const _div = html.querySelector('div')!;
       const p = html.querySelector('p')!;
 
       p.innerHTML = 'modified';
@@ -1212,7 +1212,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
   describe('Stale References', () => {
     test('should handle element reference after parent removal', () => {
       const html = new HtmlMod('<div><p id="child">text</p></div>');
-      const p = html.querySelector('#child')!;
+      const _p = html.querySelector('#child')!;
       const div = html.querySelector('div')!;
 
       div.remove();
@@ -1260,7 +1260,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should handle modification of removed element', () => {
       const html = new HtmlMod('<div><p>text</p></div>');
       const p = html.querySelector('p')!;
-      const originalOuterHTML = p.outerHTML;
+      const _originalOuterHTML = p.outerHTML;
 
       p.remove();
 
@@ -1680,9 +1680,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should modify text node content', () => {
       const html = new HtmlMod('<div>text content</div>');
       const div = html.querySelector('div')!;
-      const textNode = div.children[0] as any;
+      const textNode = div.children[0];
 
-      if (textNode && textNode.textContent !== undefined) {
+      if (textNode instanceof HtmlModText) {
         textNode.textContent = 'modified text';
         expect(html.toString()).toBe('<div>modified text</div>');
       }
@@ -1699,9 +1699,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should modify text node innerHTML', () => {
       const html = new HtmlMod('<div>plain text</div>');
       const div = html.querySelector('div')!;
-      const textNode = div.children[0] as any;
+      const textNode = div.children[0];
 
-      if (textNode && textNode.innerHTML !== undefined) {
+      if (textNode instanceof HtmlModText) {
         textNode.innerHTML = '<b>bold</b>';
         // After modifying text node innerHTML, check the div contains the new content
         expect(html.toString()).toContain('<b>bold</b>');
@@ -1737,9 +1737,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should handle text node toString', () => {
       const html = new HtmlMod('<div>text content</div>');
       const div = html.querySelector('div')!;
-      const textNode = div.children[0] as any;
+      const textNode = div.children[0];
 
-      if (textNode && typeof textNode.toString === 'function') {
+      if (textNode instanceof HtmlModText) {
         expect(textNode.toString()).toBe('text content');
       }
     });
@@ -1813,9 +1813,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should handle sibling modifications', () => {
       const html = new HtmlMod('<div><p id="first">1</p><p id="second">2</p><p id="third">3</p></div>');
-      const first = html.querySelector('#first')!;
+      const _first = html.querySelector('#first')!;
       const second = html.querySelector('#second')!;
-      const third = html.querySelector('#third')!;
+      const _third = html.querySelector('#third')!;
 
       second.remove();
 
@@ -1835,7 +1835,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       expect(children.length).toBe(3);
 
       // Modify through children array
-      (children[0] as any).innerHTML = 'modified';
+      const firstChild = children[0];
+      if (firstChild instanceof HtmlModElement) {
+        firstChild.innerHTML = 'modified';
+      }
       expect(html.querySelectorAll('p')[0].innerHTML).toBe('modified');
     });
 
@@ -1868,7 +1871,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       div.setAttribute('class', 'parent');
       const children = div.children;
 
-      (children[0] as any).innerHTML = 'modified';
+      const firstChild = children[0];
+      if (firstChild instanceof HtmlModElement) {
+        firstChild.innerHTML = 'modified';
+      }
       expect(html.toString()).toBe('<div class="parent"><p>modified</p></div>');
     });
 
@@ -1884,7 +1890,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const div = html.querySelector('div')!;
       const children = div.children;
 
-      (children[1] as any).remove();
+      const secondChild = children[1];
+      if (secondChild instanceof HtmlModElement) {
+        secondChild.remove();
+      }
 
       expect(html.querySelectorAll('p').length).toBe(2);
       expect(html.querySelectorAll('p')[0].innerHTML).toBe('1');

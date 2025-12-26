@@ -123,7 +123,7 @@ describe('Dataset API (Experimental)', () => {
       const html = new HtmlMod('<div>content</div>');
       const div = html.querySelector('div')!;
 
-      div.dataset.count = 42 as any;
+      div.dataset.count = String(42);
 
       expect(div.dataset.count).toBe('42');
       expect(typeof div.dataset.count).toBe('string');
@@ -133,7 +133,7 @@ describe('Dataset API (Experimental)', () => {
       const html = new HtmlMod('<div>content</div>');
       const div = html.querySelector('div')!;
 
-      div.dataset.active = true as any;
+      div.dataset.active = String(true);
 
       expect(div.dataset.active).toBe('true');
     });
