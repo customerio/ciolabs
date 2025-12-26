@@ -84,11 +84,15 @@ console.log(h.toString());
 //=> <div>world</div>
 ```
 
-## Flushing the manipulations
+## Automatic Position Updates
 
-When you are manipulating the HTML, you are really manipulating the underlying string, not the AST. So when you run queries you are only ever querying against the initial HTML string. **You are not querying against the manipulated HTML string**.
+`html-mod` automatically keeps the AST synchronized with string manipulations without expensive reparsing. When you modify the HTML, the library:
 
-If you need to query against the manipulated HTML string, you need to "flush" the manipulations. This will take the manipulated HTML string and reparse it. This is not a cheap operation, so you should only do it when you absolutely need to.
+1. Tracks position changes from string operations
+2. Updates AST node positions incrementally (cheap!)
+3. Ensures queries always reflect the current state
+
+This means you can query immediately after modifications:
 
 ```typescript
 import { HtmlMod } from '@ciolabs/html-mod';
@@ -97,23 +101,22 @@ const h = new HtmlMod('<div>hello</div>');
 
 h.querySelector('div')!.append('<div>world</div>');
 
-console.log(h.querySelectorAll('div').length); //=> 1
-
-h.flush();
-
+// Queries work immediately - no manual flushing needed!
 console.log(h.querySelectorAll('div').length); //=> 2
 ```
 
-You can check if the manipulations have been flushed by calling `isFlushed()`:
+### Manual Flushing (Rarely Needed)
+
+The `flush()` method is still available for backward compatibility or rare edge cases where you need to force a full reparse:
 
 ```typescript
-import { HtmlMod } from '@ciolabs/html-mod';
+h.flush(); // Force full reparse (usually not needed)
+```
 
-const h = new HtmlMod('<div>hello</div>');
+You can check flush status with `isFlushed()`, though this is primarily for internal use:
 
-h.querySelector('div')!.append('<div>world</div>');
-
-console.log(h.isFlushed()); //=> false
+```typescript
+console.log(h.isFlushed()); //=> true (automatically maintained)
 ```
 
 ## HtmlMod
@@ -162,7 +165,7 @@ Returns `true` if the resulting HTML is empty.
 
 #### isFlushed() => boolean
 
-Returns `true` if the source string is in sync with the AST.
+Returns `true` if the AST positions are in sync with the source string. This is automatically managed and primarily for internal use.
 
 #### generateDecodedMap()
 
@@ -182,7 +185,7 @@ Returns a new `HtmlMod` instance with the same HTML string.
 
 #### flush() => this
 
-Flushes the manipulations. This will take the manipulated HTML string and reparse it. This is not a cheap operation, so you should only do it when you need to.
+Forces a full reparse of the HTML. This is rarely needed as the library automatically maintains AST synchronization. Provided for backward compatibility and edge cases.
 
 Returns `this`.
 
