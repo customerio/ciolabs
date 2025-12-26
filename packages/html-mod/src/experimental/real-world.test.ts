@@ -142,6 +142,7 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
 
         // Move last item to first
         const last = items.at(-1);
+        if (!last) throw new Error('Expected last item');
         const lastHTML = last.outerHTML;
         last.remove();
 
@@ -492,7 +493,7 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
         // User deletes paragraph
         () => {
           const paragraphs = html.querySelectorAll('p');
-          if (paragraphs.length > 2) paragraphs.at(-1).remove();
+          if (paragraphs.length > 2) paragraphs.at(-1)?.remove();
         },
         // User modifies list
         () => {

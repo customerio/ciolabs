@@ -4,8 +4,7 @@
  * This module provides functions to directly manipulate the AST structure
  * without reparsing, keeping the AST in sync with string modifications.
  */
-import { parseDocument, SourceElement, SourceChildNode, SourceText, isTag } from '@ciolabs/htmlparser2-source';
-import type { Options } from 'htmlparser2';
+import { parseDocument, SourceElement, SourceChildNode, SourceText, isTag, Options } from '@ciolabs/htmlparser2-source';
 
 /**
  * Internal types for AST manipulation that expose mutable properties

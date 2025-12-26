@@ -386,6 +386,7 @@ describe('Source Data Synchronization - Experimental', () => {
         expect(nameSubstring).toBe('data-test');
 
         // Verify value data matches source
+        if (!attribute.value) throw new Error('Expected value');
         const valueSubstring = html.__source.slice(attribute.value.startIndex, attribute.value.endIndex + 1);
         expect(attribute.value.data).toBe(valueSubstring);
         expect(valueSubstring).toBe('hello');
@@ -439,7 +440,7 @@ describe('Source Data Synchronization - Experimental', () => {
 
       const attribute = div.__element.source.attributes.find(a => a.name.data === 'data-text');
       // Double quotes in value cause switch to single quotes
-      expect(attribute?.value.data).toBe('He said "hello"');
+      expect(attribute?.value?.data).toBe('He said "hello"');
       expect(attribute?.source.data).toBe(`data-text='He said "hello"'`);
 
       // Verify data matches source
@@ -455,7 +456,7 @@ describe('Source Data Synchronization - Experimental', () => {
 
       const attribute = div.__element.source.attributes.find(a => a.name.data === 'data-text');
       // Single quotes cause switch to double quotes (no escaping needed)
-      expect(attribute?.value.data).toBe("It's great");
+      expect(attribute?.value?.data).toBe("It's great");
       expect(attribute?.source.data).toBe(`data-text="It's great"`);
 
       // Verify data matches source
@@ -479,7 +480,7 @@ describe('Source Data Synchronization - Experimental', () => {
 
       // The source should have escaped double quotes
       expect(attributeSubstring).toContain('&quot;');
-      expect(attribute?.value.data).toBe("He said &quot;It's great&quot;");
+      expect(attribute?.value?.data).toBe("He said &quot;It's great&quot;");
     });
 
     test('should handle angle brackets in attribute values', () => {
@@ -549,7 +550,7 @@ describe('Source Data Synchronization - Experimental', () => {
       div.dataset.emoji = '🚀 Hello 世界';
 
       const attribute = div.__element.source.attributes.find(a => a.name.data === 'data-emoji');
-      expect(attribute?.value.data).toBe('🚀 Hello 世界');
+      expect(attribute?.value?.data).toBe('🚀 Hello 世界');
       // Space requires quotes
       expect(attribute?.source.data).toBe('data-emoji="🚀 Hello 世界"');
 
@@ -566,7 +567,7 @@ describe('Source Data Synchronization - Experimental', () => {
       div.dataset.long = longValue;
 
       const attribute = div.__element.source.attributes.find(a => a.name.data === 'data-long');
-      expect(attribute?.value.data).toBe(longValue);
+      expect(attribute?.value?.data).toBe(longValue);
 
       // Verify data matches source
       const attributeSubstring = html.__source.slice(attribute!.source.startIndex, attribute!.source.endIndex + 1);

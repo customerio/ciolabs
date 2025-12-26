@@ -1,4 +1,4 @@
-import { parseDocument } from '@ciolabs/htmlparser2-source';
+import { parseDocument, isTag } from '@ciolabs/htmlparser2-source';
 import { describe, expect, test } from 'vitest';
 
 import { AstUpdater } from './ast-updater.js';
@@ -138,6 +138,7 @@ describe('AstUpdater', () => {
       const updater = new AstUpdater();
 
       const div = doc.children[0];
+      if (!isTag(div)) throw new Error('Expected element');
       const span = div.children[0];
 
       // Simulate insertion before the div
@@ -155,6 +156,7 @@ describe('AstUpdater', () => {
       const updater = new AstUpdater();
 
       const div = doc.children[0];
+      if (!isTag(div)) throw new Error('Expected element');
       const classAttribute = div.source.attributes.find(a => a.name.data === 'class')!;
 
       const originalNameStart = classAttribute.name.startIndex;
@@ -174,6 +176,7 @@ describe('AstUpdater', () => {
       const updater = new AstUpdater();
 
       const div = doc.children[0];
+      if (!isTag(div)) throw new Error('Expected element');
       const textNode = div.children[0];
 
       // Simulate insertion before text
@@ -238,6 +241,7 @@ describe('AstUpdater', () => {
       const updater = new AstUpdater();
 
       const div = doc.children[0];
+      if (!isTag(div)) throw new Error('Expected element');
       const originalCloseTagStart = div.source.closeTag!.startIndex;
 
       // Insert after opening tag
@@ -253,7 +257,9 @@ describe('AstUpdater', () => {
       const updater = new AstUpdater();
 
       const div = doc.children[0];
+      if (!isTag(div)) throw new Error('Expected element');
       const section = div.children[0];
+      if (!isTag(section)) throw new Error('Expected element');
       const p = section.children[0];
 
       // Insert at beginning

@@ -163,7 +163,6 @@ describe('Adversarial Tests - Experimental Auto-Flush', () => {
 
     test('should handle rapid query operations during modifications', () => {
       const html = new HtmlMod('<div><p class="target">text</p></div>');
-      const _div = html.querySelector('div')!;
 
       for (let index = 0; index < 100; index++) {
         const p = html.querySelector('.target')!;
@@ -309,8 +308,6 @@ describe('Adversarial Tests - Experimental Auto-Flush', () => {
     test('should handle operations on deeply nested removed elements', () => {
       const html = new HtmlMod('<div><section><article><p>deep</p></article></section></div>');
       const p = html.querySelector('p')!;
-      const _article = html.querySelector('article')!;
-      const _section = html.querySelector('section')!;
       const div = html.querySelector('div')!;
 
       // Remove parent
@@ -710,7 +707,6 @@ describe('Adversarial Tests - Experimental Auto-Flush', () => {
 
     test('should handle adding siblings while iterating', () => {
       const html = new HtmlMod('<ul><li>1</li><li>2</li></ul>');
-      const _ul = html.querySelector('ul')!;
       const items = html.querySelectorAll('li');
 
       // This changes the document structure during iteration
@@ -972,7 +968,6 @@ describe('Adversarial Tests - Experimental Auto-Flush', () => {
     test('should handle deeply nested removal and sibling modification', () => {
       const html = new HtmlMod('<div><section><article><p>1</p><p>2</p></article></section></div>');
       const article = html.querySelector('article')!;
-      const _p2 = html.querySelectorAll('p')[1];
 
       // Remove container
       article.remove();
@@ -1122,9 +1117,6 @@ describe('Adversarial Tests - Experimental Auto-Flush', () => {
         const b = html.querySelector('#b')!;
 
         // Create circular-like pattern
-        const _aHtml = a.outerHTML;
-        const _bHtml = b.outerHTML;
-
         b.innerHTML = 'updated';
         a.setAttribute('data-iter', String(index));
       }

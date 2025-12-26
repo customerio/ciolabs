@@ -1068,7 +1068,6 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should handle style tags with inline CSS', () => {
       const html = new HtmlMod('<div><style>.test { color: red; }</style><p>text</p></div>');
-      const _div = html.querySelector('div')!;
       const p = html.querySelector('p')!;
 
       p.innerHTML = 'modified';
@@ -1212,7 +1211,6 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
   describe('Stale References', () => {
     test('should handle element reference after parent removal', () => {
       const html = new HtmlMod('<div><p id="child">text</p></div>');
-      const _p = html.querySelector('#child')!;
       const div = html.querySelector('div')!;
 
       div.remove();
@@ -1260,7 +1258,6 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
     test('should handle modification of removed element', () => {
       const html = new HtmlMod('<div><p>text</p></div>');
       const p = html.querySelector('p')!;
-      const _originalOuterHTML = p.outerHTML;
 
       p.remove();
 
@@ -1813,9 +1810,7 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should handle sibling modifications', () => {
       const html = new HtmlMod('<div><p id="first">1</p><p id="second">2</p><p id="third">3</p></div>');
-      const _first = html.querySelector('#first')!;
       const second = html.querySelector('#second')!;
-      const _third = html.querySelector('#third')!;
 
       second.remove();
 
