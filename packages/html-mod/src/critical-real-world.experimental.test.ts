@@ -6,9 +6,8 @@
  */
 
 /* eslint-disable unicorn/prefer-dom-node-dataset */
-import { describe, expect, test } from 'vitest';
-
 import { parseDocument } from '@ciolabs/htmlparser2-source';
+import { describe, expect, test } from 'vitest';
 
 import { HtmlMod } from './index.experimental.js';
 
@@ -20,7 +19,7 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod(initial);
 
       // Simulate user typing " World" character by character
-      for (let i = 0; i < 100; i++) {
+      for (let index = 0; index < 100; index++) {
         const p = html.querySelector('p')!;
         const current = p.innerHTML;
         p.innerHTML = current + 'x'; // User types 'x'
@@ -44,7 +43,7 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div><p>Hello World</p></div>');
 
       // Simulate user backspacing character by character
-      for (let i = 0; i < 11; i++) {
+      for (let index = 0; index < 11; index++) {
         const p = html.querySelector('p')!;
         const current = p.innerHTML;
         p.innerHTML = current.slice(0, -1); // Backspace
@@ -62,7 +61,7 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const p = html.querySelector('p')!;
 
       // User pastes 1000 lines
-      const pastedContent = Array.from({ length: 1000 }, (_, i) => `Line ${i}`).join('<br>');
+      const pastedContent = Array.from({ length: 1000 }, (_, index) => `Line ${index}`).join('<br>');
       p.innerHTML = pastedContent;
 
       // Must be queryable and valid
@@ -80,21 +79,21 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       states.push(html.toString());
 
       // Make 10 changes
-      for (let i = 0; i < 10; i++) {
+      for (let index = 0; index < 10; index++) {
         const p = html.querySelector('p')!;
-        p.innerHTML = `State ${i}`;
+        p.innerHTML = `State ${index}`;
         states.push(html.toString());
       }
 
       // Undo by restoring previous states
-      for (let i = 9; i >= 0; i--) {
-        const restored = new HtmlMod(states[i]);
+      for (let index = 9; index >= 0; index--) {
+        const restored = new HtmlMod(states[index]);
         const p = restored.querySelector('p')!;
 
-        if (i === 0) {
+        if (index === 0) {
           expect(p.innerHTML).toBe('Initial');
         } else {
-          expect(p.innerHTML).toBe(`State ${i - 1}`);
+          expect(p.innerHTML).toBe(`State ${index - 1}`);
         }
       }
     });
@@ -104,12 +103,12 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const stateB = '<div><p>State B</p></div>';
 
       // Rapidly switch between states 100 times
-      for (let i = 0; i < 100; i++) {
-        const state = i % 2 === 0 ? stateA : stateB;
+      for (let index = 0; index < 100; index++) {
+        const state = index % 2 === 0 ? stateA : stateB;
         const html = new HtmlMod(state);
 
         const p = html.querySelector('p')!;
-        const expected = i % 2 === 0 ? 'State A' : 'State B';
+        const expected = index % 2 === 0 ? 'State A' : 'State B';
         expect(p.innerHTML).toBe(expected);
       }
     });
@@ -137,12 +136,12 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
     test('should handle 100 element reorderings', () => {
       const html = new HtmlMod('<ul><li id="0">0</li><li id="1">1</li><li id="2">2</li></ul>');
 
-      for (let i = 0; i < 100; i++) {
+      for (let index = 0; index < 100; index++) {
         const ul = html.querySelector('ul')!;
         const items = html.querySelectorAll('li');
 
         // Move last item to first
-        const last = items[items.length - 1];
+        const last = items.at(-1);
         const lastHTML = last.outerHTML;
         last.remove();
 
@@ -160,12 +159,12 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const div = html.querySelector('div')!;
 
       // Set 10 different attributes simultaneously
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('data-a', String(i));
-        div.setAttribute('data-b', String(i * 2));
-        div.setAttribute('data-c', String(i * 3));
-        div.setAttribute('data-d', String(i * 4));
-        div.setAttribute('data-e', String(i * 5));
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('data-a', String(index));
+        div.setAttribute('data-b', String(index * 2));
+        div.setAttribute('data-c', String(index * 3));
+        div.setAttribute('data-d', String(index * 4));
+        div.setAttribute('data-e', String(index * 5));
       }
 
       expect(div.getAttribute('data-a')).toBe('99');
@@ -179,9 +178,9 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div data-existing="old">content</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('data-existing', `updated-${i}`);
-        div.setAttribute(`data-new-${i}`, String(i));
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('data-existing', `updated-${index}`);
+        div.setAttribute(`data-new-${index}`, String(index));
       }
 
       expect(div.getAttribute('data-existing')).toBe('updated-99');
@@ -226,8 +225,8 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div data-text="&lt;tag&gt;">&amp;</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('data-iteration', String(i));
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('data-iteration', String(index));
       }
 
       // Entities should be preserved
@@ -241,8 +240,8 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div>content</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('data-html', `&lt;div&gt;${i}&lt;/div&gt;`);
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('data-html', `&lt;div&gt;${index}&lt;/div&gt;`);
       }
 
       const value = div.getAttribute('data-html')!;
@@ -257,17 +256,17 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const div = html.querySelector('div')!;
 
       // Modify middle attribute 100 times
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('class', `iteration-${i}`);
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('class', `iteration-${index}`);
       }
 
       // Get attribute names in order
-      const attrNames = div.getAttributeNames();
+      const attributeNames = div.getAttributeNames();
 
       // Verify attributes still exist (order may change)
-      expect(attrNames).toContain('id');
-      expect(attrNames).toContain('class');
-      expect(attrNames).toContain('data-value');
+      expect(attributeNames).toContain('id');
+      expect(attributeNames).toContain('class');
+      expect(attributeNames).toContain('data-value');
     });
   });
 
@@ -276,8 +275,8 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div>  content  </div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('data-i', String(i));
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('data-i', String(index));
       }
 
       expect(div.innerHTML).toBe('  content  ');
@@ -287,8 +286,8 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div>line1\nline2\nline3</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('data-i', String(i));
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('data-i', String(index));
       }
 
       expect(div.innerHTML).toBe('line1\nline2\nline3');
@@ -301,9 +300,9 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod(original);
 
       // Modify and query 100 times
-      for (let i = 0; i < 100; i++) {
+      for (let index = 0; index < 100; index++) {
         const div = html.querySelector('div')!;
-        div.setAttribute('data-iteration', String(i));
+        div.setAttribute('data-iteration', String(index));
 
         const p = html.querySelector('p')!;
         expect(p.innerHTML).toBe('content');
@@ -345,9 +344,9 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
     test('should handle XML namespace attributes', () => {
       const html = new HtmlMod('<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>');
 
-      for (let i = 0; i < 100; i++) {
+      for (let index = 0; index < 100; index++) {
         const svg = html.querySelector('svg')!;
-        svg.setAttribute('data-i', String(i));
+        svg.setAttribute('data-i', String(index));
       }
 
       expect(html.toString()).toContain('xmlns=');
@@ -357,8 +356,8 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       const html = new HtmlMod('<div aria-label="test" aria-hidden="true">content</div>');
       const div = html.querySelector('div')!;
 
-      for (let i = 0; i < 100; i++) {
-        div.setAttribute('aria-label', `label-${i}`);
+      for (let index = 0; index < 100; index++) {
+        div.setAttribute('aria-label', `label-${index}`);
       }
 
       expect(div.getAttribute('aria-label')).toBe('label-99');
@@ -370,51 +369,83 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
     test('should handle 1000 different operations without any corruption', () => {
       const html = new HtmlMod('<div id="root"><section><article><p>text</p></article></section></div>');
 
-      for (let i = 0; i < 1000; i++) {
-        const operation = i % 20;
+      for (let index = 0; index < 1000; index++) {
+        const operation = index % 20;
 
-        if (operation === 0) {
-          const root = html.querySelector('#root')!;
-          root.setAttribute('data-i', String(i));
-        } else if (operation === 1) {
-          const section = html.querySelector('section')!;
-          section.setAttribute('class', `s-${i}`);
-        } else if (operation === 2) {
-          const article = html.querySelector('article')!;
-          article.setAttribute('data-article', String(i));
-        } else if (operation === 3) {
-          const p = html.querySelector('p')!;
-          p.innerHTML = `text-${i}`;
-        } else if (operation === 4) {
-          const p = html.querySelector('p')!;
-          p.setAttribute('data-p', String(i));
-        } else if (operation === 5) {
-          const article = html.querySelector('article')!;
-          article.prepend('<span>before</span>');
-        } else if (operation === 6) {
-          const article = html.querySelector('article')!;
-          article.append('<span>after</span>');
-        } else if (operation === 7) {
-          const spans = html.querySelectorAll('span');
-          if (spans.length > 5) {
-            spans[0].remove();
+        switch (operation) {
+          case 0: {
+            const root = html.querySelector('#root')!;
+            root.setAttribute('data-i', String(index));
+
+            break;
           }
-        } else if (operation === 8) {
-          const section = html.querySelector('section')!;
-          section.removeAttribute('class');
-        } else if (operation === 9) {
-          const article = html.querySelector('article')!;
-          article.toggleAttribute('data-toggle');
-        } else {
-          // Verify structure is intact
-          expect(html.querySelector('#root')).not.toBeNull();
-          expect(html.querySelector('section')).not.toBeNull();
-          expect(html.querySelector('article')).not.toBeNull();
-          expect(html.querySelector('p')).not.toBeNull();
+          case 1: {
+            const section = html.querySelector('section')!;
+            section.setAttribute('class', `s-${index}`);
+
+            break;
+          }
+          case 2: {
+            const article = html.querySelector('article')!;
+            article.setAttribute('data-article', String(index));
+
+            break;
+          }
+          case 3: {
+            const p = html.querySelector('p')!;
+            p.innerHTML = `text-${index}`;
+
+            break;
+          }
+          case 4: {
+            const p = html.querySelector('p')!;
+            p.setAttribute('data-p', String(index));
+
+            break;
+          }
+          case 5: {
+            const article = html.querySelector('article')!;
+            article.prepend('<span>before</span>');
+
+            break;
+          }
+          case 6: {
+            const article = html.querySelector('article')!;
+            article.append('<span>after</span>');
+
+            break;
+          }
+          case 7: {
+            const spans = html.querySelectorAll('span');
+            if (spans.length > 5) {
+              spans[0].remove();
+            }
+
+            break;
+          }
+          case 8: {
+            const section = html.querySelector('section')!;
+            section.removeAttribute('class');
+
+            break;
+          }
+          case 9: {
+            const article = html.querySelector('article')!;
+            article.toggleAttribute('data-toggle');
+
+            break;
+          }
+          default: {
+            // Verify structure is intact
+            expect(html.querySelector('#root')).not.toBeNull();
+            expect(html.querySelector('section')).not.toBeNull();
+            expect(html.querySelector('article')).not.toBeNull();
+            expect(html.querySelector('p')).not.toBeNull();
+          }
         }
 
         // CRITICAL: Verify HTML is always parseable
-        if (i % 100 === 0) {
+        if (index % 100 === 0) {
           const output = html.toString();
           const parsed = parseDocument(output);
           expect(parsed.children.length).toBeGreaterThan(0);
@@ -461,7 +492,7 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
         // User deletes paragraph
         () => {
           const paragraphs = html.querySelectorAll('p');
-          if (paragraphs.length > 2) paragraphs[paragraphs.length - 1].remove();
+          if (paragraphs.length > 2) paragraphs.at(-1).remove();
         },
         // User modifies list
         () => {
@@ -498,12 +529,12 @@ describe('CRITICAL - Real Visual Editor Scenarios', () => {
       ];
 
       // Simulate 2000 random user operations
-      for (let i = 0; i < 2000; i++) {
-        const operation = operations[i % operations.length];
+      for (let index = 0; index < 2000; index++) {
+        const operation = operations[index % operations.length];
         operation();
 
         // Verify structure every 100 operations
-        if (i % 100 === 0) {
+        if (index % 100 === 0) {
           expect(html.querySelector('article')).not.toBeNull();
           expect(html.querySelector('h1')).not.toBeNull();
 
