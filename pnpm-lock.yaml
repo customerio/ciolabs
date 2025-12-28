@@ -120,9 +120,6 @@ importers:
 
   packages/config-prettier:
     devDependencies:
-      '@trivago/prettier-plugin-sort-imports':
-        specifier: ^4.3.0
-        version: 4.3.0(prettier@3.6.2)
       prettier:
         specifier: ^3.3.3
         version: 3.6.2
