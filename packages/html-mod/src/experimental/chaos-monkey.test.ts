@@ -166,19 +166,15 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
             }
           }
 
-          // Flush stable after every operation
           stable.flush();
 
-          // Verify outputs match (allowing for attribute order differences)
           const stableOutput = stable.toString();
           const expOutput = experimental.toString();
 
-          // For exact comparison, we need to normalize attribute order
-          // But for now, just check that both parse to valid HTML and have same structure
           expect(expOutput.length).toBeGreaterThan(0);
           expect(stableOutput.length).toBeGreaterThan(0);
 
-          // Check that key content is present in both
+          // Verify content matches
           const contentMatches = stableOutput.match(/content-\d+|value-\d+|before-\d+|after-\d+/g) || [];
           for (const match of contentMatches) {
             expect(expOutput).toContain(match);
@@ -189,7 +185,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
         }
       }
 
-      // Final verification - both should produce valid HTML with same content
       const stableFinal = stable.toString();
       const expFinal = experimental.toString();
 
@@ -297,7 +292,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
 
         stable.flush();
 
-        // Verify structure is still valid
         const stableOutput = stable.toString();
         const expOutput = experimental.toString();
 
@@ -309,7 +303,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
       }
     }
 
-    // Final check
     const stableFinal = stable.toString();
     const expFinal = experimental.toString();
 
@@ -337,7 +330,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
       if (index % 10 === 0) {
         stable.flush();
 
-        // Check both still work
         const stableOutput = stable.toString();
         const expOutput = experimental.toString();
 
@@ -348,7 +340,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
 
     stable.flush();
 
-    // Final verification - should have latest attribute values
     const stableFinal = stable.toString();
     const expFinal = experimental.toString();
 
@@ -477,7 +468,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
 
           stable.flush();
 
-          // Verify both produce valid output
           const stableOutput = stable.toString();
           const expOutput = experimental.toString();
 
@@ -546,8 +536,6 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
 
     expect(expFinal.length).toBeGreaterThan(0);
     expect(stableFinal.length).toBeGreaterThan(0);
-
-    // Verify structure is still intact
     expect(stableFinal).toContain('root');
     expect(expFinal).toContain('root');
   });
@@ -596,18 +584,14 @@ describe('Chaos Monkey Tests - Stable vs Experimental', () => {
 
         stable.flush();
 
-        // Property: output should always contain matching opening and closing tags
         const stableOutput = stable.toString();
         const expOutput = experimental.toString();
-
-        // Basic HTML validity checks
         const stableOpenTags = (stableOutput.match(/<(\w+)[^>]*>/g) || []).length;
         const stableCloseTags = (stableOutput.match(/<\/(\w+)>/g) || []).length;
 
         const expOpenTags = (expOutput.match(/<(\w+)[^>]*>/g) || []).length;
         const expCloseTags = (expOutput.match(/<\/(\w+)>/g) || []).length;
 
-        // Should have balanced tags (accounting for self-closing)
         expect(expOpenTags).toBeGreaterThan(0);
         expect(expCloseTags).toBeGreaterThan(0);
         expect(stableOpenTags).toBeGreaterThan(0);
