@@ -1,7 +1,7 @@
 import { parseDocument, isTag } from '@ciolabs/htmlparser2-source';
 import { describe, expect, test } from 'vitest';
 
-import { AstUpdater } from './ast-updater.js';
+import { AstUpdater } from './ast-updater';
 import {
   calculateOverwriteDelta,
   calculateAppendRightDelta,
@@ -9,7 +9,7 @@ import {
   calculateRemoveDelta,
   shouldUpdatePosition,
   applyDeltaToPosition,
-} from './position-delta.js';
+} from './position-delta';
 
 describe('position-delta', () => {
   describe('calculateOverwriteDelta', () => {

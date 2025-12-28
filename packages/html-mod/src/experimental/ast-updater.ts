@@ -6,7 +6,7 @@
  */
 import { SourceDocument, SourceElement, SourceChildNode, SourceText, isTag, isText } from '@ciolabs/htmlparser2-source';
 
-import { PositionDelta, applyDeltaToPosition } from './position-delta.js';
+import { PositionDelta, applyDeltaToPosition } from './position-delta';
 
 /**
  * Type guard to check if a node has position tracking

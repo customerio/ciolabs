@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.js';
+import { HtmlMod } from './index';
 
 /**
  * Tests to verify direct string manipulation produces correct output

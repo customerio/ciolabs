@@ -9,7 +9,7 @@
 import { parseDocument } from '@ciolabs/htmlparser2-source';
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.js';
+import { HtmlMod } from './index';
 
 describe('CRITICAL - Data Corruption Prevention', () => {
   describe('Multi-byte UTF-8 Characters', () => {

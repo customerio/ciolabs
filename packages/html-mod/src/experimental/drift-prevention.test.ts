@@ -9,7 +9,7 @@
 import { parseDocument } from '@ciolabs/htmlparser2-source';
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.js';
+import { HtmlMod } from './index';
 
 describe('Drift Prevention - Long-Running Edit Sequences', () => {
   test('should handle 10,000 setAttribute operations without drift', () => {

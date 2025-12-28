@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index.js';
+import { HtmlMod } from './index';
 
 describe('Source Data Synchronization - Experimental', () => {
   describe('Tag Name Changes', () => {
