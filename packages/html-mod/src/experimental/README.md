@@ -224,8 +224,8 @@ for (let i = 0; i < 2000; i++) {
 const html = new HtmlMod('<div><p>unclosed paragraph</div>');
 
 // Parser auto-corrects structure
-const div = html.querySelector('div');  // ✅ Works
-const p = html.querySelector('p');      // ✅ Works
+const div = html.querySelector('div'); // ✅ Works
+const p = html.querySelector('p'); // ✅ Works
 
 // Stable version:
 div.setAttribute('class', 'test');
