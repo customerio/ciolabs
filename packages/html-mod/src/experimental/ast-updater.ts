@@ -68,26 +68,33 @@ export class AstUpdater {
     element.startIndex = applyDeltaToPosition(element.startIndex, delta);
     element.endIndex = applyDeltaToPosition(element.endIndex, delta);
 
-    // Update openTag positions
-    if (element.source?.openTag) {
-      element.source.openTag.startIndex = applyDeltaToPosition(element.source.openTag.startIndex, delta);
-      element.source.openTag.endIndex = applyDeltaToPosition(element.source.openTag.endIndex, delta);
+    // Optimization: Only update tags and attributes if they're in the affected range
+    const openTagEnd = element.source?.openTag?.endIndex ?? element.startIndex;
+    const tagsAffected = openTagEnd >= delta.mutationStart;
+
+    if (tagsAffected) {
+      // Update openTag positions
+      if (element.source?.openTag) {
+        element.source.openTag.startIndex = applyDeltaToPosition(element.source.openTag.startIndex, delta);
+        element.source.openTag.endIndex = applyDeltaToPosition(element.source.openTag.endIndex, delta);
+      }
+
+      // Update attribute positions (they're within the openTag)
+      if (element.source?.attributes) {
+        for (const attribute of element.source.attributes) {
+          this.updateAttributePositions(attribute, delta);
+        }
+      }
     }
 
     // Update closeTag positions (if exists)
+    // Note: applyDeltaToPosition handles checking if update is needed based on operation type
     if (element.source?.closeTag) {
       element.source.closeTag.startIndex = applyDeltaToPosition(element.source.closeTag.startIndex, delta);
       element.source.closeTag.endIndex = applyDeltaToPosition(element.source.closeTag.endIndex, delta);
     }
 
-    // Update attribute positions
-    if (element.source?.attributes) {
-      for (const attribute of element.source.attributes) {
-        this.updateAttributePositions(attribute, delta);
-      }
-    }
-
-    // Recursively update children
+    // Recursively update children (they might be affected even if tags aren't)
     if (element.children) {
       for (const child of element.children) {
         this.updateNode(child, delta);

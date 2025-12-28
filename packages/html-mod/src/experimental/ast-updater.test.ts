@@ -304,7 +304,6 @@ describe('AstUpdater', () => {
       const doc = parseDocument(html);
       const updater = new AstUpdater();
 
-      const div = doc.children[0];
       const comment = doc.children[1];
 
       if (!('startIndex' in comment) || !('endIndex' in comment)) {

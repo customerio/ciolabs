@@ -30,13 +30,12 @@ export class HtmlMod {
   __source: string;
   __s: MagicString;
   __dom: SourceDocument;
-  __flushed = false;
+  __flushed = true; // Always true with auto-flush - AST is always synchronized
   __HtmlMod: typeof HtmlMod;
   __HtmlModElement: typeof HtmlModElement;
   __HtmlModText: typeof HtmlModText;
   __options: HtmlModOptions;
   __astUpdater: AstUpdater;
-  __pendingDeltas: PositionDelta[] = [];
   __cachedInnerHTML: WeakMap<SourceElement, string> = new WeakMap();
   __cachedOuterHTML: WeakMap<SourceElement, string> = new WeakMap();
 
@@ -56,26 +55,33 @@ export class HtmlMod {
   }
 
   /**
-   * Apply all pending deltas at end of operation
-   * This updates AST positions, refreshes source, and creates fresh MagicString
+   * Track a delta and immediately update AST positions, then recreate MagicString
+   * This keeps the AST synchronized with the string state after each operation
+   *
+   * Note: We must recreate MagicString after each operation because MagicString's
+   * internal chunk structure doesn't support overlapping edits to the same regions.
    */
-  __finishOperation() {
-    if (this.__pendingDeltas.length === 0) {
-      return;
-    }
+  __trackDelta(delta: PositionDelta) {
+    // Apply delta to AST positions immediately
+    this.__astUpdater.updateNodePositions(this.__dom, delta);
 
-    // Apply all deltas to AST positions
-    for (const delta of this.__pendingDeltas) {
-      this.__astUpdater.updateNodePositions(this.__dom, delta);
-    }
-
-    // Update source and create fresh MagicString with current state
+    // Recreate MagicString to reset chunk structure for next operation
+    // This is necessary to support multiple edits to the same regions
     this.__source = this.__s.toString();
     this.__s = new MagicString(this.__source);
-
-    // Clear pending deltas
-    this.__pendingDeltas = [];
     this.__flushed = true;
+  }
+
+  /**
+   * Ensure source string is synced with MagicString state
+   * Call this before any read operation that needs the source string
+   */
+  __ensureFlushed() {
+    // Only update source if it's out of sync
+    const currentString = this.__s.toString();
+    if (this.__source !== currentString) {
+      this.__source = currentString;
+    }
   }
 
   trim(charType?: Parameters<typeof MagicString.prototype.trim>[0]) {
@@ -88,16 +94,15 @@ export class HtmlMod {
     const trimmedEnd = beforeSource.length - beforeSource.trimEnd().length;
 
     if (trimmedStart > 0) {
-      this.__pendingDeltas.push(calculateRemoveDelta(0, trimmedStart));
+      this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
     }
     if (trimmedEnd > 0) {
-      this.__pendingDeltas.push(calculateRemoveDelta(beforeSource.length - trimmedEnd, beforeSource.length));
+      this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmedEnd, beforeSource.length));
     }
 
     // 3. No AST structure changes for trim operations
 
     // 4. Apply deltas and refresh
-    this.__finishOperation();
 
     return this;
   }
@@ -110,13 +115,12 @@ export class HtmlMod {
     // 2. Queue delta for removed characters at start
     const trimmed = beforeSource.length - beforeSource.trimStart().length;
     if (trimmed > 0) {
-      this.__pendingDeltas.push(calculateRemoveDelta(0, trimmed));
+      this.__trackDelta(calculateRemoveDelta(0, trimmed));
     }
 
     // 3. No AST structure changes for trim operations
 
     // 4. Apply deltas and refresh
-    this.__finishOperation();
 
     return this;
   }
@@ -129,13 +133,12 @@ export class HtmlMod {
     // 2. Queue delta for removed characters at end
     const trimmed = beforeSource.length - beforeSource.trimEnd().length;
     if (trimmed > 0) {
-      this.__pendingDeltas.push(calculateRemoveDelta(beforeSource.length - trimmed, beforeSource.length));
+      this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmed, beforeSource.length));
     }
 
     // 3. No AST structure changes for trim operations
 
     // 4. Apply deltas and refresh
-    this.__finishOperation();
 
     return this;
   }
@@ -169,26 +172,32 @@ export class HtmlMod {
 
     if (trimmedStartLines > 0) {
       const trimmedChars = beforeLines.slice(0, trimmedStartLines).join('\n').length + 1; // +1 for final newline
-      this.__pendingDeltas.push(calculateRemoveDelta(0, trimmedChars));
+      this.__trackDelta(calculateRemoveDelta(0, trimmedChars));
     }
 
     if (trimmedEndLines > 0) {
       const startPos = beforeLines.slice(0, beforeLines.length - trimmedEndLines).join('\n').length;
-      this.__pendingDeltas.push(calculateRemoveDelta(startPos, beforeSource.length));
+      this.__trackDelta(calculateRemoveDelta(startPos, beforeSource.length));
     }
 
     // 3. No AST structure changes for trim operations
 
     // 4. Apply deltas and refresh
-    this.__finishOperation();
 
     return this;
   }
   isEmpty() {
     return this.__s.isEmpty();
   }
+  /**
+   * Check if the AST is synchronized with the string state.
+   *
+   * @deprecated This always returns `true` in the experimental auto-flush implementation.
+   * The AST is automatically kept synchronized after every modification, so manual
+   * flushing is never needed. This method exists only for API compatibility.
+   */
   isFlushed() {
-    return this.__flushed;
+    return true;
   }
   generateDecodedMap(options?: Parameters<typeof MagicString.prototype.generateDecodedMap>[0]) {
     return this.__s.generateDecodedMap(options);
@@ -197,6 +206,8 @@ export class HtmlMod {
     return this.__s.generateMap(options);
   }
   toString() {
+    this.__ensureFlushed();
+
     if (this.__options.autofix) {
       return nodeToString(parseDocument(this.__s.toString(), this.__options));
     }
@@ -204,6 +215,7 @@ export class HtmlMod {
     return this.__s.toString();
   }
   clone() {
+    this.__ensureFlushed();
     return new HtmlMod(this.__s.toString());
   }
 
@@ -214,6 +226,7 @@ export class HtmlMod {
   }
 
   querySelector(selector: string): HtmlModElement | null {
+    this.__ensureFlushed();
     const result = select(selector, this.__dom)?.[0];
     if (!result) {
       return null;
@@ -223,6 +236,7 @@ export class HtmlMod {
   }
 
   querySelectorAll(selector: string): HtmlModElement[] {
+    this.__ensureFlushed();
     return select(selector, this.__dom).map(element => {
       return new this.__HtmlModElement(element as unknown as SourceElement, this);
     });
@@ -241,6 +255,7 @@ export class HtmlModElement {
   }
 
   get sourceRange() {
+    this.__htmlMod.__ensureFlushed();
     const startIndex = this.__element.source.openTag.startIndex;
     const endIndex = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
     const html = this.__htmlMod.__source;
@@ -266,6 +281,7 @@ export class HtmlModElement {
   }
 
   get tagName() {
+    this.__htmlMod.__ensureFlushed();
     return this.__element.tagName;
   }
 
@@ -284,35 +300,43 @@ export class HtmlModElement {
     const openTagStart = this.__element.source.openTag.startIndex + 1;
     const openTagEnd = this.__element.source.openTag.startIndex + 1 + currentTagName.length;
     this.__htmlMod.__s.overwrite(openTagStart, openTagEnd, tagName);
-    this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(openTagStart, openTagEnd, tagName));
+    this.__htmlMod.__trackDelta(calculateOverwriteDelta(openTagStart, openTagEnd, tagName));
 
     // Override the closing tag
     if (this.__element.source.closeTag) {
       const closeTagStart = this.__element.source.closeTag.startIndex + 2;
       const closeTagEnd = this.__element.source.closeTag.startIndex + 2 + currentTagName.length;
       this.__htmlMod.__s.overwrite(closeTagStart, closeTagEnd, tagName);
-      this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(closeTagStart, closeTagEnd, tagName));
+      this.__htmlMod.__trackDelta(calculateOverwriteDelta(closeTagStart, closeTagEnd, tagName));
     }
 
     // 3. Modify AST: Update element tag name
     AstManipulator.setTagName(this.__element, tagName);
-
-    // 4. Apply deltas and refresh
-    this.__htmlMod.__finishOperation();
   }
 
   get id() {
+    this.__htmlMod.__ensureFlushed();
     return this.__element.attribs.id ?? '';
   }
 
   get classList() {
-    const classList = (this.__element.attribs.class ?? '').split(' ').map((c: string) => c.trim());
+    this.__htmlMod.__ensureFlushed();
+    const classes = this.__element.attribs.class ?? '';
+    const result: string[] = [];
 
-    // compact
-    return classList.filter((c: string) => Boolean(c.trim()));
+    // Single loop: split, trim, and filter in one pass
+    for (const cls of classes.split(' ')) {
+      const trimmed = cls.trim();
+      if (trimmed) {
+        result.push(trimmed);
+      }
+    }
+
+    return result;
   }
 
   get className() {
+    this.__htmlMod.__ensureFlushed();
     return this.__element.attribs.class ?? '';
   }
 
@@ -370,6 +394,7 @@ export class HtmlModElement {
   }
 
   get attributes() {
+    this.__htmlMod.__ensureFlushed();
     return this.__element.source.attributes.map(attribute => {
       return {
         name: attribute.name.data,
@@ -379,6 +404,7 @@ export class HtmlModElement {
   }
 
   get innerHTML() {
+    this.__htmlMod.__ensureFlushed();
     // Check if innerHTML is cached (element was removed/replaced)
     const cached = this.__htmlMod.__cachedInnerHTML.get(this.__element);
     if (cached !== undefined) {
@@ -423,27 +449,24 @@ export class HtmlModElement {
         const slashStart = this.__element.source.openTag.endIndex - 1;
         const tagEnd = this.__element.source.openTag.endIndex + 1; // After the '>'
         this.__htmlMod.__s.overwrite(slashStart, tagEnd, `>${combined}`);
-        this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(slashStart, tagEnd, `>${combined}`));
+        this.__htmlMod.__trackDelta(calculateOverwriteDelta(slashStart, tagEnd, `>${combined}`));
       } else {
         // No slash, just append after the '>'
         const insertPos = this.__element.source.openTag.endIndex;
         this.__htmlMod.__s.appendRight(insertPos, combined);
-        this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, combined));
+        this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, combined));
       }
     } else if (isEmpty) {
       // When empty (not self-closing), use prependLeft at contentEnd to shift the closeTag
       this.__htmlMod.__s.prependLeft(contentEnd, html);
-      this.__htmlMod.__pendingDeltas.push(calculatePrependLeftDelta(contentEnd, html));
+      this.__htmlMod.__trackDelta(calculatePrependLeftDelta(contentEnd, html));
     } else {
       // Normal case: overwrite existing content
       this.__htmlMod.__s.overwrite(contentStart, contentEnd, html);
-      this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(contentStart, contentEnd, html));
+      this.__htmlMod.__trackDelta(calculateOverwriteDelta(contentStart, contentEnd, html));
     }
 
-    // 3. Finish operation FIRST (apply deltas to existing AST and refresh)
-    this.__htmlMod.__finishOperation();
-
-    // 4. After deltas applied, parse and add new content to AST
+    // 3. Parse and add new content to AST
     if (html.length > 0) {
       // Calculate parse position - use ORIGINAL positions since content was inserted there
       let parsePos: number;
@@ -487,6 +510,7 @@ export class HtmlModElement {
   }
 
   get textContent() {
+    this.__htmlMod.__ensureFlushed();
     const text = DomUtils.textContent(this.__element);
 
     return decode(text);
@@ -501,6 +525,7 @@ export class HtmlModElement {
   }
 
   get outerHTML() {
+    this.__htmlMod.__ensureFlushed();
     // Check if outerHTML is cached (element was removed/replaced)
     const cached = this.__htmlMod.__cachedOuterHTML.get(this.__element);
     if (cached !== undefined) {
@@ -514,6 +539,7 @@ export class HtmlModElement {
   }
 
   get children(): (HtmlModElement | HtmlModText)[] {
+    this.__htmlMod.__ensureFlushed();
     return this.__element.children
       .map(child => {
         if (child.type === 'text') {
@@ -528,6 +554,7 @@ export class HtmlModElement {
   }
 
   get parent(): HtmlModElement | null {
+    this.__htmlMod.__ensureFlushed();
     const { parent } = this.__element;
 
     if (parent?.type === 'tag') {
@@ -544,12 +571,9 @@ export class HtmlModElement {
     this.__htmlMod.__s.prependLeft(insertPos, html);
 
     // 2. Queue delta
-    this.__htmlMod.__pendingDeltas.push(calculatePrependLeftDelta(insertPos, html));
+    this.__htmlMod.__trackDelta(calculatePrependLeftDelta(insertPos, html));
 
-    // 3. Apply deltas first
-    this.__htmlMod.__finishOperation();
-
-    // 4. Parse and insert nodes AFTER deltas are applied
+    // 3. Parse and insert nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.insertBefore(this.__element, newNodes);
 
@@ -563,12 +587,9 @@ export class HtmlModElement {
     this.__htmlMod.__s.appendRight(insertPos, html);
 
     // 2. Queue delta
-    this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, html));
+    this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, html));
 
-    // 3. Apply deltas first
-    this.__htmlMod.__finishOperation();
-
-    // 4. Parse and insert nodes AFTER deltas are applied
+    // 3. Parse and insert nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.insertAfter(this.__element, newNodes);
 
@@ -593,25 +614,22 @@ export class HtmlModElement {
         const gtEnd = originalEndIndex + 1;
         const replacement = `>${html}${closingTag}`;
         this.__htmlMod.__s.overwrite(slashStart, gtEnd, replacement);
-        this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(slashStart, gtEnd, replacement));
+        this.__htmlMod.__trackDelta(calculateOverwriteDelta(slashStart, gtEnd, replacement));
       } else {
         // No slash, just append after '>'
         const insertPos = originalEndIndex + 1;
         const combined = html + closingTag;
         this.__htmlMod.__s.appendRight(insertPos, combined);
-        this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, combined));
+        this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, combined));
       }
     } else {
       // Regular tag - prepend content
       const insertPos = originalEndIndex + 1;
       this.__htmlMod.__s.prependLeft(insertPos, html);
-      this.__htmlMod.__pendingDeltas.push(calculatePrependLeftDelta(insertPos, html));
+      this.__htmlMod.__trackDelta(calculatePrependLeftDelta(insertPos, html));
     }
 
-    // Apply deltas first
-    this.__htmlMod.__finishOperation();
-
-    // Now parse and add children to AST (using original positions)
+    // Parse and add children to AST (using original positions)
     if (isSelfClosing) {
       // For self-closing, content starts after the '>'
       const parsePos = originalEndIndex + 1;
@@ -648,12 +666,9 @@ export class HtmlModElement {
     this.__htmlMod.__s.appendRight(insertPos, html);
 
     // 2. Queue delta
-    this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, html));
+    this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, html));
 
-    // 3. Apply deltas first
-    this.__htmlMod.__finishOperation();
-
-    // 4. Parse and append nodes AFTER deltas are applied
+    // 3. Parse and append nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.appendChild(this.__element, newNodes);
 
@@ -711,11 +726,9 @@ export class HtmlModElement {
     );
 
     this.__htmlMod.__s.remove(removeStart, removeEnd);
-    this.__htmlMod.__pendingDeltas.push(calculateRemoveDelta(removeStart, removeEnd));
+    this.__htmlMod.__trackDelta(calculateRemoveDelta(removeStart, removeEnd));
 
     AstManipulator.removeNode(this.__element);
-
-    this.__htmlMod.__finishOperation();
 
     return this;
   }
@@ -739,12 +752,9 @@ export class HtmlModElement {
     this.__htmlMod.__s.overwrite(replaceStart, replaceEnd, html);
 
     // 2. Queue delta
-    this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(replaceStart, replaceEnd, html));
+    this.__htmlMod.__trackDelta(calculateOverwriteDelta(replaceStart, replaceEnd, html));
 
-    // 3. Apply deltas first
-    this.__htmlMod.__finishOperation();
-
-    // 4. Parse and replace nodes AFTER deltas are applied
+    // 3. Parse and replace nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, replaceStart, this.__htmlMod.__options);
     AstManipulator.replaceNode(this.__element, newNodes);
 
@@ -803,7 +813,7 @@ export class HtmlModElement {
         const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
         this.__htmlMod.__s.overwrite(overwriteStart, overwriteEnd, content);
-        this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(overwriteStart, overwriteEnd, content));
+        this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, content));
 
         nameStart = attribute.name.startIndex;
         valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -827,7 +837,7 @@ export class HtmlModElement {
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
           this.__htmlMod.__s.overwrite(overwriteStart, overwriteEnd, content);
-          this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(overwriteStart, overwriteEnd, content));
+          this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, content));
 
           nameStart = attribute.name.startIndex;
           valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -841,7 +851,7 @@ export class HtmlModElement {
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
           this.__htmlMod.__s.appendRight(insertPos, content);
-          this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, content));
+          this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, content));
 
           nameStart = attribute.name.startIndex;
           valueStart = insertPos + (quoteChar ? 1 : 0);
@@ -857,7 +867,7 @@ export class HtmlModElement {
         const content = `=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
         this.__htmlMod.__s.appendRight(insertPos, content);
-        this.__htmlMod.__pendingDeltas.push(calculateAppendRightDelta(insertPos, content));
+        this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, content));
 
         nameStart = attribute.name.startIndex;
         valueStart = insertPos + 1 + (actualQuoteUsed ? 1 : 1);
@@ -893,7 +903,7 @@ export class HtmlModElement {
       }
 
       this.__htmlMod.__s.prependLeft(insertPos, content);
-      this.__htmlMod.__pendingDeltas.push(calculatePrependLeftDelta(insertPos, content));
+      this.__htmlMod.__trackDelta(calculatePrependLeftDelta(insertPos, content));
 
       // Positions are calculated relative to where content is inserted
       // prependLeft inserts BEFORE insertPos, so content starts at insertPos
@@ -908,10 +918,7 @@ export class HtmlModElement {
       sourceEnd = contentStart + content.length - 1 - (hasTrailingSpace ? 1 : 0);
     }
 
-    // 3. Apply deltas first
-    this.__htmlMod.__finishOperation();
-
-    // 4. Modify AST: Update attribute in element AFTER deltas are applied
+    // 3. Modify AST: Update attribute in element
     // Positions are already correct since they were calculated before the operation
     // Pass escapedValue for source.data (HTML), value for attribs (JavaScript)
     AstManipulator.setAttribute(
@@ -957,19 +964,17 @@ export class HtmlModElement {
       const removeEnd = attribute.source.endIndex + 1;
 
       this.__htmlMod.__s.remove(removeStart, removeEnd);
-      this.__htmlMod.__pendingDeltas.push(calculateRemoveDelta(removeStart, removeEnd));
+      this.__htmlMod.__trackDelta(calculateRemoveDelta(removeStart, removeEnd));
     }
 
     // 3. Modify AST: Remove attribute from element
     AstManipulator.removeAttribute(this.__element, name);
 
-    // 4. Apply deltas and refresh
-    this.__htmlMod.__finishOperation();
-
     return this;
   }
 
   querySelector(selector: string): HtmlModElement | null {
+    this.__htmlMod.__ensureFlushed();
     const result = select(selector, this.__element)?.[0] ?? null;
     if (!result) {
       return null;
@@ -979,6 +984,7 @@ export class HtmlModElement {
   }
 
   querySelectorAll(selector: string): HtmlModElement[] {
+    this.__htmlMod.__ensureFlushed();
     return select(selector, this.__element).map(element => {
       return new this.__htmlMod.__HtmlModElement(element as unknown as SourceElement, this.__htmlMod);
     });
@@ -1014,10 +1020,12 @@ export class HtmlModText {
   }
 
   get textContent() {
+    this.__htmlMod.__ensureFlushed();
     return decode(this.__text.data);
   }
 
   get innerHTML() {
+    this.__htmlMod.__ensureFlushed();
     return this.__text.data;
   }
 
@@ -1036,15 +1044,12 @@ export class HtmlModText {
     this.__htmlMod.__s.overwrite(overwriteStart, overwriteEnd, html);
 
     // 2. Queue delta
-    this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(overwriteStart, overwriteEnd, html));
+    this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, html));
 
     // 3. Modify AST: Update text node data
     AstManipulator.setTextData(this.__text, html);
 
-    // 4. Apply deltas and refresh
-    this.__htmlMod.__finishOperation();
-
-    // 5. Manually update endIndex AFTER deltas are applied
+    // 4. Manually update endIndex
     // The text node is inside the overwritten region, so its position needs manual correction
     this.__text.endIndex = originalStart + html.length - 1;
   }
@@ -1066,15 +1071,12 @@ export class HtmlModText {
     this.__htmlMod.__s.overwrite(overwriteStart, overwriteEnd, escapedText);
 
     // 2. Queue delta
-    this.__htmlMod.__pendingDeltas.push(calculateOverwriteDelta(overwriteStart, overwriteEnd, escapedText));
+    this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, escapedText));
 
     // 3. Modify AST: Update text node data
     AstManipulator.setTextData(this.__text, escapedText);
 
-    // 4. Apply deltas and refresh
-    this.__htmlMod.__finishOperation();
-
-    // 5. Manually update endIndex AFTER deltas are applied
+    // 4. Manually update endIndex
     // The text node is inside the overwritten region, so its position needs manual correction
     this.__text.endIndex = originalStart + escapedText.length - 1;
   }
