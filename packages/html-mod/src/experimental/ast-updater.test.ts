@@ -271,5 +271,55 @@ describe('AstUpdater', () => {
       expect(section.startIndex).toBe(5 + shift);
       expect(p.startIndex).toBe(14 + shift);
     });
+
+    test('updates comment node positions', () => {
+      const html = '<!-- comment --><div>content</div>';
+      const doc = parseDocument(html);
+      const updater = new AstUpdater();
+
+      const comment = doc.children[0];
+      const div = doc.children[1];
+
+      expect(comment.type).toBe('comment');
+      if (!('startIndex' in comment) || !('endIndex' in comment)) {
+        throw new Error('Comment should have position tracking');
+      }
+      expect(comment.startIndex).toBe(0);
+      expect(comment.endIndex).toBe(15);
+
+      // Insert at beginning
+      const delta = calculatePrependLeftDelta(0, 'XX');
+      updater.updateNodePositions(doc, delta);
+
+      // Comment positions should shift
+      expect(comment.startIndex).toBe(2);
+      expect(comment.endIndex).toBe(17);
+
+      // Div should also shift
+      expect(div.startIndex).toBe(18);
+    });
+
+    test('updates comment positions after elements', () => {
+      const html = '<div>text</div><!-- comment -->';
+      const doc = parseDocument(html);
+      const updater = new AstUpdater();
+
+      const div = doc.children[0];
+      const comment = doc.children[1];
+
+      if (!('startIndex' in comment) || !('endIndex' in comment)) {
+        throw new Error('Comment should have position tracking');
+      }
+      expect(comment.startIndex).toBe(15);
+      expect(comment.endIndex).toBe(30);
+
+      // Insert in middle of div content
+      const delta = calculateAppendRightDelta(10, 'INSERTED');
+      updater.updateNodePositions(doc, delta);
+
+      // Comment after modification should shift
+      expect(comment.startIndex).toBe(23); // 15 + 8
+      expect(comment.endIndex).toBe(38); // 30 + 8
+    });
   });
 });

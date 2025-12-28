@@ -8,6 +8,23 @@ import { SourceDocument, SourceElement, SourceChildNode, SourceText, isTag, isTe
 
 import { PositionDelta, applyDeltaToPosition } from './position-delta.js';
 
+/**
+ * Type guard to check if a node has position tracking
+ */
+interface NodeWithPositions {
+  startIndex: number;
+  endIndex: number;
+}
+
+function hasPositions(node: SourceChildNode): node is SourceChildNode & NodeWithPositions {
+  return (
+    'startIndex' in node &&
+    'endIndex' in node &&
+    typeof node.startIndex === 'number' &&
+    typeof node.endIndex === 'number'
+  );
+}
+
 export class AstUpdater {
   /**
    * Update all affected node positions in the AST based on a position delta
@@ -32,8 +49,10 @@ export class AstUpdater {
       this.updateElementNode(node, delta);
     } else if (isText(node)) {
       this.updateTextNode(node, delta);
+    } else {
+      // Other node types (comments, CDATA, processing instructions, etc.) have basic position tracking
+      this.updateBasicNode(node, delta);
     }
-    // Other node types (comments, CDATA, etc.) don't have position tracking in our implementation
   }
 
   /**
@@ -87,6 +106,24 @@ export class AstUpdater {
 
     text.startIndex = applyDeltaToPosition(text.startIndex, delta);
     text.endIndex = applyDeltaToPosition(text.endIndex, delta);
+  }
+
+  /**
+   * Update positions for other node types (comments, CDATA, processing instructions, etc.)
+   */
+  private updateBasicNode(node: SourceChildNode, delta: PositionDelta): void {
+    // Check if node has position tracking
+    if (!hasPositions(node)) {
+      return;
+    }
+
+    // Optimization: if node ends before mutation, no update needed
+    if (node.endIndex < delta.mutationStart) {
+      return;
+    }
+
+    node.startIndex = applyDeltaToPosition(node.startIndex, delta);
+    node.endIndex = applyDeltaToPosition(node.endIndex, delta);
   }
 
   /**
