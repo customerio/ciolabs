@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { HtmlMod as StableHtmlMod } from '../index';
+
 import { HtmlMod as ExperimentalHtmlMod } from './index';
 
 /**

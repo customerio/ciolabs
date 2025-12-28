@@ -4,13 +4,14 @@
  * These utilities combine string manipulation with delta tracking to prevent
  * bugs where developers forget to call __trackDelta after string operations.
  */
-import type { HtmlMod } from './index';
 import {
   calculateOverwriteDelta,
   calculateAppendRightDelta,
   calculatePrependLeftDelta,
   calculateRemoveDelta,
 } from './position-delta';
+
+import type { HtmlMod } from './index';
 
 /**
  * Atomically overwrite a range in the source string and track the delta

@@ -11,9 +11,6 @@ const config: Config = {
   bracketSameLine: false,
   arrowParens: 'avoid',
   endOfLine: 'lf',
-  plugins: ['@trivago/prettier-plugin-sort-imports'],
-  importOrder: ['^[./]'],
-  importOrderSeparation: true,
   overrides: [
     {
       files: ['*.{js,ts,gts,jsx,tsx}', '.*.{js,ts,gts,jsx,tsx}'],
