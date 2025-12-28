@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod as StableHtmlMod } from '../index.js';
-import { HtmlMod as ExperimentalHtmlMod } from './index.js';
+import { HtmlMod as StableHtmlMod } from '../index';
+import { HtmlMod as ExperimentalHtmlMod } from './index';
 
 /**
  * Chaos Monkey / Fuzzing Tests
