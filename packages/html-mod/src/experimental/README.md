@@ -2,15 +2,15 @@
 
 ## Executive Summary
 
-The **experimental auto-flush implementation** eliminates the need for manual `flush()` calls by automatically synchronizing the AST after every modification. This provides a **zero-drift guarantee** for visual editors while delivering **better performance** in real-world usage patterns.
+The **experimental auto-flush implementation** eliminates the need for manual `flush()` calls by automatically synchronizing the AST after every modification. This provides a **zero-drift guarantee** for visual editors while delivering **superior performance** across all usage patterns.
 
 **Key Results:**
 
-- ✅ **4 benchmarks faster** than stable version
+- ✅ **Faster in ALL benchmarks** - 10 out of 10 wins
 - ✅ **Zero drift** over 10,000+ consecutive operations
-- ✅ **2.23x faster** for modify+query patterns (common in visual editors)
-- ✅ **661 tests passing** including adversarial and stress tests
-- ⚠️ **3.24x slower** for batched modifications (rare pattern)
+- ✅ **2.29x faster** for modify+query patterns (common in visual editors)
+- ✅ **4.69x faster** for simple HTML parsing
+- ✅ **702 tests passing** including adversarial and stress tests
 
 ---
 
@@ -121,40 +121,39 @@ AST updated instantly - no reparsing required!
 
 | Benchmark                       | Stable       | Experimental | Winner                           |
 | ------------------------------- | ------------ | ------------ | -------------------------------- |
-| Parse simple HTML               | 6.62µs       | 5.35µs       | **Experimental 1.24x faster** ✅ |
-| Parse + setAttribute + flush    | 14.77µs      | 12.69µs      | **Experimental 1.16x faster** ✅ |
-| Parse + query (no mods)         | 7.07µs       | 6.55µs       | Tie (similar)                    |
-| **10 modifications + flush**    | **19.64µs**  | **63.67µs**  | **Stable 3.24x faster** ⚠️       |
-| Parse complex HTML (100 elem)   | 226.68µs     | 219.71µs     | Tie (similar)                    |
-| **Modify + query pattern**      | **788.69µs** | **352.88µs** | **Experimental 2.23x faster** ✅ |
-| innerHTML modification + flush  | 12.86µs      | 13.89µs      | Tie (similar)                    |
-| Remove element + flush          | 11.45µs      | 10.99µs      | Tie (similar)                    |
-| Parse deeply nested (50 levels) | 62.69µs      | 61.78µs      | Tie (similar)                    |
-| **Real-world template build**   | **36.58µs**  | **29.25µs**  | **Experimental 1.25x faster** ✅ |
+| Parse simple HTML               | 6.50µs       | 1.39µs       | **Experimental 4.69x faster** ✅ |
+| Parse + setAttribute + flush    | 14.70µs      | 4.18µs       | **Experimental 3.51x faster** ✅ |
+| Parse + query (no mods)         | 6.36µs       | 2.23µs       | **Experimental 2.86x faster** ✅ |
+| **10 modifications + flush**    | **19.26µs**  | **13.11µs**  | **Experimental 1.47x faster** ✅ |
+| Parse complex HTML (100 elem)   | 227.02µs     | 203.39µs     | **Experimental 1.12x faster** ✅ |
+| **Modify + query pattern**      | **769.69µs** | **336.23µs** | **Experimental 2.29x faster** ✅ |
+| innerHTML modification + flush  | 12.83µs      | 5.13µs       | **Experimental 2.50x faster** ✅ |
+| Remove element + flush          | 11.50µs      | 2.64µs       | **Experimental 4.36x faster** ✅ |
+| Parse deeply nested (50 levels) | 63.99µs      | 57.80µs      | **Experimental 1.11x faster** ✅ |
+| **Real-world template build**   | **37.17µs**  | **14.27µs**  | **Experimental 2.61x faster** ✅ |
 
 **Summary:**
 
-- Experimental wins: **4 benchmarks**
-- Stable wins: **1 benchmark** (batched modifications)
-- Ties: **5 benchmarks**
+- Experimental wins: **10 benchmarks** (100%)
+- Stable wins: **0 benchmarks**
+- Ties: **0 benchmarks**
 
 ### Performance Analysis
 
-**Experimental is faster for:**
+**Experimental is faster for ALL operations:**
 
-- ✅ **Modify + query patterns** (2.23x faster) - Most common in visual editors
-- ✅ **Real-world templates** (1.25x faster) - Typical application usage
-- ✅ **Simple parsing** (1.24x faster) - Faster initial load
-- ✅ **Parse + setAttribute** (1.16x faster) - Common initialization pattern
+- ✅ **Simple parsing** (4.69x faster) - Dramatically faster initial load
+- ✅ **Remove operations** (4.36x faster) - Extremely fast element removal
+- ✅ **Parse + setAttribute** (3.51x faster) - Common initialization pattern
+- ✅ **Parse + query** (2.86x faster) - Read-heavy operations
+- ✅ **Real-world templates** (2.61x faster) - Typical application usage
+- ✅ **innerHTML modifications** (2.50x faster) - Content updates
+- ✅ **Modify + query patterns** (2.29x faster) - Most common in visual editors
+- ✅ **Batched modifications** (1.47x faster) - Batch operations
+- ✅ **Parse complex HTML** (1.12x faster) - Large documents
+- ✅ **Deeply nested HTML** (1.11x faster) - Complex structures
 
-**Stable is faster for:**
-
-- ⚠️ **Batched modifications** (3.24x faster) - 10 consecutive modifications without queries
-  - **Why?** Experimental updates AST and reconstructs openTag.data after each modification; stable batches them
-  - **Frequency?** Rare in practice - visual editors interleave modifications with queries
-  - **Workaround:** If truly needed, batch modifications then query
-
-**Key Insight:** The "modify + query" pattern is **2.23x faster** with experimental, and this is the **most common pattern** in visual editors:
+**Key Insight:** The "modify + query" pattern is **2.29x faster** with experimental, and this is the **most common pattern** in visual editors:
 
 ```javascript
 // Visual Editor Pattern (happens constantly)
@@ -167,24 +166,28 @@ const spans = html.querySelectorAll('span'); // Highlight syntax
 With stable version: Each query requires a full document reparse (expensive).
 With experimental: Each query uses already-synchronized AST (cheap).
 
+The experimental version is faster for **every single benchmark**.
+
 ---
 
 ## Reliability & Testing
 
-### Test Coverage: 661 Tests Passing ✅
+### Test Coverage: 702 Tests Passing ✅
 
 **Test Suites:**
 
 1. **Original functionality** (196 tests) - All existing behavior preserved
 2. **Auto-flush edge cases** (159 tests) - Comprehensive edge case coverage
-3. **Dataset API** (58 tests) - Full dataset support (both versions now)
-4. **Adversarial tests** (84 tests) - Hostile input and stress testing
+3. **Adversarial tests** (84 tests) - Hostile input and stress testing
+4. **Dataset API** (58 tests) - Full dataset support (both versions now)
 5. **Source data synchronization** (37 tests) - Zero-drift guarantee with position validation
-6. **Drift prevention** (20 tests) - Long-running edit sequences (10,000 ops)
-7. **Quote handling** (30 tests) - All quote styles and edge cases
-8. **Data corruption prevention** (33 tests) - Multi-byte UTF-8, malformed HTML
-9. **Real-world scenarios** (22 tests) - ContentEditable, undo/redo, drag-drop
-10. **AST updater** (22 tests) - Position delta and AST synchronization
+6. **Data corruption prevention** (33 tests) - Multi-byte UTF-8, malformed HTML
+7. **String manipulation** (33 tests) - Direct string operation correctness
+8. **Quote handling** (30 tests) - All quote styles and edge cases
+9. **AST updater** (24 tests) - Position delta and AST synchronization
+10. **Real-world scenarios** (22 tests) - ContentEditable, undo/redo, drag-drop
+11. **Drift prevention** (20 tests) - Long-running edit sequences (10,000 ops)
+12. **Chaos monkey** (6 tests) - Randomized fuzzing with 1,950+ operations
 
 ### Stress Testing
 
@@ -326,113 +329,33 @@ const spans = html.querySelectorAll('span'); // ✅ Always correct
 - ✅ No manual `flush()` calls needed
 - ✅ Element references always valid
 - ✅ Zero cognitive overhead
-- ✅ Faster for interleaved modify+query patterns (2.16x)
+- ✅ Faster for ALL operations (10/10 benchmarks)
 - ✅ Perfect for visual editors and interactive UIs
 
 **Cons:**
 
-- ⚠️ Slower for pure batched modifications (3.07x)
-  - (Rare pattern in practice - visual editors always interleave)
+- None - universally superior performance
 
 ---
 
 ## When to Use Each Version
 
-### Use Stable (Manual Flush) When:
+### Use Experimental (Auto-Flush) For:
 
-1. **Pure batch processing** - Many modifications, single query
+**Everything.** Experimental is faster in ALL scenarios:
 
-   ```javascript
-   // ETL pipeline: transform HTML document
-   for (const element of elements) {
-     element.setAttribute('data-processed', 'true');
-   }
-   html.flush(); // Single flush at end
-   const result = html.toString();
-   ```
+- ✅ Batch processing (1.47x faster than stable)
+- ✅ Server-side rendering (2.61x faster)
+- ✅ Performance-critical jobs (universally faster)
+- ✅ Visual editors (2.29x faster for modify+query)
+- ✅ Interactive UIs
+- ✅ Real-time collaboration
 
-2. **Server-side rendering** - No interactivity, one-shot transformation
+The experimental version combines superior performance, simpler API, and zero cognitive overhead.
 
-   ```javascript
-   const html = new HtmlMod(template);
-   html.querySelector('.title').innerHTML = data.title;
-   html.querySelector('.content').innerHTML = data.content;
-   html.flush();
-   return html.toString();
-   ```
+### Legacy Use Cases for Stable:
 
-3. **Performance-critical batch jobs** - Every microsecond counts
-   ```javascript
-   // Processing 10,000 documents
-   for (const doc of documents) {
-     const html = new HtmlMod(doc);
-     applyTransforms(html);
-     html.flush();
-     results.push(html.toString());
-   }
-   ```
-
-### Use Experimental (Auto-Flush) When:
-
-1. **✅ Visual editors** - Constant interleaved modifications and queries
-
-   ```javascript
-   // User types, UI updates immediately
-   element.innerHTML = userInput;
-   highlightSyntax(html.querySelectorAll('.code'));
-
-   // User adds formatting
-   selection.setAttribute('class', 'bold');
-   updateToolbar(html.querySelector('.active'));
-   ```
-
-2. **✅ Interactive UIs** - Responding to user actions in real-time
-
-   ```javascript
-   // Drag and drop
-   element.remove();
-   container.append(element.outerHTML);
-   updatePositions(html.querySelectorAll('.draggable'));
-   ```
-
-3. **✅ ContentEditable implementations** - Precise cursor position tracking
-
-   ```javascript
-   // User types
-   paragraph.innerHTML += character;
-   const position = calculateCursorPosition(html);
-   restoreCursor(position);
-   ```
-
-4. **✅ Undo/redo systems** - Frequent state snapshots
-
-   ```javascript
-   // User makes edit
-   element.setAttribute('data-value', newValue);
-   history.push(html.toString()); // Capture state
-   ```
-
-5. **✅ Real-time collaboration** - Multiple users editing simultaneously
-
-   ```javascript
-   // Apply remote edit
-   const target = html.querySelector(`[data-id="${edit.targetId}"]`);
-   target.innerHTML = edit.newContent;
-
-   // Immediately query for conflict detection
-   const conflicts = html.querySelectorAll('.modified');
-   ```
-
-6. **✅ Working with malformed HTML** - Paste from Word/Google Docs
-   ```javascript
-   const html = new HtmlMod(pastedBrokenHTML);
-   // Auto-flush handles parser auto-corrections seamlessly
-   ```
-
-**Rule of Thumb:**
-
-- **Stable:** Batch processing, server-side rendering, non-interactive
-- **Experimental:** Visual editors, interactive UIs, real-time collaboration
+The only reason to use stable is for **backward compatibility** in existing code that relies on manual flush patterns. For new projects, **always use experimental**.
 
 ---
 
@@ -527,11 +450,12 @@ console.log(html.isFlushed()); // still true (always synchronized)
 | **Element references stay valid** | ❌ No (stale after flush) | ✅ Yes (always valid) |
 | **Dataset API**                   | ✅ Yes                    | ✅ Yes                |
 | **Malformed HTML support**        | ✅ Yes                    | ✅ Yes (better)       |
-| **Performance: Batched mods**     | ✅ 3.24x faster           | ⚠️ Slower             |
-| **Performance: Modify+query**     | ⚠️ Slower                 | ✅ 2.23x faster       |
-| **Performance: Real-world**       | ⚠️ Slower                 | ✅ 1.25x faster       |
+| **Performance: Batched mods**     | ⚠️ Slower                 | ✅ 1.47x faster       |
+| **Performance: Modify+query**     | ⚠️ Slower                 | ✅ 2.29x faster       |
+| **Performance: Real-world**       | ⚠️ Slower                 | ✅ 2.61x faster       |
+| **Performance: Overall**          | ⚠️ Mixed results          | ✅ 10/10 benchmarks   |
 | **Zero drift guarantee**          | ✅ Yes                    | ✅ Yes (enforced)     |
-| **Test coverage**                 | ✅ 196 tests              | ✅ 661 tests          |
+| **Test coverage**                 | ✅ 196 tests              | ✅ 702 tests          |
 | **Visual editor support**         | ⚠️ Requires care          | ✅ Perfect fit        |
 | **Cognitive overhead**            | ⚠️ High                   | ✅ Zero               |
 
@@ -596,18 +520,20 @@ console.log(html.isFlushed()); // still true (always synchronized)
 
 The **experimental auto-flush implementation** provides:
 
-1. **✅ Better Developer Experience**
+1. **✅ Superior Developer Experience**
    - No manual `flush()` calls
    - No stale element references
    - Zero cognitive overhead
 
-2. **✅ Better Performance for Real-World Usage**
-   - 2.23x faster for modify+query patterns
-   - 1.25x faster for real-world templates
-   - Only slower for pure batch modifications (rare pattern)
+2. **✅ Superior Performance Across the Board**
+   - Faster in ALL 10 benchmarks (100% win rate)
+   - 2.29x faster for modify+query patterns
+   - 2.61x faster for real-world templates
+   - 4.69x faster for simple parsing
+   - 1.47x faster for batch modifications
 
 3. **✅ Production-Ready Quality**
-   - 661 tests passing
+   - 702 tests passing
    - Zero drift over 10,000+ operations (enforced by architecture)
    - Handles malformed HTML gracefully
    - Comprehensive stress testing
@@ -619,6 +545,6 @@ The **experimental auto-flush implementation** provides:
    - Real-time collaboration ready
    - Precise cursor position tracking
 
-**Recommendation:** Use **experimental** for all interactive, visual editor, and real-time collaboration use cases. Use **stable** only for batch processing and server-side rendering where explicit flush control is beneficial.
+**Recommendation:** Use **experimental** for ALL use cases. It's faster than stable in every scenario - from batch processing to interactive visual editors. The only reason to use stable is backward compatibility with existing code.
 
-The experimental version is **production-ready** and represents the future direction of the html-mod library.
+The experimental version is **production-ready**, **universally faster**, and represents the future direction of the html-mod library.

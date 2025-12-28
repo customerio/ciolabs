@@ -11,15 +11,11 @@ import { select } from 'cheerio-select';
 import escapeHtml from 'escape-html';
 import { decode } from 'html-entities';
 
-import * as AstManipulator from './ast-manipulator.js';
-import { AstUpdater } from './ast-updater.js';
-import {
-  calculateOverwriteDelta,
-  calculateAppendRightDelta,
-  calculatePrependLeftDelta,
-  calculateRemoveDelta,
-  type PositionDelta,
-} from './position-delta.js';
+import * as AstManipulator from './ast-manipulator';
+import { AstUpdater } from './ast-updater';
+import { getContentStart, getContentEnd, makeClosingTag, isSelfClosing, hasTrailingSlash } from './element-utils';
+import { calculateRemoveDelta, type PositionDelta } from './position-delta';
+import { atomicOverwrite, atomicAppendRight, atomicPrependLeft, atomicRemove } from './string-operations';
 
 export type HtmlModOptions = Options & {
   HtmlModElement?: typeof HtmlModElement; // allow for custom HtmlModElement
@@ -90,31 +86,34 @@ export class HtmlMod {
   }
 
   trim() {
-    // 1. Calculate what will be trimmed
     const beforeSource = this.__source;
-    this.__source = this.__source.trim();
+    const afterSource = beforeSource.trim();
+    this.__source = afterSource;
 
-    // 2. Queue deltas for removed characters
-    const trimmedStart = beforeSource.length - beforeSource.trimStart().length;
-    const trimmedEnd = beforeSource.length - beforeSource.trimEnd().length;
+    // Queue deltas for removed characters
+    const trimmedTotal = beforeSource.length - afterSource.length;
+    if (trimmedTotal > 0) {
+      const trimmedStart = beforeSource.length - beforeSource.trimStart().length;
+      const trimmedEnd = trimmedTotal - trimmedStart;
 
-    if (trimmedStart > 0) {
-      this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
-    }
-    if (trimmedEnd > 0) {
-      this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmedEnd, beforeSource.length));
+      if (trimmedStart > 0) {
+        this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
+      }
+      if (trimmedEnd > 0) {
+        this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmedEnd, beforeSource.length));
+      }
     }
 
     return this;
   }
 
   trimStart() {
-    // 1. Calculate what will be trimmed
     const beforeSource = this.__source;
-    this.__source = this.__source.trimStart();
+    const afterSource = beforeSource.trimStart();
+    this.__source = afterSource;
 
-    // 2. Queue delta for removed characters at start
-    const trimmed = beforeSource.length - beforeSource.trimStart().length;
+    // Queue delta for removed characters at start
+    const trimmed = beforeSource.length - afterSource.length;
     if (trimmed > 0) {
       this.__trackDelta(calculateRemoveDelta(0, trimmed));
     }
@@ -123,12 +122,12 @@ export class HtmlMod {
   }
 
   trimEnd() {
-    // 1. Calculate what will be trimmed
     const beforeSource = this.__source;
-    this.__source = this.__source.trimEnd();
+    const afterSource = beforeSource.trimEnd();
+    this.__source = afterSource;
 
-    // 2. Queue delta for removed characters at end
-    const trimmed = beforeSource.length - beforeSource.trimEnd().length;
+    // Queue delta for removed characters at end
+    const trimmed = beforeSource.length - afterSource.length;
     if (trimmed > 0) {
       this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmed, beforeSource.length));
     }
@@ -137,10 +136,7 @@ export class HtmlMod {
   }
 
   trimLines() {
-    // 1. Calculate what will be trimmed
     const beforeSource = this.__source;
-
-    // Manually implement trimLines: remove empty lines from start and end
     const beforeLines = beforeSource.split('\n');
 
     let trimmedStartLines = 0;
@@ -167,7 +163,7 @@ export class HtmlMod {
       this.__source = keepLines.join('\n');
     }
 
-    // 2. Track deltas
+    // Track deltas
     if (trimmedStartLines > 0) {
       const trimmedChars = beforeLines.slice(0, trimmedStartLines).join('\n').length + 1; // +1 for final newline
       this.__trackDelta(calculateRemoveDelta(0, trimmedChars));
@@ -286,23 +282,16 @@ export class HtmlModElement {
 
     const currentTagName = this.__element.tagName;
 
-    // 1. Do ALL MagicString operations and 2. Queue ALL deltas
-
-    // Override the opening tag
     const openTagStart = this.__element.source.openTag.startIndex + 1;
     const openTagEnd = this.__element.source.openTag.startIndex + 1 + currentTagName.length;
-    this.__htmlMod.__overwrite(openTagStart, openTagEnd, tagName);
-    this.__htmlMod.__trackDelta(calculateOverwriteDelta(openTagStart, openTagEnd, tagName));
+    atomicOverwrite(this.__htmlMod, openTagStart, openTagEnd, tagName);
 
-    // Override the closing tag
     if (this.__element.source.closeTag) {
       const closeTagStart = this.__element.source.closeTag.startIndex + 2;
       const closeTagEnd = this.__element.source.closeTag.startIndex + 2 + currentTagName.length;
-      this.__htmlMod.__overwrite(closeTagStart, closeTagEnd, tagName);
-      this.__htmlMod.__trackDelta(calculateOverwriteDelta(closeTagStart, closeTagEnd, tagName));
+      atomicOverwrite(this.__htmlMod, closeTagStart, closeTagEnd, tagName);
     }
 
-    // 3. Modify AST: Update element tag name
     AstManipulator.setTagName(this.__element, tagName);
   }
 
@@ -426,59 +415,42 @@ export class HtmlModElement {
       return;
     }
 
-    const contentStart = this.__element.source.openTag.endIndex + 1;
-    const contentEnd = this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex;
+    const contentStart = getContentStart(this.__element);
+    const contentEnd = getContentEnd(this.__element);
     const isEmpty = this.innerHTML.length === 0;
-    const isSelfClosing = this.__element.source.openTag.isSelfClosing;
-    const hasSlash =
-      isSelfClosing && this.__htmlMod.__source.charAt(this.__element.source.openTag.endIndex - 1) === '/';
+    const selfClosing = isSelfClosing(this.__element);
+    const hasSlash = hasTrailingSlash(this.__element, this.__htmlMod.__source);
 
-    // Save original positions for parse position calculation
     const originalContentStart = contentStart;
     const originalContentEnd = contentEnd;
     const originalOpenTagEnd = this.__element.source.openTag.endIndex;
 
-    // 1. All MagicString operations
-    if (isSelfClosing) {
-      // Handle self-closing tag conversion
-      const closingTag = `</${this.__element.tagName}>`;
+    if (selfClosing) {
+      const closingTag = makeClosingTag(this.__element.tagName);
       const combined = html + closingTag;
 
       if (hasSlash) {
-        // Overwrite '/>' with '>content</div>'
         const slashStart = this.__element.source.openTag.endIndex - 1;
-        const tagEnd = this.__element.source.openTag.endIndex + 1; // After the '>'
-        this.__htmlMod.__overwrite(slashStart, tagEnd, `>${combined}`);
-        this.__htmlMod.__trackDelta(calculateOverwriteDelta(slashStart, tagEnd, `>${combined}`));
+        const tagEnd = this.__element.source.openTag.endIndex + 1;
+        atomicOverwrite(this.__htmlMod, slashStart, tagEnd, `>${combined}`);
       } else {
-        // No slash, just append after the '>'
         const insertPos = this.__element.source.openTag.endIndex;
-        this.__htmlMod.__appendRight(insertPos, combined);
-        this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, combined));
+        atomicAppendRight(this.__htmlMod, insertPos, combined);
       }
     } else if (isEmpty) {
-      // When empty (not self-closing), use prependLeft at contentEnd to shift the closeTag
-      this.__htmlMod.__prependLeft(contentEnd, html);
-      this.__htmlMod.__trackDelta(calculatePrependLeftDelta(contentEnd, html));
+      atomicPrependLeft(this.__htmlMod, contentEnd, html);
     } else {
-      // Normal case: overwrite existing content
-      this.__htmlMod.__overwrite(contentStart, contentEnd, html);
-      this.__htmlMod.__trackDelta(calculateOverwriteDelta(contentStart, contentEnd, html));
+      atomicOverwrite(this.__htmlMod, contentStart, contentEnd, html);
     }
 
-    // 3. Parse and add new content to AST
     if (html.length > 0) {
-      // Calculate parse position - use ORIGINAL positions since content was inserted there
       let parsePos: number;
-      if (isSelfClosing) {
-        // After overwrite, '>' is at endIndex-1 (if had slash) or endIndex (if no slash)
+      if (selfClosing) {
         const openTagEnd = hasSlash ? originalOpenTagEnd - 1 : originalOpenTagEnd;
-        parsePos = openTagEnd + 1; // Content starts after '>'
+        parsePos = openTagEnd + 1;
       } else if (isEmpty) {
-        // After prependLeft, content is at the ORIGINAL contentEnd position
         parsePos = originalContentEnd;
       } else {
-        // After overwrite, content is at the ORIGINAL contentStart position
         parsePos = originalContentStart;
       }
       const newChildren = AstManipulator.parseHtmlAtPosition(html, parsePos, this.__htmlMod.__options);
@@ -487,23 +459,17 @@ export class HtmlModElement {
       AstManipulator.replaceChildren(this.__element, []);
     }
 
-    // 5. After position updates, convert self-closing to regular tag
-    if (isSelfClosing) {
-      const closingTag = `</${this.__element.tagName}>`;
-
-      // Calculate positions based on the updated source
-      // After overwrite, the '>' is at position endIndex-1 (where '/' was) if there was a slash
-      const openTagEnd = hasSlash
-        ? this.__element.source.openTag.endIndex - 1 // The new '>' is where the '/' was
-        : this.__element.source.openTag.endIndex; // '>' position unchanged
+    if (selfClosing) {
+      const closingTag = makeClosingTag(this.__element.tagName);
+      const openTagEnd = hasSlash ? this.__element.source.openTag.endIndex - 1 : this.__element.source.openTag.endIndex;
 
       if (html.length > 0) {
         const closeTagStart = openTagEnd + 1 + html.length;
-        const closeTagEnd = closeTagStart + closingTag.length - 1; // Inclusive end
+        const closeTagEnd = closeTagStart + closingTag.length - 1;
         AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
       } else {
         const closeTagStart = openTagEnd + 1;
-        const closeTagEnd = closeTagStart + closingTag.length - 1; // Inclusive end
+        const closeTagEnd = closeTagStart + closingTag.length - 1;
         AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
       }
     }
@@ -567,13 +533,8 @@ export class HtmlModElement {
   before(html: string) {
     const insertPos = this.__element.source.openTag.startIndex;
 
-    // 1. Do MagicString operation
-    this.__htmlMod.__prependLeft(insertPos, html);
+    atomicPrependLeft(this.__htmlMod, insertPos, html);
 
-    // 2. Queue delta
-    this.__htmlMod.__trackDelta(calculatePrependLeftDelta(insertPos, html));
-
-    // 3. Parse and insert nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.insertBefore(this.__element, newNodes);
 
@@ -583,13 +544,8 @@ export class HtmlModElement {
   after(html: string) {
     const insertPos = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
 
-    // 1. Do MagicString operation
-    this.__htmlMod.__appendRight(insertPos, html);
+    atomicAppendRight(this.__htmlMod, insertPos, html);
 
-    // 2. Queue delta
-    this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, html));
-
-    // 3. Parse and insert nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.insertAfter(this.__element, newNodes);
 
@@ -597,49 +553,36 @@ export class HtmlModElement {
   }
 
   prepend(html: string) {
-    const isSelfClosing = this.__element.source.openTag.isSelfClosing;
-    const hadSlash =
-      isSelfClosing && this.__htmlMod.__source.charAt(this.__element.source.openTag.endIndex - 1) === '/';
-
-    // Save original endIndex before operations
+    const selfClosing = isSelfClosing(this.__element);
+    const hadSlash = hasTrailingSlash(this.__element, this.__htmlMod.__source);
     const originalEndIndex = this.__element.source.openTag.endIndex;
 
-    // Handle self-closing tag conversion
-    if (isSelfClosing) {
-      const closingTag = `</${this.__element.tagName}>`;
+    if (selfClosing) {
+      const closingTag = makeClosingTag(this.__element.tagName);
 
       if (hadSlash) {
-        // Overwrite '/>' with '>' + content + closing tag
         const slashStart = originalEndIndex - 1;
         const gtEnd = originalEndIndex + 1;
         const replacement = `>${html}${closingTag}`;
-        this.__htmlMod.__overwrite(slashStart, gtEnd, replacement);
-        this.__htmlMod.__trackDelta(calculateOverwriteDelta(slashStart, gtEnd, replacement));
+        atomicOverwrite(this.__htmlMod, slashStart, gtEnd, replacement);
       } else {
-        // No slash, just append after '>'
         const insertPos = originalEndIndex + 1;
         const combined = html + closingTag;
-        this.__htmlMod.__appendRight(insertPos, combined);
-        this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, combined));
+        atomicAppendRight(this.__htmlMod, insertPos, combined);
       }
     } else {
-      // Regular tag - prepend content
       const insertPos = originalEndIndex + 1;
-      this.__htmlMod.__prependLeft(insertPos, html);
-      this.__htmlMod.__trackDelta(calculatePrependLeftDelta(insertPos, html));
+      atomicPrependLeft(this.__htmlMod, insertPos, html);
     }
 
-    // Parse and add children to AST (using original positions)
-    if (isSelfClosing) {
-      // For self-closing, content starts after the '>'
+    if (selfClosing) {
       const parsePos = originalEndIndex + 1;
       const openTagEnd = hadSlash ? originalEndIndex - 1 : originalEndIndex;
 
       const newNodes = AstManipulator.parseHtmlAtPosition(html, parsePos, this.__htmlMod.__options);
       AstManipulator.prependChild(this.__element, newNodes);
 
-      // Convert to regular tag
-      const closingTag = `</${this.__element.tagName}>`;
+      const closingTag = makeClosingTag(this.__element.tagName);
       const closeTagStart = parsePos + html.length;
       const closeTagEnd = closeTagStart + closingTag.length - 1;
       AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
@@ -653,22 +596,14 @@ export class HtmlModElement {
   }
 
   append(html: string) {
-    /**
-     * If the element is self closing, it's the same as prepend
-     */
-    if (this.__element.source.openTag.isSelfClosing) {
+    if (isSelfClosing(this.__element)) {
       return this.prepend(html);
     }
 
-    const insertPos = this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex;
+    const insertPos = getContentEnd(this.__element);
 
-    // 1. Do MagicString operation
-    this.__htmlMod.__appendRight(insertPos, html);
+    atomicAppendRight(this.__htmlMod, insertPos, html);
 
-    // 2. Queue delta
-    this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, html));
-
-    // 3. Parse and append nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.appendChild(this.__element, newNodes);
 
@@ -711,12 +646,10 @@ export class HtmlModElement {
   }
 
   remove() {
-    // If already removed, do nothing
     if (this.__removed) {
       return this;
     }
 
-    // Cache innerHTML for this element and all descendants before removal
     this.__cacheDescendantsInnerHTML();
 
     const removeStart = this.__element.source.openTag.startIndex;
@@ -725,8 +658,7 @@ export class HtmlModElement {
       this.__htmlMod.__source.length
     );
 
-    this.__htmlMod.__remove(removeStart, removeEnd);
-    this.__htmlMod.__trackDelta(calculateRemoveDelta(removeStart, removeEnd));
+    atomicRemove(this.__htmlMod, removeStart, removeEnd);
 
     AstManipulator.removeNode(this.__element);
 
@@ -734,12 +666,10 @@ export class HtmlModElement {
   }
 
   replaceWith(html: string) {
-    // If already removed, do nothing
     if (this.__removed) {
       return this;
     }
 
-    // Cache innerHTML for this element and all descendants before replacement
     this.__cacheDescendantsInnerHTML();
 
     const replaceStart = this.__element.source.openTag.startIndex;
@@ -748,13 +678,8 @@ export class HtmlModElement {
       this.__htmlMod.__source.length
     );
 
-    // 1. Do MagicString operation
-    this.__htmlMod.__overwrite(replaceStart, replaceEnd, html);
+    atomicOverwrite(this.__htmlMod, replaceStart, replaceEnd, html);
 
-    // 2. Queue delta
-    this.__htmlMod.__trackDelta(calculateOverwriteDelta(replaceStart, replaceEnd, html));
-
-    // 3. Parse and replace nodes
     const newNodes = AstManipulator.parseHtmlAtPosition(html, replaceStart, this.__htmlMod.__options);
     AstManipulator.replaceNode(this.__element, newNodes);
 
@@ -802,7 +727,6 @@ export class HtmlModElement {
     // (may differ from quoteChar due to fallback logic)
     let actualQuoteUsed = quoteChar;
 
-    // 1. Do ALL MagicString operations and 2. Queue ALL deltas
     if (attribute) {
       /**
        * A value is already set, so we need to overwrite it
@@ -812,8 +736,7 @@ export class HtmlModElement {
         const overwriteEnd = attribute.value?.endIndex + 1 + (hasQuote ? 1 : 0);
         const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-        this.__htmlMod.__overwrite(overwriteStart, overwriteEnd, content);
-        this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, content));
+        atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content);
 
         nameStart = attribute.name.startIndex;
         valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -830,14 +753,12 @@ export class HtmlModElement {
         attribute.value.startIndex > attribute.value.endIndex &&
         attribute.value.data === ''
       ) {
-        // If the empty value is quoted, we need to replace those as well
         if (hasQuote) {
           const overwriteStart = attribute.value?.startIndex - 1;
           const overwriteEnd = attribute.value?.endIndex + 2;
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-          this.__htmlMod.__overwrite(overwriteStart, overwriteEnd, content);
-          this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, content));
+          atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content);
 
           nameStart = attribute.name.startIndex;
           valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -850,8 +771,7 @@ export class HtmlModElement {
           const insertPos = attribute.value.startIndex;
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-          this.__htmlMod.__appendRight(insertPos, content);
-          this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, content));
+          atomicAppendRight(this.__htmlMod, insertPos, content);
 
           nameStart = attribute.name.startIndex;
           valueStart = insertPos + (quoteChar ? 1 : 0);
@@ -859,18 +779,14 @@ export class HtmlModElement {
           sourceEnd = attribute.source.endIndex + content.length;
         }
       } else {
-        /**
-         * No value is set, so we need to add it
-         */
         actualQuoteUsed = quoteChar || '"';
         const insertPos = attribute.name.endIndex + 1;
         const content = `=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
-        this.__htmlMod.__appendRight(insertPos, content);
-        this.__htmlMod.__trackDelta(calculateAppendRightDelta(insertPos, content));
+        atomicAppendRight(this.__htmlMod, insertPos, content);
 
         nameStart = attribute.name.startIndex;
-        valueStart = insertPos + 1 + (actualQuoteUsed ? 1 : 1);
+        valueStart = insertPos + 2; // +1 for =, +1 for quote
         sourceStart = attribute.source.startIndex;
         sourceEnd = attribute.source.endIndex + content.length;
       }
@@ -884,8 +800,7 @@ export class HtmlModElement {
       let content = ` ${name}=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
       // For self-closing tags with trailing slash, insert before the '/' and add space after attribute
-      const isSelfClosing = this.__element.source.openTag.isSelfClosing;
-      if (isSelfClosing) {
+      if (isSelfClosing(this.__element)) {
         const charBeforeGt = this.__htmlMod.__source.charAt(insertPos - 1);
         if (charBeforeGt === '/') {
           // Check if there's already a space before the '/'
@@ -902,8 +817,7 @@ export class HtmlModElement {
         }
       }
 
-      this.__htmlMod.__prependLeft(insertPos, content);
-      this.__htmlMod.__trackDelta(calculatePrependLeftDelta(insertPos, content));
+      atomicPrependLeft(this.__htmlMod, insertPos, content);
 
       // Positions are calculated relative to where content is inserted
       // prependLeft inserts BEFORE insertPos, so content starts at insertPos
@@ -912,7 +826,7 @@ export class HtmlModElement {
       const hasTrailingSpace = content.endsWith(' ');
 
       nameStart = contentStart + (hasLeadingSpace ? 1 : 0);
-      valueStart = nameStart + name.length + 1 + (actualQuoteUsed ? 1 : 1); // +1 for =, +1 for quote
+      valueStart = nameStart + name.length + 2; // +1 for =, +1 for quote
       sourceStart = contentStart + (hasLeadingSpace ? 1 : 0);
       // sourceEnd should point to the LAST character of the attribute (inclusive), not past it
       sourceEnd = contentStart + content.length - 1 - (hasTrailingSpace ? 1 : 0);
@@ -953,7 +867,6 @@ export class HtmlModElement {
   }
 
   removeAttribute(name: string) {
-    // 1. Do ALL MagicString operations and 2. Queue ALL deltas
     for (const attribute of this.__element.source.attributes) {
       if (attribute.name.data !== name) {
         continue;
@@ -963,8 +876,7 @@ export class HtmlModElement {
       const removeStart = attribute.source.startIndex - 1;
       const removeEnd = attribute.source.endIndex + 1;
 
-      this.__htmlMod.__remove(removeStart, removeEnd);
-      this.__htmlMod.__trackDelta(calculateRemoveDelta(removeStart, removeEnd));
+      atomicRemove(this.__htmlMod, removeStart, removeEnd);
     }
 
     // 3. Modify AST: Remove attribute from element
@@ -1034,23 +946,13 @@ export class HtmlModText {
       return;
     }
 
-    // Save original positions
     const originalStart = this.__text.startIndex;
-    const originalEnd = this.__text.endIndex;
+    atomicOverwrite(this.__htmlMod, originalStart, this.__text.endIndex + 1, html);
 
-    // 1. Do MagicString operation
-    const overwriteStart = originalStart;
-    const overwriteEnd = originalEnd + 1;
-    this.__htmlMod.__overwrite(overwriteStart, overwriteEnd, html);
-
-    // 2. Queue delta
-    this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, html));
-
-    // 3. Modify AST: Update text node data
+    // Modify AST: Update text node data
     AstManipulator.setTextData(this.__text, html);
 
-    // 4. Manually update endIndex
-    // The text node is inside the overwritten region, so its position needs manual correction
+    // Manually update endIndex - text node is inside the overwritten region
     this.__text.endIndex = originalStart + html.length - 1;
   }
 
@@ -1060,24 +962,13 @@ export class HtmlModText {
     }
 
     const escapedText = escapeHtml(text);
-
-    // Save original positions
     const originalStart = this.__text.startIndex;
-    const originalEnd = this.__text.endIndex;
+    atomicOverwrite(this.__htmlMod, originalStart, this.__text.endIndex + 1, escapedText);
 
-    // 1. Do MagicString operation
-    const overwriteStart = originalStart;
-    const overwriteEnd = originalEnd + 1;
-    this.__htmlMod.__overwrite(overwriteStart, overwriteEnd, escapedText);
-
-    // 2. Queue delta
-    this.__htmlMod.__trackDelta(calculateOverwriteDelta(overwriteStart, overwriteEnd, escapedText));
-
-    // 3. Modify AST: Update text node data
+    // Modify AST: Update text node data
     AstManipulator.setTextData(this.__text, escapedText);
 
-    // 4. Manually update endIndex
-    // The text node is inside the overwritten region, so its position needs manual correction
+    // Manually update endIndex - text node is inside the overwritten region
     this.__text.endIndex = originalStart + escapedText.length - 1;
   }
 
@@ -1102,7 +993,7 @@ function processValueAndQuote(quote: '"' | "'" | null, value: string) {
   }
 
   // If the attribute has double quotes and the value only contains double quotes,
-  // we flip the quotes to double quotes
+  // we flip the quotes to single quotes
   if ((quote === '"' || !quote) && value.includes('"') && !value.includes("'")) {
     return [value, "'"];
   }
