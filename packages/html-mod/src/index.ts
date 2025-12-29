@@ -382,6 +382,59 @@ export class HtmlModElement {
     return Object.keys(this.__element.attribs);
   }
 
+  get dataset(): DOMStringMap {
+    return new Proxy(
+      {},
+      {
+        get: (_target, prop: string) => {
+          if (typeof prop !== 'string') return;
+          const attributeName = `data-${camelToKebab(prop)}`;
+          return this.getAttribute(attributeName);
+        },
+
+        set: (_target, prop: string, value: string) => {
+          if (typeof prop !== 'string') return false;
+          const attributeName = `data-${camelToKebab(prop)}`;
+          this.setAttribute(attributeName, String(value));
+          return true;
+        },
+
+        deleteProperty: (_target, prop: string) => {
+          if (typeof prop !== 'string') return false;
+          const attributeName = `data-${camelToKebab(prop)}`;
+          this.removeAttribute(attributeName);
+          return true;
+        },
+
+        has: (_target, prop: string) => {
+          if (typeof prop !== 'string') return false;
+          const attributeName = `data-${camelToKebab(prop)}`;
+          return this.hasAttribute(attributeName);
+        },
+
+        ownKeys: _target => {
+          // Return all data-* attributes as camelCase
+          return this.getAttributeNames()
+            .filter(name => name.startsWith('data-'))
+            .map(name => kebabToCamel(name.slice(5))); // Remove 'data-' prefix
+        },
+
+        getOwnPropertyDescriptor: (_target, prop: string) => {
+          if (typeof prop !== 'string') return;
+          const attributeName = `data-${camelToKebab(prop)}`;
+          if (!this.hasAttribute(attributeName)) return;
+
+          return {
+            configurable: true,
+            enumerable: true,
+            value: this.getAttribute(attributeName),
+            writable: true,
+          };
+        },
+      }
+    );
+  }
+
   setAttribute(name: string, value: string) {
     const attribute = this.__element.source.attributes.find(a => a.name.data === name);
 
@@ -588,4 +641,14 @@ function processValueAndQuote(quote: '"' | "'" | null, value: string) {
 function unescapeQuote(value: string | undefined, quote: '"' | "'" | null) {
   if (!value) return value;
   return quote === "'" ? value.replaceAll('&#39;', "'") : value.replaceAll('&quot;', '"');
+}
+
+// Helper to convert camelCase to kebab-case
+function camelToKebab(string_: string): string {
+  return string_.replaceAll(/([A-Z])/g, '-$1').toLowerCase();
+}
+
+// Helper to convert kebab-case to camelCase
+function kebabToCamel(string_: string): string {
+  return string_.replaceAll(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }

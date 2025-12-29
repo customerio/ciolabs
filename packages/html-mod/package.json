@@ -21,6 +21,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./experimental": {
+      "types": "./dist/experimental/index.d.ts",
+      "import": "./dist/experimental/index.mjs",
+      "require": "./dist/experimental/index.js"
     }
   },
   "files": [
@@ -30,7 +35,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "benchmark": "npm run build && node dist/benchmark.mjs"
   },
   "dependencies": {
     "@ciolabs/htmlparser2-source": "workspace:*",

@@ -84,11 +84,9 @@ console.log(h.toString());
 //=> <div>world</div>
 ```
 
-## Flushing the manipulations
+## Flushing and AST Synchronization
 
-When you are manipulating the HTML, you are really manipulating the underlying string, not the AST. So when you run queries you are only ever querying against the initial HTML string. **You are not querying against the manipulated HTML string**.
-
-If you need to query against the manipulated HTML string, you need to "flush" the manipulations. This will take the manipulated HTML string and reparse it. This is not a cheap operation, so you should only do it when you absolutely need to.
+When you modify the HTML, the AST (Abstract Syntax Tree) used for queries becomes out of sync with the string. You need to call `flush()` to reparse and synchronize the AST before querying:
 
 ```typescript
 import { HtmlMod } from '@ciolabs/html-mod';
@@ -97,24 +95,39 @@ const h = new HtmlMod('<div>hello</div>');
 
 h.querySelector('div')!.append('<div>world</div>');
 
-console.log(h.querySelectorAll('div').length); //=> 1
-
+// Must flush before querying to see the changes
 h.flush();
-
 console.log(h.querySelectorAll('div').length); //=> 2
 ```
 
-You can check if the manipulations have been flushed by calling `isFlushed()`:
+You can check if the AST needs to be flushed:
 
 ```typescript
-import { HtmlMod } from '@ciolabs/html-mod';
+console.log(h.isFlushed()); //=> false after modifications, true after flush()
+```
+
+### Experimental: Auto-Flush Version
+
+An experimental version is available that automatically keeps the AST synchronized without manual `flush()` calls. This provides better ergonomics and performance for interactive use cases:
+
+```typescript
+import { HtmlMod } from '@ciolabs/html-mod/experimental';
 
 const h = new HtmlMod('<div>hello</div>');
-
 h.querySelector('div')!.append('<div>world</div>');
 
-console.log(h.isFlushed()); //=> false
+// No flush needed - queries work immediately!
+console.log(h.querySelectorAll('div').length); //=> 2
 ```
+
+**Benefits:**
+
+- ✅ No manual flush() calls needed
+- ✅ 2.23x faster for modify+query patterns
+- ✅ Zero drift guarantee over 10,000+ operations
+- ✅ Perfect for visual editors and interactive UIs
+
+See [src/experimental/README.md](./src/experimental/README.md) for complete documentation, benchmarks, and migration guide.
 
 ## HtmlMod
 
@@ -162,7 +175,7 @@ Returns `true` if the resulting HTML is empty.
 
 #### isFlushed() => boolean
 
-Returns `true` if the source string is in sync with the AST.
+Returns `true` if the AST positions are in sync with the source string. Returns `false` after modifications until `flush()` is called.
 
 #### generateDecodedMap()
 
@@ -182,9 +195,11 @@ Returns a new `HtmlMod` instance with the same HTML string.
 
 #### flush() => this
 
-Flushes the manipulations. This will take the manipulated HTML string and reparse it. This is not a cheap operation, so you should only do it when you need to.
+Reparses the HTML to synchronize the AST with string modifications. Required after any modifications before querying.
 
 Returns `this`.
+
+**Note:** The experimental version (see above) automatically maintains synchronization, making manual flush calls unnecessary.
 
 #### querySelector(selector: string) => HtmlModElement | null
 
@@ -215,6 +230,16 @@ An array of the classes on the element.
 #### className: string
 
 The class attribute value of the element.
+
+#### dataset: DOMStringMap
+
+An object containing all data-\* attributes. Can be read and modified like a plain object:
+
+```typescript
+const el = h.querySelector('div')!;
+el.dataset.userId = '123'; // Sets data-user-id="123"
+console.log(el.dataset.userId); // "123"
+```
 
 #### attributes: Attribute[]
 
