@@ -1,7 +1,8 @@
 /* eslint-disable unicorn/prefer-dom-node-dataset */
+import { SourceText } from '@ciolabs/htmlparser2-source';
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod, HtmlModElement, HtmlModText } from './index';
+import { HtmlMod, HtmlModText } from './index';
 
 describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
   describe('Chained Modifications with Queries', () => {
@@ -256,16 +257,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div><p>text1</p><section><span>text2</span></section></div>');
 
       const p = html.querySelector('p')!;
-      const pText = p.children[0];
-      if (pText instanceof HtmlModText) {
-        pText.textContent = 'modified-text1';
-      }
+      p.textContent = 'modified-text1';
 
       const span = html.querySelector('span')!;
-      const spanText = span.children[0];
-      if (spanText instanceof HtmlModText) {
-        spanText.textContent = 'modified-text2';
-      }
+      span.textContent = 'modified-text2';
 
       expect(html.querySelector('p')!.textContent).toBe('modified-text1');
       expect(html.querySelector('span')!.textContent).toBe('modified-text2');
@@ -771,21 +766,19 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const html = new HtmlMod('<div>text1<span>middle</span>text2</div>');
       const div = html.querySelector('div')!;
 
-      // Get all text nodes
       const children = div.children;
-      const textNodes = children.filter(child => child instanceof HtmlModText) as HtmlModText[];
+      const textNodes = children
+        .filter(child => child.type === 'text')
+        .map(child => new HtmlModText(child as SourceText, html));
 
       expect(textNodes.length).toBe(2);
 
-      // Modify first text node
       textNodes[0].textContent = 'modified1';
       expect(html.toString()).toBe('<div>modified1<span>middle</span>text2</div>');
 
-      // Modify second text node
       textNodes[1].textContent = 'modified2';
       expect(html.toString()).toBe('<div>modified1<span>middle</span>modified2</div>');
 
-      // Modify first again
       textNodes[0].textContent = 'final1';
       expect(html.toString()).toBe('<div>final1<span>middle</span>modified2</div>');
     });
@@ -1829,11 +1822,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
       expect(children.length).toBe(3);
 
-      // Modify through children array
-      const firstChild = children[0];
-      if (firstChild instanceof HtmlModElement) {
-        firstChild.innerHTML = 'modified';
-      }
+      const firstChild = html.querySelectorAll('p')[0];
+      firstChild.innerHTML = 'modified';
+
       expect(html.querySelectorAll('p')[0].innerHTML).toBe('modified');
     });
 
@@ -1864,12 +1855,10 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
       const div = html.querySelector('div')!;
 
       div.setAttribute('class', 'parent');
-      const children = div.children;
 
-      const firstChild = children[0];
-      if (firstChild instanceof HtmlModElement) {
-        firstChild.innerHTML = 'modified';
-      }
+      const firstChildElement = html.querySelector('p')!;
+      firstChildElement.innerHTML = 'modified';
+
       expect(html.toString()).toBe('<div class="parent"><p>modified</p></div>');
     });
 
@@ -1882,13 +1871,9 @@ describe('Auto-Flush Edge Cases - Aggressive Testing', () => {
 
     test('should remove child through children array', () => {
       const html = new HtmlMod('<div><p>1</p><p>2</p><p>3</p></div>');
-      const div = html.querySelector('div')!;
-      const children = div.children;
 
-      const secondChild = children[1];
-      if (secondChild instanceof HtmlModElement) {
-        secondChild.remove();
-      }
+      const paragraphs = html.querySelectorAll('p');
+      paragraphs[1].remove();
 
       expect(html.querySelectorAll('p').length).toBe(2);
       expect(html.querySelectorAll('p')[0].innerHTML).toBe('1');
