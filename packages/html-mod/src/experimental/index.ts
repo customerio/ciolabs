@@ -510,19 +510,8 @@ export class HtmlModElement {
     );
   }
 
-  get children(): (HtmlModElement | HtmlModText)[] {
-    this.__htmlMod.__ensureFlushed();
-    return this.__element.children
-      .map(child => {
-        if (child.type === 'text') {
-          return new this.__htmlMod.__HtmlModText(child as unknown as SourceText, this.__htmlMod);
-        } else if (child.type === 'tag') {
-          return new this.__htmlMod.__HtmlModElement(child as unknown as SourceElement, this.__htmlMod);
-        }
-        // For other node types (comments, etc.), skip them for now
-        return null;
-      })
-      .filter((child): child is HtmlModElement | HtmlModText => child !== null);
+  get children() {
+    return this.__element.children;
   }
 
   get parent(): HtmlModElement | null {
