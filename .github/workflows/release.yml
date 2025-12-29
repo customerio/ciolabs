@@ -14,7 +14,8 @@ jobs:
     environment: release
     permissions:
       id-token: write
-      contents: read
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
