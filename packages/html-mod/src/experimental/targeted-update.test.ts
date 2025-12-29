@@ -1,19 +1,19 @@
 import type { SourceElement } from '@ciolabs/htmlparser2-source';
 import { describe, test, expect } from 'vitest';
 
-import { HtmlMod, HtmlElement } from './index';
+import { HtmlMod, HtmlModElement } from './index';
 
 /**
  * Internal testing interface for accessing private properties
  */
-interface HtmlElementInternal extends HtmlElement {
+interface HtmlElementInternal extends HtmlModElement {
   __element: SourceElement;
 }
 
 /**
  * Type-safe helper to access internal element for position testing
  */
-function getInternalElement(element: HtmlElement): SourceElement {
+function getInternalElement(element: HtmlModElement): SourceElement {
   return (element as HtmlElementInternal).__element;
 }
 
@@ -161,7 +161,6 @@ describe('Targeted AST Update Optimization', () => {
     const html = new HtmlMod('<div id="parent"><div id="child">text</div></div><div id="sibling">other</div>');
 
     const child = html.querySelector('#child')!;
-    const sibling = html.querySelector('#sibling')!;
 
     // Remove child
     child.remove();
