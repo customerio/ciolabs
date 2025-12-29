@@ -3,33 +3,14 @@ import { describe, test, expect } from 'vitest';
 
 import { HtmlMod, HtmlModElement } from './index';
 
-/**
- * Internal testing interface for accessing private properties
- */
 interface HtmlElementInternal extends HtmlModElement {
   __element: SourceElement;
 }
 
-/**
- * Type-safe helper to access internal element for position testing
- */
 function getInternalElement(element: HtmlModElement): SourceElement {
   return (element as HtmlElementInternal).__element;
 }
 
-/**
- * Tests for the targeted AST update optimization
- *
- * The optimization updates only:
- * 1. The modified element and its descendants
- * 2. Ancestors of the element (only endIndex and closeTag)
- * 3. Following siblings at all ancestor levels
- *
- * These tests verify that the optimization:
- * - Correctly updates all affected nodes
- * - Does NOT update unaffected nodes (preceding siblings, unrelated branches)
- * - Handles edge cases (deep nesting, wide trees, removal, etc.)
- */
 describe('Targeted AST Update Optimization', () => {
   test('should only update following siblings, not preceding siblings', () => {
     const html = new HtmlMod('<div id="a">A</div><div id="b">B</div><div id="c">C</div>');
@@ -38,21 +19,15 @@ describe('Targeted AST Update Optimization', () => {
     const divA = html.querySelector('#a')!;
     const divC = html.querySelector('#c')!;
 
-    // Record initial positions
     const aStartBefore = getInternalElement(divA).startIndex;
     const aEndBefore = getInternalElement(divA).endIndex;
 
-    // Modify B - should NOT affect A (preceding sibling)
     divB.setAttribute('class', 'modified');
 
-    // A's positions should be unchanged
     expect(getInternalElement(divA).startIndex).toBe(aStartBefore);
     expect(getInternalElement(divA).endIndex).toBe(aEndBefore);
-
-    // C's positions should be updated (following sibling)
     expect(getInternalElement(divC).startIndex).toBeGreaterThan(getInternalElement(divB).endIndex);
 
-    // Verify the output is correct
     expect(html.toString()).toContain('<div id="a">A</div>');
     expect(html.toString()).toContain('<div id="b" class="modified">B</div>');
     expect(html.toString()).toContain('<div id="c">C</div>');
