@@ -6,11 +6,11 @@ Automatically synchronizes the AST after every modification - no manual `flush()
 
 **Faster in ALL benchmarks** (10/10 wins):
 
-- 4.69x faster for simple parsing
-- 3.51x faster for parse + setAttribute
-- 2.61x faster for real-world templates
+- 4.72x faster for simple parsing
+- 3.40x faster for parse + setAttribute
+- 2.44x faster for real-world templates
 - 2.29x faster for modify+query patterns
-- 1.47x faster for batch modifications
+- 1.33x faster for batch modifications
 
 **Simpler API:**
 
@@ -48,13 +48,13 @@ div.setAttribute('data-id', '123'); // ✅ Still works
 
 | Benchmark              | Stable   | Experimental | Speedup         |
 | ---------------------- | -------- | ------------ | --------------- |
-| Parse simple HTML      | 6.50µs   | 1.39µs       | 4.69x faster ✅ |
-| Parse + setAttribute   | 14.70µs  | 4.18µs       | 3.51x faster ✅ |
-| Real-world template    | 37.17µs  | 14.27µs      | 2.61x faster ✅ |
-| innerHTML modification | 12.83µs  | 5.13µs       | 2.50x faster ✅ |
-| Remove element         | 11.50µs  | 2.64µs       | 4.36x faster ✅ |
-| Modify + query pattern | 769.69µs | 336.23µs     | 2.29x faster ✅ |
-| 10 modifications       | 19.26µs  | 13.11µs      | 1.47x faster ✅ |
+| Parse simple HTML      | 5.31µs   | 1.13µs       | 4.72x faster ✅ |
+| Parse + setAttribute   | 11.35µs  | 3.34µs       | 3.40x faster ✅ |
+| Real-world template    | 27.96µs  | 11.44µs      | 2.44x faster ✅ |
+| innerHTML modification | 9.86µs   | 3.97µs       | 2.49x faster ✅ |
+| Remove element         | 8.70µs   | 2.18µs       | 4.00x faster ✅ |
+| Modify + query pattern | 604.05µs | 263.83µs     | 2.29x faster ✅ |
+| 10 modifications       | 14.54µs  | 10.95µs      | 1.33x faster ✅ |
 
 **Result: Experimental wins 10/10 benchmarks**
 
