@@ -20,7 +20,7 @@ Automatically synchronizes the AST after every modification - no manual `flush()
 
 **Production-ready:**
 
-- 702 tests passing
+- 715 tests passing
 - Zero drift over 10,000+ operations
 - Handles malformed HTML gracefully
 

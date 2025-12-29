@@ -71,9 +71,15 @@ export class HtmlMod {
    * Track a delta and immediately update AST positions
    * With direct string manipulation, we don't need to recreate anything!
    */
-  __trackDelta(delta: PositionDelta) {
+  __trackDelta(delta: PositionDelta, affectedElement?: SourceElement) {
     // Apply delta to AST positions immediately
-    this.__astUpdater.updateNodePositions(this.__dom, delta);
+    if (affectedElement) {
+      // Targeted update - only update affected subtrees (ancestors + descendants + following siblings)
+      this.__astUpdater.updateFromElement(affectedElement, this.__dom, delta);
+    } else {
+      // Full tree walk fallback (for operations without element context like trim())
+      this.__astUpdater.updateNodePositions(this.__dom, delta);
+    }
     // Note: __source is already up-to-date from string operations
   }
 
@@ -284,12 +290,12 @@ export class HtmlModElement {
 
     const openTagStart = this.__element.source.openTag.startIndex + 1;
     const openTagEnd = this.__element.source.openTag.startIndex + 1 + currentTagName.length;
-    atomicOverwrite(this.__htmlMod, openTagStart, openTagEnd, tagName);
+    atomicOverwrite(this.__htmlMod, openTagStart, openTagEnd, tagName, this.__element);
 
     if (this.__element.source.closeTag) {
       const closeTagStart = this.__element.source.closeTag.startIndex + 2;
       const closeTagEnd = this.__element.source.closeTag.startIndex + 2 + currentTagName.length;
-      atomicOverwrite(this.__htmlMod, closeTagStart, closeTagEnd, tagName);
+      atomicOverwrite(this.__htmlMod, closeTagStart, closeTagEnd, tagName, this.__element);
     }
 
     AstManipulator.setTagName(this.__element, tagName);
@@ -432,15 +438,15 @@ export class HtmlModElement {
       if (hasSlash) {
         const slashStart = this.__element.source.openTag.endIndex - 1;
         const tagEnd = this.__element.source.openTag.endIndex + 1;
-        atomicOverwrite(this.__htmlMod, slashStart, tagEnd, `>${combined}`);
+        atomicOverwrite(this.__htmlMod, slashStart, tagEnd, `>${combined}`, this.__element);
       } else {
         const insertPos = this.__element.source.openTag.endIndex;
-        atomicAppendRight(this.__htmlMod, insertPos, combined);
+        atomicAppendRight(this.__htmlMod, insertPos, combined, this.__element);
       }
     } else if (isEmpty) {
-      atomicPrependLeft(this.__htmlMod, contentEnd, html);
+      atomicPrependLeft(this.__htmlMod, contentEnd, html, this.__element);
     } else {
-      atomicOverwrite(this.__htmlMod, contentStart, contentEnd, html);
+      atomicOverwrite(this.__htmlMod, contentStart, contentEnd, html, this.__element);
     }
 
     if (html.length > 0) {
@@ -533,7 +539,7 @@ export class HtmlModElement {
   before(html: string) {
     const insertPos = this.__element.source.openTag.startIndex;
 
-    atomicPrependLeft(this.__htmlMod, insertPos, html);
+    atomicPrependLeft(this.__htmlMod, insertPos, html, this.__element);
 
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.insertBefore(this.__element, newNodes);
@@ -544,7 +550,7 @@ export class HtmlModElement {
   after(html: string) {
     const insertPos = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
 
-    atomicAppendRight(this.__htmlMod, insertPos, html);
+    atomicAppendRight(this.__htmlMod, insertPos, html, this.__element);
 
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.insertAfter(this.__element, newNodes);
@@ -564,15 +570,15 @@ export class HtmlModElement {
         const slashStart = originalEndIndex - 1;
         const gtEnd = originalEndIndex + 1;
         const replacement = `>${html}${closingTag}`;
-        atomicOverwrite(this.__htmlMod, slashStart, gtEnd, replacement);
+        atomicOverwrite(this.__htmlMod, slashStart, gtEnd, replacement, this.__element);
       } else {
         const insertPos = originalEndIndex + 1;
         const combined = html + closingTag;
-        atomicAppendRight(this.__htmlMod, insertPos, combined);
+        atomicAppendRight(this.__htmlMod, insertPos, combined, this.__element);
       }
     } else {
       const insertPos = originalEndIndex + 1;
-      atomicPrependLeft(this.__htmlMod, insertPos, html);
+      atomicPrependLeft(this.__htmlMod, insertPos, html, this.__element);
     }
 
     if (selfClosing) {
@@ -602,7 +608,7 @@ export class HtmlModElement {
 
     const insertPos = getContentEnd(this.__element);
 
-    atomicAppendRight(this.__htmlMod, insertPos, html);
+    atomicAppendRight(this.__htmlMod, insertPos, html, this.__element);
 
     const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
     AstManipulator.appendChild(this.__element, newNodes);
@@ -658,7 +664,7 @@ export class HtmlModElement {
       this.__htmlMod.__source.length
     );
 
-    atomicRemove(this.__htmlMod, removeStart, removeEnd);
+    atomicRemove(this.__htmlMod, removeStart, removeEnd, this.__element);
 
     AstManipulator.removeNode(this.__element);
 
@@ -678,7 +684,7 @@ export class HtmlModElement {
       this.__htmlMod.__source.length
     );
 
-    atomicOverwrite(this.__htmlMod, replaceStart, replaceEnd, html);
+    atomicOverwrite(this.__htmlMod, replaceStart, replaceEnd, html, this.__element);
 
     const newNodes = AstManipulator.parseHtmlAtPosition(html, replaceStart, this.__htmlMod.__options);
     AstManipulator.replaceNode(this.__element, newNodes);
@@ -736,7 +742,7 @@ export class HtmlModElement {
         const overwriteEnd = attribute.value?.endIndex + 1 + (hasQuote ? 1 : 0);
         const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-        atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content);
+        atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content, this.__element);
 
         nameStart = attribute.name.startIndex;
         valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -758,7 +764,7 @@ export class HtmlModElement {
           const overwriteEnd = attribute.value?.endIndex + 2;
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-          atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content);
+          atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content, this.__element);
 
           nameStart = attribute.name.startIndex;
           valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -771,7 +777,7 @@ export class HtmlModElement {
           const insertPos = attribute.value.startIndex;
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-          atomicAppendRight(this.__htmlMod, insertPos, content);
+          atomicAppendRight(this.__htmlMod, insertPos, content, this.__element);
 
           nameStart = attribute.name.startIndex;
           valueStart = insertPos + (quoteChar ? 1 : 0);
@@ -783,7 +789,7 @@ export class HtmlModElement {
         const insertPos = attribute.name.endIndex + 1;
         const content = `=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
-        atomicAppendRight(this.__htmlMod, insertPos, content);
+        atomicAppendRight(this.__htmlMod, insertPos, content, this.__element);
 
         nameStart = attribute.name.startIndex;
         valueStart = insertPos + 2; // +1 for =, +1 for quote
@@ -817,7 +823,7 @@ export class HtmlModElement {
         }
       }
 
-      atomicPrependLeft(this.__htmlMod, insertPos, content);
+      atomicPrependLeft(this.__htmlMod, insertPos, content, this.__element);
 
       // Positions are calculated relative to where content is inserted
       // prependLeft inserts BEFORE insertPos, so content starts at insertPos
@@ -876,7 +882,7 @@ export class HtmlModElement {
       const removeStart = attribute.source.startIndex - 1;
       const removeEnd = attribute.source.endIndex + 1;
 
-      atomicRemove(this.__htmlMod, removeStart, removeEnd);
+      atomicRemove(this.__htmlMod, removeStart, removeEnd, this.__element);
     }
 
     // 3. Modify AST: Remove attribute from element
