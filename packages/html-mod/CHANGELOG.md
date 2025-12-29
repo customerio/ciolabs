@@ -1,5 +1,11 @@
 # @ciolabs/html-mod
 
+## 0.1.1
+
+### Patch Changes
+
+- [#31](https://github.com/customerio/ciolabs/pull/31) [`de38bfc`](https://github.com/customerio/ciolabs/commit/de38bfcce588ce365d4a89028e27b626435d5234) Thanks [@avigoldman](https://github.com/avigoldman)! - Update experimental version to have same API as standard
+
 ## 0.1.0
 
 ### Minor Changes
