@@ -198,6 +198,53 @@ describe('querySelector and querySelectorAll', () => {
         expect(results.length).toBe(1);
         expect(results[0].textContent).toBe('deep');
       });
+
+      test('should handle :scope > div + span (adjacent sibling)', () => {
+        const html = new HtmlMod(`
+          <div>1</div>
+          <span>adjacent to div</span>
+          <p>2</p>
+          <div>3</div>
+          <p>not a span</p>
+        `);
+
+        const results = html.querySelectorAll(':scope > div + span');
+
+        // Only the first span is immediately after a div
+        expect(results.length).toBe(1);
+        expect(results[0].textContent).toBe('adjacent to div');
+      });
+
+      test('should handle :scope > div ~ span (general sibling)', () => {
+        const html = new HtmlMod(`
+          <p>before</p>
+          <div>trigger</div>
+          <span>sibling1</span>
+          <p>between</p>
+          <span>sibling2</span>
+          <div>another div</div>
+          <span>sibling3</span>
+        `);
+
+        const results = html.querySelectorAll(':scope > div ~ span');
+
+        // Should get all spans that come after ANY div
+        expect(results.length).toBe(3);
+      });
+
+      test('should handle :scope > * + span (any element followed by span)', () => {
+        const html = new HtmlMod(`
+          <div>1</div>
+          <span>after div</span>
+          <p>2</p>
+          <span>after p</span>
+          <span>after span</span>
+        `);
+
+        const results = html.querySelectorAll(':scope > * + span');
+
+        expect(results.length).toBe(3);
+      });
     });
 
     describe('comma-separated :scope selectors', () => {
@@ -271,6 +318,46 @@ describe('querySelector and querySelectorAll', () => {
       });
     });
 
+    describe('pseudo-classes', () => {
+      test('should handle :scope > div:first-child', () => {
+        const html = new HtmlMod(`
+          <div id="first">1</div>
+          <div id="second">2</div>
+          <div id="third">3</div>
+        `);
+
+        const results = html.querySelectorAll(':scope > div:first-child');
+
+        expect(results.length).toBe(1);
+        expect(results[0].getAttribute('id')).toBe('first');
+      });
+
+      test('should handle :scope > div:nth-child(2)', () => {
+        const html = new HtmlMod(`
+          <div>1</div>
+          <div id="target">2</div>
+          <div>3</div>
+        `);
+
+        const results = html.querySelectorAll(':scope > div:nth-child(2)');
+
+        expect(results.length).toBe(1);
+        expect(results[0].getAttribute('id')).toBe('target');
+      });
+
+      test('should handle :scope > div:last-child span', () => {
+        const html = new HtmlMod(`
+          <div><span>first</span></div>
+          <div><span>last</span></div>
+        `);
+
+        const results = html.querySelectorAll(':scope > div:last-child span');
+
+        expect(results.length).toBe(1);
+        expect(results[0].textContent).toBe('last');
+      });
+    });
+
     describe('edge cases', () => {
       test('should return empty array when no children exist', () => {
         const html = new HtmlMod('');
@@ -305,6 +392,32 @@ describe('querySelector and querySelectorAll', () => {
         expect(children.length).toBe(2);
         expect(children[0].tagName).toBe('div');
         expect(children[1].tagName).toBe('span');
+      });
+
+      test('should handle :scope with multiple classes', () => {
+        const html = new HtmlMod(`
+          <div class="foo bar">1</div>
+          <div class="foo">2</div>
+          <div class="bar">3</div>
+        `);
+
+        const results = html.querySelectorAll(':scope > .foo.bar');
+
+        expect(results.length).toBe(1);
+        expect(results[0].textContent).toBe('1');
+      });
+
+      test('should handle :scope with negation pseudo-class', () => {
+        const html = new HtmlMod(`
+          <div class="foo">1</div>
+          <div>2</div>
+          <div class="foo">3</div>
+        `);
+
+        const results = html.querySelectorAll(':scope > div:not(.foo)');
+
+        expect(results.length).toBe(1);
+        expect(results[0].textContent).toBe('2');
       });
     });
   });
