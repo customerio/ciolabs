@@ -221,6 +221,14 @@ export class HtmlMod {
 
   querySelector(selector: string): HtmlModElement | null {
     this.__ensureFlushed();
+
+    // If selector contains :scope, use querySelectorAll and return first result
+    // This ensures :scope handling is consistent between querySelector and querySelectorAll
+    if (selector.includes(':scope')) {
+      const results = this.querySelectorAll(selector);
+      return results[0] || null;
+    }
+
     const result = select(selector, this.__dom)?.[0];
     if (!result) {
       return null;
@@ -231,6 +239,117 @@ export class HtmlMod {
 
   querySelectorAll(selector: string): HtmlModElement[] {
     this.__ensureFlushed();
+
+    // Handle :scope selector on root document
+    // When :scope is used on the document root, it should refer to the document itself
+    // cheerio-select doesn't support :scope on document nodes, so we need to handle it manually
+    if (selector.includes(':scope')) {
+      // Handle comma-separated selectors: ":scope > div, :scope > p"
+      if (selector.includes(',')) {
+        const parts = selector.split(',').map(s => s.trim());
+        const uniqueElements = new Set<SourceElement>();
+
+        for (const part of parts) {
+          const results = this.querySelectorAll(part); // Recursive call
+          for (const result of results) {
+            uniqueElements.add((result as any).__element);
+          }
+        }
+
+        return [...uniqueElements].map(element => {
+          return new this.__HtmlModElement(element, this);
+        });
+      }
+
+      // Handle :scope > selector patterns
+      const scopeDirectChildMatch = selector.match(/^:scope\s*>\s*(.+)$/);
+      if (scopeDirectChildMatch) {
+        const afterScopeArrow = scopeDirectChildMatch[1];
+
+        // Get all direct children of the document (only tag elements)
+        const directChildren: SourceElement[] = [];
+        for (const node of this.__dom.children) {
+          if (node.type === 'tag') {
+            directChildren.push(node as SourceElement);
+          }
+        }
+
+        // Check if there's more selector after the first part
+        // Pattern: "firstPart [combinator rest]"
+        // Combinators: space (descendant), > (child), + (adjacent sibling), ~ (general sibling)
+        const nextCombinatorMatch = afterScopeArrow.match(/^([^\s+>~]+)([\s+>~].+)$/);
+
+        if (nextCombinatorMatch) {
+          // Complex pattern: ":scope > firstPart [combinator rest]"
+          // Example: ":scope > div span" or ":scope > div > span"
+          const firstPart = nextCombinatorMatch[1]; // e.g., "div"
+          const restSelector = nextCombinatorMatch[2]; // e.g., " span" or "> span"
+
+          // Step 1: Get direct children matching firstPart
+          let matchingDirectChildren: SourceElement[];
+
+          if (firstPart === '*') {
+            matchingDirectChildren = directChildren;
+          } else {
+            const matchingElements = select(firstPart, this.__dom);
+            const matchingSet = new Set(matchingElements);
+            matchingDirectChildren = directChildren.filter(element => matchingSet.has(element as any));
+          }
+
+          // Step 2: For each matching direct child, apply rest of selector
+          const uniqueResults = new Set<SourceElement>();
+          for (const element of matchingDirectChildren) {
+            const results = select(restSelector.trim(), element);
+            for (const result of results) {
+              uniqueResults.add(result as SourceElement);
+            }
+          }
+
+          return [...uniqueResults].map(element => {
+            return new this.__HtmlModElement(element, this);
+          });
+        } else {
+          // Simple pattern: ":scope > selector" with no additional combinators
+          // Example: ":scope > div" or ":scope > .foo"
+
+          if (afterScopeArrow === '*') {
+            // Return all direct children
+            const result: HtmlModElement[] = [];
+            for (const element of directChildren) {
+              result.push(new this.__HtmlModElement(element, this));
+            }
+            return result;
+          }
+
+          // Filter direct children by the selector
+          const matchingElements = select(afterScopeArrow, this.__dom);
+          const matchingSet = new Set(matchingElements);
+
+          const result: HtmlModElement[] = [];
+          for (const element of directChildren) {
+            if (matchingSet.has(element as any)) {
+              result.push(new this.__HtmlModElement(element, this));
+            }
+          }
+          return result;
+        }
+      }
+
+      // Handle :scope without > (descendant selector)
+      // ":scope div" means "all divs in the document" which is just "div"
+      // Since we're already at the document root, :scope is redundant
+      const descendantPattern = /^:scope\s+(.+)$/;
+      if (descendantPattern.test(selector)) {
+        selector = selector.replace(/^:scope\s+/, '');
+        return select(selector, this.__dom).map(element => {
+          return new this.__HtmlModElement(element as unknown as SourceElement, this);
+        });
+      }
+
+      // If we get here, it's an unsupported :scope pattern
+      // Fall through to regular select (will likely return empty results)
+    }
+
     return select(selector, this.__dom).map(element => {
       return new this.__HtmlModElement(element as unknown as SourceElement, this);
     });
@@ -367,9 +486,14 @@ export class HtmlModElement {
 
         ownKeys: _target => {
           // Return all data-* attributes as camelCase
-          return this.getAttributeNames()
-            .filter(name => name.startsWith('data-'))
-            .map(name => kebabToCamel(name.slice(5))); // Remove 'data-' prefix
+          // Single loop combining filter and map
+          const result: string[] = [];
+          for (const name of this.getAttributeNames()) {
+            if (name.startsWith('data-')) {
+              result.push(kebabToCamel(name.slice(5))); // Remove 'data-' prefix
+            }
+          }
+          return result;
         },
 
         getOwnPropertyDescriptor: (_target, prop: string) => {
