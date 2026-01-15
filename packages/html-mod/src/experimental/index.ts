@@ -231,6 +231,45 @@ export class HtmlMod {
 
   querySelectorAll(selector: string): HtmlModElement[] {
     this.__ensureFlushed();
+
+    // Handle :scope selector on root document
+    // When :scope is used on the document root, it should refer to the document itself
+    // cheerio-select doesn't support :scope on document nodes, so we need to handle it manually
+    if (selector.includes(':scope')) {
+      // For :scope > selector, we need to match direct children of the document
+      const scopeDirectChildMatch = selector.match(/^:scope\s*>\s*(.+)$/);
+      if (scopeDirectChildMatch) {
+        const childSelector = scopeDirectChildMatch[1];
+        // Get all direct children of the document
+        const directChildren = this.__dom.children.filter((node): node is SourceElement => node.type === 'tag');
+
+        // If childSelector is *, return all direct children
+        if (childSelector === '*') {
+          return directChildren.map(element => {
+            return new this.__HtmlModElement(element, this);
+          });
+        }
+
+        // Otherwise, filter direct children by the selector
+        // We need to test each element against the selector
+        // cheerio-select's select() searches within a context, but we need to test if the element itself matches
+        // So we select from the document with the child selector and see if our direct children are in the results
+        const matchingElements = select(childSelector, this.__dom);
+        const matchingSet = new Set(matchingElements);
+
+        return directChildren
+          .filter(element => matchingSet.has(element as any))
+          .map(element => {
+            return new this.__HtmlModElement(element, this);
+          });
+      }
+
+      // For other :scope patterns, replace :scope with :root
+      // :root in the context of a document matches the root element
+      // However, since we're on a document node, we can just select from children
+      selector = selector.replaceAll(':scope', ':root');
+    }
+
     return select(selector, this.__dom).map(element => {
       return new this.__HtmlModElement(element as unknown as SourceElement, this);
     });
