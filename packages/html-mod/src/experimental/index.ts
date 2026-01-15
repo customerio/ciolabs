@@ -236,10 +236,28 @@ export class HtmlMod {
     // When :scope is used on the document root, it should refer to the document itself
     // cheerio-select doesn't support :scope on document nodes, so we need to handle it manually
     if (selector.includes(':scope')) {
-      // For :scope > selector, we need to match direct children of the document
+      // Handle comma-separated selectors: ":scope > div, :scope > p"
+      if (selector.includes(',')) {
+        const parts = selector.split(',').map(s => s.trim());
+        const uniqueElements = new Set<SourceElement>();
+
+        for (const part of parts) {
+          const results = this.querySelectorAll(part); // Recursive call
+          for (const result of results) {
+            uniqueElements.add((result as any).__element);
+          }
+        }
+
+        return [...uniqueElements].map(element => {
+          return new this.__HtmlModElement(element, this);
+        });
+      }
+
+      // Handle :scope > selector patterns
       const scopeDirectChildMatch = selector.match(/^:scope\s*>\s*(.+)$/);
       if (scopeDirectChildMatch) {
-        const childSelector = scopeDirectChildMatch[1];
+        const afterScopeArrow = scopeDirectChildMatch[1];
+
         // Get all direct children of the document (only tag elements)
         const directChildren: SourceElement[] = [];
         for (const node of this.__dom.children) {
@@ -248,36 +266,80 @@ export class HtmlMod {
           }
         }
 
-        // If childSelector is *, return all direct children
-        if (childSelector === '*') {
+        // Check if there's more selector after the first part
+        // Pattern: "firstPart [combinator rest]"
+        // Combinators: space (descendant), > (child), + (adjacent sibling), ~ (general sibling)
+        const nextCombinatorMatch = afterScopeArrow.match(/^([^\s+>~]+)([\s+>~].+)$/);
+
+        if (nextCombinatorMatch) {
+          // Complex pattern: ":scope > firstPart [combinator rest]"
+          // Example: ":scope > div span" or ":scope > div > span"
+          const firstPart = nextCombinatorMatch[1]; // e.g., "div"
+          const restSelector = nextCombinatorMatch[2]; // e.g., " span" or "> span"
+
+          // Step 1: Get direct children matching firstPart
+          let matchingDirectChildren: SourceElement[];
+
+          if (firstPart === '*') {
+            matchingDirectChildren = directChildren;
+          } else {
+            const matchingElements = select(firstPart, this.__dom);
+            const matchingSet = new Set(matchingElements);
+            matchingDirectChildren = directChildren.filter(element => matchingSet.has(element as any));
+          }
+
+          // Step 2: For each matching direct child, apply rest of selector
+          const uniqueResults = new Set<SourceElement>();
+          for (const element of matchingDirectChildren) {
+            const results = select(restSelector.trim(), element);
+            for (const result of results) {
+              uniqueResults.add(result as SourceElement);
+            }
+          }
+
+          return [...uniqueResults].map(element => {
+            return new this.__HtmlModElement(element, this);
+          });
+        } else {
+          // Simple pattern: ":scope > selector" with no additional combinators
+          // Example: ":scope > div" or ":scope > .foo"
+
+          if (afterScopeArrow === '*') {
+            // Return all direct children
+            const result: HtmlModElement[] = [];
+            for (const element of directChildren) {
+              result.push(new this.__HtmlModElement(element, this));
+            }
+            return result;
+          }
+
+          // Filter direct children by the selector
+          const matchingElements = select(afterScopeArrow, this.__dom);
+          const matchingSet = new Set(matchingElements);
+
           const result: HtmlModElement[] = [];
           for (const element of directChildren) {
-            result.push(new this.__HtmlModElement(element, this));
+            if (matchingSet.has(element as any)) {
+              result.push(new this.__HtmlModElement(element, this));
+            }
           }
           return result;
         }
-
-        // Otherwise, filter direct children by the selector
-        // We need to test each element against the selector
-        // cheerio-select's select() searches within a context, but we need to test if the element itself matches
-        // So we select from the document with the child selector and see if our direct children are in the results
-        const matchingElements = select(childSelector, this.__dom);
-        const matchingSet = new Set(matchingElements);
-
-        // Single loop combining filter and map
-        const result: HtmlModElement[] = [];
-        for (const element of directChildren) {
-          if (matchingSet.has(element as any)) {
-            result.push(new this.__HtmlModElement(element, this));
-          }
-        }
-        return result;
       }
 
-      // For other :scope patterns, replace :scope with :root
-      // :root in the context of a document matches the root element
-      // However, since we're on a document node, we can just select from children
-      selector = selector.replaceAll(':scope', ':root');
+      // Handle :scope without > (descendant selector)
+      // ":scope div" means "all divs in the document" which is just "div"
+      // Since we're already at the document root, :scope is redundant
+      const descendantPattern = /^:scope\s+(.+)$/;
+      if (descendantPattern.test(selector)) {
+        selector = selector.replace(/^:scope\s+/, '');
+        return select(selector, this.__dom).map(element => {
+          return new this.__HtmlModElement(element as unknown as SourceElement, this);
+        });
+      }
+
+      // If we get here, it's an unsupported :scope pattern
+      // Fall through to regular select (will likely return empty results)
     }
 
     return select(selector, this.__dom).map(element => {

@@ -129,6 +129,148 @@ describe('querySelector and querySelectorAll', () => {
       });
     });
 
+    describe('complex :scope > patterns', () => {
+      test('should handle :scope > div span (descendant)', () => {
+        const html = new HtmlMod(`
+          <div>
+            <span>nested1</span>
+          </div>
+          <div>
+            <span>nested2</span>
+          </div>
+          <p>
+            <span>not in div</span>
+          </p>
+        `);
+
+        const results = html.querySelectorAll(':scope > div span');
+
+        expect(results.length).toBe(2);
+        expect(results[0].textContent).toBe('nested1');
+        expect(results[1].textContent).toBe('nested2');
+      });
+
+      test('should handle :scope > div > span (direct child)', () => {
+        const html = new HtmlMod(`
+          <div>
+            <span>direct</span>
+          </div>
+          <div>
+            <p><span>nested</span></p>
+          </div>
+        `);
+
+        const results = html.querySelectorAll(':scope > div > span');
+
+        expect(results.length).toBe(1);
+        expect(results[0].textContent).toBe('direct');
+      });
+
+      test('should handle :scope > * span (any direct child with span descendants)', () => {
+        const html = new HtmlMod(`
+          <div>
+            <span>in div</span>
+          </div>
+          <p>
+            <span>in p</span>
+          </p>
+          <section>no span</section>
+        `);
+
+        const results = html.querySelectorAll(':scope > * span');
+
+        expect(results.length).toBe(2);
+      });
+
+      test('should handle deeply nested selectors', () => {
+        const html = new HtmlMod(`
+          <container>
+            <row>
+              <column>
+                <text>deep</text>
+              </column>
+            </row>
+          </container>
+        `);
+
+        const results = html.querySelectorAll(':scope > container row column text');
+
+        expect(results.length).toBe(1);
+        expect(results[0].textContent).toBe('deep');
+      });
+    });
+
+    describe('comma-separated :scope selectors', () => {
+      test('should handle :scope > div, :scope > p', () => {
+        const html = new HtmlMod(`
+          <div>1</div>
+          <span>2</span>
+          <p>3</p>
+        `);
+
+        const results = html.querySelectorAll(':scope > div, :scope > p');
+
+        expect(results.length).toBe(2);
+        expect(results[0].tagName).toBe('div');
+        expect(results[1].tagName).toBe('p');
+      });
+
+      test('should deduplicate results from comma-separated selectors', () => {
+        const html = new HtmlMod(`
+          <div class="foo">1</div>
+          <div class="bar">2</div>
+        `);
+
+        const results = html.querySelectorAll(':scope > div, :scope > .foo');
+
+        // Should get div.foo only once, plus div.bar
+        expect(results.length).toBe(2);
+      });
+
+      test('should handle complex comma-separated patterns', () => {
+        const html = new HtmlMod(`
+          <div>
+            <span>a</span>
+          </div>
+          <p>
+            <span>b</span>
+          </p>
+        `);
+
+        const results = html.querySelectorAll(':scope > div span, :scope > p span');
+
+        expect(results.length).toBe(2);
+      });
+    });
+
+    describe(':scope descendant patterns (without >)', () => {
+      test('should handle :scope div (all divs)', () => {
+        const html = new HtmlMod(`
+          <div>top</div>
+          <container>
+            <div>nested</div>
+          </container>
+        `);
+
+        const results = html.querySelectorAll(':scope div');
+
+        expect(results.length).toBe(2);
+      });
+
+      test('should handle :scope .foo (all elements with class)', () => {
+        const html = new HtmlMod(`
+          <div class="foo">1</div>
+          <p>
+            <span class="foo">2</span>
+          </p>
+        `);
+
+        const results = html.querySelectorAll(':scope .foo');
+
+        expect(results.length).toBe(2);
+      });
+    });
+
     describe('edge cases', () => {
       test('should return empty array when no children exist', () => {
         const html = new HtmlMod('');
