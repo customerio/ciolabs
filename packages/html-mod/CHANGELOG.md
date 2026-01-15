@@ -1,5 +1,11 @@
 # @ciolabs/html-mod
 
+## 0.1.2
+
+### Patch Changes
+
+- [#33](https://github.com/customerio/ciolabs/pull/33) [`0f4b1c7`](https://github.com/customerio/ciolabs/commit/0f4b1c7dd0f535addfd47ce1c3ba776d62c6dbd7) Thanks [@avigoldman](https://github.com/avigoldman)! - Add support for :scope queries on the root of an element
+
 ## 0.1.1
 
 ### Patch Changes
