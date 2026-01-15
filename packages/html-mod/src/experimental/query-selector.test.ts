@@ -3,6 +3,56 @@ import { describe, expect, test } from 'vitest';
 import { HtmlMod } from './index';
 
 describe('querySelector and querySelectorAll', () => {
+  describe('querySelector with :scope', () => {
+    test('should return first match with :scope > *', () => {
+      const html = new HtmlMod(`
+        <div>first</div>
+        <span>second</span>
+      `);
+
+      const result = html.querySelector(':scope > *');
+
+      expect(result).toBeTruthy();
+      expect(result?.tagName).toBe('div');
+    });
+
+    test('should return first match with :scope > div', () => {
+      const html = new HtmlMod(`
+        <p>not this</p>
+        <div id="target">this one</div>
+        <div>not this</div>
+      `);
+
+      const result = html.querySelector(':scope > div');
+
+      expect(result).toBeTruthy();
+      expect(result?.getAttribute('id')).toBe('target');
+    });
+
+    test('should return null when no match', () => {
+      const html = new HtmlMod(`
+        <div>no span</div>
+      `);
+
+      const result = html.querySelector(':scope > span');
+
+      expect(result).toBeNull();
+    });
+
+    test('should work with complex :scope patterns', () => {
+      const html = new HtmlMod(`
+        <div>
+          <span>nested</span>
+        </div>
+      `);
+
+      const result = html.querySelector(':scope > div span');
+
+      expect(result).toBeTruthy();
+      expect(result?.textContent).toBe('nested');
+    });
+  });
+
   describe(':scope selector', () => {
     describe('on HtmlMod (root document)', () => {
       test('should select direct children with :scope > *', () => {

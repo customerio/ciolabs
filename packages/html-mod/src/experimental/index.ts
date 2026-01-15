@@ -221,6 +221,14 @@ export class HtmlMod {
 
   querySelector(selector: string): HtmlModElement | null {
     this.__ensureFlushed();
+
+    // If selector contains :scope, use querySelectorAll and return first result
+    // This ensures :scope handling is consistent between querySelector and querySelectorAll
+    if (selector.includes(':scope')) {
+      const results = this.querySelectorAll(selector);
+      return results[0] || null;
+    }
+
     const result = select(selector, this.__dom)?.[0];
     if (!result) {
       return null;
