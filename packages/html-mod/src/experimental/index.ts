@@ -240,14 +240,21 @@ export class HtmlMod {
       const scopeDirectChildMatch = selector.match(/^:scope\s*>\s*(.+)$/);
       if (scopeDirectChildMatch) {
         const childSelector = scopeDirectChildMatch[1];
-        // Get all direct children of the document
-        const directChildren = this.__dom.children.filter((node): node is SourceElement => node.type === 'tag');
+        // Get all direct children of the document (only tag elements)
+        const directChildren: SourceElement[] = [];
+        for (const node of this.__dom.children) {
+          if (node.type === 'tag') {
+            directChildren.push(node as SourceElement);
+          }
+        }
 
         // If childSelector is *, return all direct children
         if (childSelector === '*') {
-          return directChildren.map(element => {
-            return new this.__HtmlModElement(element, this);
-          });
+          const result: HtmlModElement[] = [];
+          for (const element of directChildren) {
+            result.push(new this.__HtmlModElement(element, this));
+          }
+          return result;
         }
 
         // Otherwise, filter direct children by the selector
@@ -257,11 +264,14 @@ export class HtmlMod {
         const matchingElements = select(childSelector, this.__dom);
         const matchingSet = new Set(matchingElements);
 
-        return directChildren
-          .filter(element => matchingSet.has(element as any))
-          .map(element => {
-            return new this.__HtmlModElement(element, this);
-          });
+        // Single loop combining filter and map
+        const result: HtmlModElement[] = [];
+        for (const element of directChildren) {
+          if (matchingSet.has(element as any)) {
+            result.push(new this.__HtmlModElement(element, this));
+          }
+        }
+        return result;
       }
 
       // For other :scope patterns, replace :scope with :root
@@ -406,9 +416,14 @@ export class HtmlModElement {
 
         ownKeys: _target => {
           // Return all data-* attributes as camelCase
-          return this.getAttributeNames()
-            .filter(name => name.startsWith('data-'))
-            .map(name => kebabToCamel(name.slice(5))); // Remove 'data-' prefix
+          // Single loop combining filter and map
+          const result: string[] = [];
+          for (const name of this.getAttributeNames()) {
+            if (name.startsWith('data-')) {
+              result.push(kebabToCamel(name.slice(5))); // Remove 'data-' prefix
+            }
+          }
+          return result;
         },
 
         getOwnPropertyDescriptor: (_target, prop: string) => {
