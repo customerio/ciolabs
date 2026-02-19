@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/html-process-conditional-comments",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Makes it easy to safely process HTML inside of conditional comments",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

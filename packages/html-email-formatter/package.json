@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/html-email-formatter",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Format and prettify HTML email content",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",
