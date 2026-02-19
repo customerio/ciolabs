@@ -26,6 +26,21 @@
       "types": "./dist/experimental/index.d.ts",
       "import": "./dist/experimental/index.mjs",
       "require": "./dist/experimental/index.js"
+    },
+    "./ast-updater": {
+      "types": "./dist/ast-updater.d.ts",
+      "import": "./dist/ast-updater.mjs",
+      "require": "./dist/ast-updater.js"
+    },
+    "./ast-manipulator": {
+      "types": "./dist/ast-manipulator.d.ts",
+      "import": "./dist/ast-manipulator.mjs",
+      "require": "./dist/ast-manipulator.js"
+    },
+    "./position-delta": {
+      "types": "./dist/position-delta.d.ts",
+      "import": "./dist/position-delta.mjs",
+      "require": "./dist/position-delta.js"
     }
   },
   "files": [
@@ -42,8 +57,7 @@
     "@ciolabs/htmlparser2-source": "workspace:*",
     "cheerio-select": "^2.1.0",
     "escape-html": "^1.0.3",
-    "html-entities": "^2.5.2",
-    "magic-string": "^0.30.0"
+    "html-entities": "^2.5.2"
   },
   "devDependencies": {
     "@types/escape-html": "^1.0.0"

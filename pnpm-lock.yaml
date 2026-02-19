@@ -182,9 +182,6 @@ importers:
       html-entities:
         specifier: ^2.5.2
         version: 2.6.0
-      magic-string:
-        specifier: ^0.30.0
-        version: 0.30.19
     devDependencies:
       '@types/escape-html':
         specifier: ^1.0.0
