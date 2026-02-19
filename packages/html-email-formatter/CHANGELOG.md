@@ -1,5 +1,16 @@
 # @ciolabs/html-email-formatter
 
+## 0.0.5
+
+### Patch Changes
+
+- [#39](https://github.com/customerio/ciolabs/pull/39) [`f240699`](https://github.com/customerio/ciolabs/commit/f2406998fc22499da96d9d94884cc2dc218cd924) Thanks [@avigoldman](https://github.com/avigoldman)! - Bundle ranges-apply into CJS dist
+
+  `ranges-apply` and its dependencies (`ranges-merge`, `tiny-invariant`) are ESM-only packages. Without bundling them, CJS consumers (like server-procedures in parcel) can't `require()` the ciolabs packages. Added `noExternal` to tsup configs to inline these deps into the dist output.
+
+- Updated dependencies [[`f240699`](https://github.com/customerio/ciolabs/commit/f2406998fc22499da96d9d94884cc2dc218cd924)]:
+  - @ciolabs/html-preserve-comment-whitespace@0.0.3
+
 ## 0.0.4
 
 ### Patch Changes
