@@ -1,7 +1,7 @@
 /**
  * Position delta tracking for incremental AST updates
  *
- * This module calculates how MagicString operations affect position indices
+ * This module calculates how string manipulation operations affect position indices
  * in the AST, allowing us to update node positions without reparsing.
  */
 
@@ -9,7 +9,7 @@ export type OperationType = 'overwrite' | 'appendRight' | 'prependLeft' | 'remov
 
 export interface PositionDelta {
   /**
-   * Type of MagicString operation
+   * Type of string manipulation operation
    */
   operationType: OperationType;
 

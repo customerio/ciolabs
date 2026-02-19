@@ -1,7 +1,7 @@
 /**
  * AST Position Update Engine
  *
- * This module updates AST node positions after MagicString operations,
+ * This module updates AST node positions after string manipulation operations,
  * keeping the AST synchronized with the string state without reparsing.
  */
 import { SourceDocument, SourceElement, SourceChildNode, SourceText, isTag, isText } from '@ciolabs/htmlparser2-source';

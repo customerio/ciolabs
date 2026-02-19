@@ -47,7 +47,7 @@ export class HtmlMod {
   }
 
   /**
-   * Direct string manipulation methods (replacing MagicString)
+   * Direct string manipulation methods
    * Public but marked with __ to indicate internal use
    */
   __overwrite(start: number, end: number, content: string): void {

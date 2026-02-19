@@ -1,5 +1,5 @@
 import findConditionalComments from '@ciolabs/html-find-conditional-comments';
-import MagicString from 'magic-string';
+import { rApply as applyRanges } from 'ranges-apply';
 
 const OPENER = `<!--__PROCESS_CONDITIONAL_COMMENTS`;
 const CLOSER = `__PROCESS_CONDITIONAL_COMMENTS-->`;
@@ -19,8 +19,8 @@ const CLOSER = `__PROCESS_CONDITIONAL_COMMENTS-->`;
  * ```
  */
 export function preprocess(source: string): string {
-  const magicSource = new MagicString(source);
   const comments = findConditionalComments(source);
+  const ranges: Array<[number, number, string]> = [];
 
   for (const comment of comments) {
     // Skip conditional comments that are not actually comments
@@ -35,11 +35,10 @@ export function preprocess(source: string): string {
 
     const contentStartIndex = comment.range[0] + comment.open.length;
     const contentEndIndex = comment.range[1] - comment.close.length;
-    magicSource.prependLeft(contentStartIndex, CLOSER);
-    magicSource.appendRight(contentEndIndex, OPENER);
+    ranges.push([contentStartIndex, contentStartIndex, CLOSER], [contentEndIndex, contentEndIndex, OPENER]);
   }
 
-  return magicSource.toString();
+  return applyRanges(source, ranges);
 }
 
 /**
@@ -54,8 +53,8 @@ export function postprocess(source: string): string {
  * with whitespace.
  */
 export function getEmbeddedDocument(source: string): string {
-  const magicSource = new MagicString(source);
   const comments = findConditionalComments(source);
+  const ranges: Array<[number, number, string]> = [];
 
   for (const comment of comments) {
     // Skip conditional comments that are not actually comments
@@ -63,10 +62,11 @@ export function getEmbeddedDocument(source: string): string {
       continue;
     }
 
-    magicSource.overwrite(comment.range[0], comment.range[0] + comment.open.length, ' '.repeat(comment.open.length));
-
-    magicSource.overwrite(comment.range[1] - comment.close.length, comment.range[1], ' '.repeat(comment.close.length));
+    ranges.push(
+      [comment.range[0], comment.range[0] + comment.open.length, ' '.repeat(comment.open.length)],
+      [comment.range[1] - comment.close.length, comment.range[1], ' '.repeat(comment.close.length)]
+    );
   }
 
-  return magicSource.toString();
+  return applyRanges(source, ranges);
 }

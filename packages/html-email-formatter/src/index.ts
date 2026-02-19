@@ -1,8 +1,8 @@
 import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 import { preserve, restore } from '@ciolabs/html-preserve-comment-whitespace';
 import jsBeautify from 'js-beautify';
-import MagicString from 'magic-string';
 import pretty from 'pretty';
+import { rApply as applyRanges } from 'ranges-apply';
 
 export default function emailFormatter(
   html: string,
@@ -40,17 +40,16 @@ export default function emailFormatter(
  */
 function closeConditionalComments(html: string, { opener, closer }: { opener: string; closer: string }) {
   const comments = findConditionalComments(html);
-  const s = new MagicString(html);
 
+  const ranges: Array<[number, number, string]> = [];
   for (const comment of comments) {
     const contentStartIndex = comment.range[0] + comment.open.length;
     const contentEndIndex = comment.range[1] - comment.close.length;
 
-    s.appendLeft(contentStartIndex, closer);
-    s.appendLeft(contentEndIndex, opener);
+    ranges.push([contentStartIndex, contentStartIndex, closer], [contentEndIndex, contentEndIndex, opener]);
   }
 
-  return s.toString();
+  return applyRanges(html, ranges);
 }
 
 /**
@@ -78,8 +77,8 @@ function openConditionalComments(html: string, { opener, closer }: { opener: str
  */
 function alignOpenAndCloseOfConditionalComments(html: string) {
   const comments = findConditionalComments(html);
-  const s = new MagicString(html);
 
+  const ranges: Array<[number, number, string]> = [];
   for (const comment of comments) {
     const code = new Set(html.slice(comment.range[0], comment.range[1]));
     if (!code.has('\n') && !code.has('\r')) {
@@ -98,17 +97,17 @@ function alignOpenAndCloseOfConditionalComments(html: string) {
     }
 
     if (openLeadingWhitespace.length > closeLeadingWhitespace.length) {
-      s.overwrite(comment.range[0] - openLeadingWhitespace.length, comment.range[0], closeLeadingWhitespace);
+      ranges.push([comment.range[0] - openLeadingWhitespace.length, comment.range[0], closeLeadingWhitespace]);
     } else {
-      s.overwrite(
+      ranges.push([
         comment.range[1] - comment.close.length - closeLeadingText.length - closeLeadingWhitespace.length,
         comment.range[1] - comment.close.length - closeLeadingText.length,
-        openLeadingWhitespace
-      );
+        openLeadingWhitespace,
+      ]);
     }
   }
 
-  return s.toString();
+  return applyRanges(html, ranges);
 }
 
 function parseWhitespaceAndTextOfLastLine(string_: string): {
