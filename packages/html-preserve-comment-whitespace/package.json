@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/html-preserve-comment-whitespace",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Preserves the presence or lack thereof of whitespace surrounding HTML comments",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",
