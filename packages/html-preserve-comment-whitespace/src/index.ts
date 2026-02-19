@@ -1,4 +1,4 @@
-import MagicString from 'magic-string';
+import { rApply as applyRanges } from 'ranges-apply';
 
 const COMMENT_REGEX = /<!--([\S\s]*?)-->/g;
 
@@ -75,7 +75,7 @@ export function preserve(string_: string): CommentData[] {
  * @returns Restored HTML string with correct comment whitespace
  */
 export function restore(string_: string, comments: CommentData[] = [], options?: RestoreOptions): string {
-  const magicString = new MagicString(string_);
+  const ranges: Array<[number, number, string]> = [];
   let index = 0;
   const restoreOptions = options ?? { restoreInline: true };
 
@@ -98,7 +98,7 @@ export function restore(string_: string, comments: CommentData[] = [], options?:
      * comment to be removed.
      */
     if (!hasLeadingWhitespace && isWhitespace(newLeadingWhitespace)) {
-      magicString.remove(startIndex - newLeadingWhitespace.length, startIndex);
+      ranges.push([startIndex - newLeadingWhitespace.length, startIndex, '']);
     }
 
     /**
@@ -107,16 +107,12 @@ export function restore(string_: string, comments: CommentData[] = [], options?:
     if (hasLeadingWhitespace) {
       // if it is now has no whitespace, restore the whitespace until the first new line
       if (!isWhitespace(newLeadingWhitespace)) {
-        magicString.prependLeft(startIndex, last(leadingWhitespace.split('\n')));
+        ranges.push([startIndex, startIndex, last(leadingWhitespace.split('\n'))]);
       }
 
       // it is now on it's own line and it wasn't before, replace it the whitespace until the first new line
       else if (restoreOptions.restoreInline && hasNewLine(newLeadingWhitespace) && !hasNewLine(leadingWhitespace)) {
-        magicString.overwrite(
-          startIndex - newLeadingWhitespace.length,
-          startIndex,
-          last(leadingWhitespace.split('\n'))
-        );
+        ranges.push([startIndex - newLeadingWhitespace.length, startIndex, last(leadingWhitespace.split('\n'))]);
       } else {
         // it has ok whitespace so leave it alone
       }
@@ -128,7 +124,7 @@ export function restore(string_: string, comments: CommentData[] = [], options?:
      * comment to be removed.
      */
     if (!hasTrailingWhitespace && isWhitespace(newTrailingWhitespace)) {
-      magicString.remove(endIndex, endIndex + newTrailingWhitespace.length);
+      ranges.push([endIndex, endIndex + newTrailingWhitespace.length, '']);
     }
 
     /**
@@ -137,12 +133,12 @@ export function restore(string_: string, comments: CommentData[] = [], options?:
     if (hasTrailingWhitespace) {
       // if it is now has no whitespace, restore the whitespace until the first new line
       if (!isWhitespace(newTrailingWhitespace)) {
-        magicString.appendRight(endIndex, first(trailingWhitespace.split('\n')));
+        ranges.push([endIndex, endIndex, first(trailingWhitespace.split('\n'))]);
       }
 
       // it is now on it's own line and it wasn't before, replace it the whitespace until the first new line
       else if (restoreOptions.restoreInline && hasNewLine(newTrailingWhitespace) && !hasNewLine(trailingWhitespace)) {
-        magicString.overwrite(endIndex, endIndex + newTrailingWhitespace.length, first(trailingWhitespace.split('\n')));
+        ranges.push([endIndex, endIndex + newTrailingWhitespace.length, first(trailingWhitespace.split('\n'))]);
       } else {
         // it has ok whitespace so leave it alone
       }
@@ -151,5 +147,5 @@ export function restore(string_: string, comments: CommentData[] = [], options?:
     index++;
   }
 
-  return magicString.toString();
+  return applyRanges(string_, ranges);
 }

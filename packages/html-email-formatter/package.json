@@ -37,8 +37,8 @@
     "@ciolabs/html-preserve-comment-whitespace": "workspace:*",
     "@types/js-beautify": "^1.13.3",
     "@types/pretty": "^2.0.1",
-    "js-beautify": "^1.15.1",
-    "magic-string": "^0.30.0",
-    "pretty": "^2.0.0"
+    "js-beautify": "~1.13.4",
+    "pretty": "^2.0.0",
+    "ranges-apply": "^7.0.16"
   }
 }

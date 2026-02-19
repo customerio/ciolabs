@@ -33,6 +33,6 @@
   },
   "dependencies": {
     "@ciolabs/html-find-conditional-comments": "workspace:*",
-    "magic-string": "^0.30.0"
+    "ranges-apply": "^7.0.16"
   }
 }
