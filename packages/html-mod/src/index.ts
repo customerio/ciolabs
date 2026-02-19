@@ -24,7 +24,7 @@ export type HtmlModOptions = Options & {
 export class HtmlMod {
   __source: string;
   __dom: SourceDocument;
-  __flushed = true; // Always true with auto-flush - AST is always synchronized
+
   __HtmlMod: typeof HtmlMod;
   __HtmlModElement: typeof HtmlModElement;
   __HtmlModText: typeof HtmlModText;
@@ -40,7 +40,6 @@ export class HtmlMod {
       ...options,
     };
     this.__dom = parseDocument(source, this.__options);
-    this.__flushed = true;
     this.__HtmlModElement = options?.HtmlModElement || HtmlModElement;
     this.__HtmlModText = HtmlModText;
     this.__HtmlMod = HtmlMod;
@@ -81,14 +80,6 @@ export class HtmlMod {
       this.__astUpdater.updateNodePositions(this.__dom, delta);
     }
     // Note: __source is already up-to-date from string operations
-  }
-
-  /**
-   * Ensure AST is synchronized (no-op since we update immediately)
-   * Kept for API compatibility
-   */
-  __ensureFlushed() {
-    // No-op: source is always up-to-date with direct string manipulation
   }
 
   trim() {
@@ -187,20 +178,7 @@ export class HtmlMod {
     return this.__source.length === 0;
   }
 
-  /**
-   * Check if the AST is synchronized with the string state.
-   *
-   * @deprecated This always returns `true` in the experimental auto-flush implementation.
-   * The AST is automatically kept synchronized after every modification, so manual
-   * flushing is never needed. This method exists only for API compatibility.
-   */
-  isFlushed() {
-    return true;
-  }
-
   toString() {
-    this.__ensureFlushed();
-
     if (this.__options.autofix) {
       return nodeToString(parseDocument(this.__source, this.__options));
     }
@@ -209,19 +187,10 @@ export class HtmlMod {
   }
 
   clone() {
-    this.__ensureFlushed();
     return new HtmlMod(this.__source);
   }
 
-  flush(_source?: string) {
-    // No-op in experimental auto-flush version - AST is always synchronized
-    // Kept for backwards compatibility
-    return this;
-  }
-
   querySelector(selector: string): HtmlModElement | null {
-    this.__ensureFlushed();
-
     // If selector contains :scope, use querySelectorAll and return first result
     // This ensures :scope handling is consistent between querySelector and querySelectorAll
     if (selector.includes(':scope')) {
@@ -238,8 +207,6 @@ export class HtmlMod {
   }
 
   querySelectorAll(selector: string): HtmlModElement[] {
-    this.__ensureFlushed();
-
     // Handle :scope selector on root document
     // When :scope is used on the document root, it should refer to the document itself
     // cheerio-select doesn't support :scope on document nodes, so we need to handle it manually
@@ -368,7 +335,6 @@ export class HtmlModElement {
   }
 
   get sourceRange() {
-    this.__htmlMod.__ensureFlushed();
     const startIndex = this.__element.source.openTag.startIndex;
     const endIndex = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
     const html = this.__htmlMod.__source;
@@ -394,7 +360,6 @@ export class HtmlModElement {
   }
 
   get tagName() {
-    this.__htmlMod.__ensureFlushed();
     return this.__element.tagName;
   }
 
@@ -421,7 +386,6 @@ export class HtmlModElement {
   }
 
   get id() {
-    this.__htmlMod.__ensureFlushed();
     return this.__element.attribs.id ?? '';
   }
 
@@ -430,7 +394,6 @@ export class HtmlModElement {
   }
 
   get classList() {
-    this.__htmlMod.__ensureFlushed();
     const classes = this.__element.attribs.class ?? '';
     const result: string[] = [];
 
@@ -446,7 +409,6 @@ export class HtmlModElement {
   }
 
   get className() {
-    this.__htmlMod.__ensureFlushed();
     return this.__element.attribs.class ?? '';
   }
 
@@ -513,7 +475,6 @@ export class HtmlModElement {
   }
 
   get attributes() {
-    this.__htmlMod.__ensureFlushed();
     return this.__element.source.attributes.map(attribute => {
       return {
         name: attribute.name.data,
@@ -523,7 +484,6 @@ export class HtmlModElement {
   }
 
   get innerHTML() {
-    this.__htmlMod.__ensureFlushed();
     // Check if innerHTML is cached (element was removed/replaced)
     const cached = this.__htmlMod.__cachedInnerHTML.get(this.__element);
     if (cached !== undefined) {
@@ -606,7 +566,6 @@ export class HtmlModElement {
   }
 
   get textContent() {
-    this.__htmlMod.__ensureFlushed();
     const text = DomUtils.textContent(this.__element);
 
     return decode(text);
@@ -621,7 +580,6 @@ export class HtmlModElement {
   }
 
   get outerHTML() {
-    this.__htmlMod.__ensureFlushed();
     // Check if outerHTML is cached (element was removed/replaced)
     const cached = this.__htmlMod.__cachedOuterHTML.get(this.__element);
     if (cached !== undefined) {
@@ -639,7 +597,6 @@ export class HtmlModElement {
   }
 
   get parent(): HtmlModElement | null {
-    this.__htmlMod.__ensureFlushed();
     const { parent } = this.__element;
 
     if (parent?.type === 'tag') {
@@ -1005,7 +962,6 @@ export class HtmlModElement {
   }
 
   querySelector(selector: string): HtmlModElement | null {
-    this.__htmlMod.__ensureFlushed();
     const result = select(selector, this.__element)?.[0] ?? null;
     if (!result) {
       return null;
@@ -1015,7 +971,6 @@ export class HtmlModElement {
   }
 
   querySelectorAll(selector: string): HtmlModElement[] {
-    this.__htmlMod.__ensureFlushed();
     return select(selector, this.__element).map(element => {
       return new this.__htmlMod.__HtmlModElement(element as unknown as SourceElement, this.__htmlMod);
     });
@@ -1051,12 +1006,10 @@ export class HtmlModText {
   }
 
   get textContent() {
-    this.__htmlMod.__ensureFlushed();
     return decode(this.__text.data);
   }
 
   get innerHTML() {
-    this.__htmlMod.__ensureFlushed();
     return this.__text.data;
   }
 

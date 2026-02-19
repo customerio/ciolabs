@@ -117,7 +117,6 @@ results.push(
       const html = new HtmlModOriginal(simpleHTML);
       const div = html.querySelector('div')!;
       div.setAttribute('id', 'test');
-      html.flush();
     },
     () => {
       const html = new HtmlModExperimental(simpleHTML);
@@ -154,7 +153,6 @@ results.push(
       for (let index = 0; index < 10; index++) {
         div.setAttribute(`data-${index}`, `value-${index}`);
       }
-      html.flush();
     },
     () => {
       const html = new HtmlModExperimental(simpleHTML);
@@ -189,10 +187,8 @@ results.push(
       const html = new HtmlModOriginal(complexHTML);
       const items = html.querySelectorAll('.item');
       items[0].dataset.first = 'true';
-      html.flush();
       html.querySelectorAll('.item');
       items[50].dataset.middle = 'true';
-      html.flush();
     },
     () => {
       const html = new HtmlModExperimental(complexHTML);
@@ -213,7 +209,6 @@ results.push(
       const html = new HtmlModOriginal(simpleHTML);
       const div = html.querySelector('div')!;
       div.innerHTML = '<span>New content</span>';
-      html.flush();
     },
     () => {
       const html = new HtmlModExperimental(simpleHTML);
@@ -232,7 +227,6 @@ results.push(
       const html = new HtmlModOriginal(simpleHTML);
       const p = html.querySelector('p')!;
       p.remove();
-      html.flush();
     },
     () => {
       const html = new HtmlModExperimental(simpleHTML);
@@ -266,10 +260,8 @@ results.push(
       const list = html.querySelector('#list')!;
       const items = Array.from({ length: 10 }, (_, index) => `<li>Item ${index}</li>`).join('');
       list.innerHTML = `<ul>${items}</ul>`;
-      html.flush();
       const lis = html.querySelectorAll('li');
       lis[0].setAttribute('class', 'first');
-      html.flush();
     },
     () => {
       const html = new HtmlModExperimental('<div id="list"></div>');
