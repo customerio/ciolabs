@@ -142,17 +142,13 @@ The class to use for the `HtmlModElement` class. This is the class that is used 
 
 Removes all whitespace from the beginning and end of the HTML string.
 
-#### trimStart(charType?: string) => this
+#### trimStart() => this
 
 Removes all whitespace from the beginning of the HTML string.
 
-**charType**: The type of character to remove. Defaults to `\s`.
-
-#### trimEnd(charType?: string) => this
+#### trimEnd() => this
 
 Removes all whitespace from the end of the HTML string.
-
-**charType**: The type of character to remove. Defaults to `\s`.
 
 #### trimLines() => this
 
@@ -186,11 +182,11 @@ The `HtmlModElement` class is the class that is used to manipulate the HTML. It'
 
 #### tagName: string
 
-The tag name of the element.
+The tag name of the element. This can be set.
 
 #### id: string
 
-The id of the element.
+The id of the element. This can be set.
 
 #### classList: string[]
 
@@ -320,6 +316,26 @@ Returns the HTML string. Same as `outerHTML`.
 Returns a new `HtmlModElement` instance with the same HTML string.
 
 Useful if you want to manipulate the HTML without affecting the original `HtmlMod` instance.
+
+## HtmlModText
+
+The `HtmlModText` class represents a text node in the HTML. It's returned as part of an element's `children` array.
+
+### Properties
+
+#### textContent: string
+
+The decoded text content of the node. This can be set (HTML entities will be escaped).
+
+#### innerHTML: string
+
+The raw HTML content of the text node. This can be set.
+
+### Methods
+
+#### toString() => string
+
+Returns the raw text node content.
 
 ## Types
 
