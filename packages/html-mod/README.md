@@ -84,9 +84,9 @@ console.log(h.toString());
 //=> <div>world</div>
 ```
 
-## Flushing and AST Synchronization
+## AST Synchronization
 
-When you modify the HTML, the AST (Abstract Syntax Tree) used for queries becomes out of sync with the string. You need to call `flush()` to reparse and synchronize the AST before querying:
+The AST is automatically kept in sync with string modifications. You can freely modify and query without any manual steps:
 
 ```typescript
 import { HtmlMod } from '@ciolabs/html-mod';
@@ -95,39 +95,28 @@ const h = new HtmlMod('<div>hello</div>');
 
 h.querySelector('div')!.append('<div>world</div>');
 
-// Must flush before querying to see the changes
-h.flush();
+// Queries always reflect the latest modifications
 console.log(h.querySelectorAll('div').length); //=> 2
 ```
 
-You can check if the AST needs to be flushed:
+Element references stay valid across modifications — no need to re-query after making changes:
 
 ```typescript
-console.log(h.isFlushed()); //=> false after modifications, true after flush()
+const h = new HtmlMod('<div><p>Hello</p></div>');
+const div = h.querySelector('div')!;
+
+div.setAttribute('class', 'active');
+
+// Element reference is still valid
+div.setAttribute('data-id', '123'); // ✅ Works perfectly
+
+// Queries reflect all modifications
+const p = h.querySelector('p'); // ✅ Finds the element
 ```
 
-### Experimental: Auto-Flush Version
+### Migrating from older versions
 
-An experimental version is available that automatically keeps the AST synchronized without manual `flush()` calls. This provides better ergonomics and performance for interactive use cases:
-
-```typescript
-import { HtmlMod } from '@ciolabs/html-mod/experimental';
-
-const h = new HtmlMod('<div>hello</div>');
-h.querySelector('div')!.append('<div>world</div>');
-
-// No flush needed - queries work immediately!
-console.log(h.querySelectorAll('div').length); //=> 2
-```
-
-**Benefits:**
-
-- ✅ No manual flush() calls needed
-- ✅ 2.23x faster for modify+query patterns
-- ✅ Zero drift guarantee over 10,000+ operations
-- ✅ Perfect for visual editors and interactive UIs
-
-See [src/experimental/README.md](./src/experimental/README.md) for complete documentation, benchmarks, and migration guide.
+If you're upgrading from a version that required manual `flush()` calls, you can safely remove them. The `@ciolabs/html-mod/experimental` import path still works but is deprecated — import from `@ciolabs/html-mod` directly instead.
 
 ## HtmlMod
 
@@ -153,17 +142,13 @@ The class to use for the `HtmlModElement` class. This is the class that is used 
 
 Removes all whitespace from the beginning and end of the HTML string.
 
-#### trimStart(charType?: string) => this
+#### trimStart() => this
 
 Removes all whitespace from the beginning of the HTML string.
 
-**charType**: The type of character to remove. Defaults to `\s`.
-
-#### trimEnd(charType?: string) => this
+#### trimEnd() => this
 
 Removes all whitespace from the end of the HTML string.
-
-**charType**: The type of character to remove. Defaults to `\s`.
 
 #### trimLines() => this
 
@@ -173,18 +158,6 @@ Removes empty lines from the start and end.
 
 Returns `true` if the resulting HTML is empty.
 
-#### isFlushed() => boolean
-
-Returns `true` if the AST positions are in sync with the source string. Returns `false` after modifications until `flush()` is called.
-
-#### generateDecodedMap()
-
-Generates a decoded map of the HTML string. This is used to map the manipulated HTML string back to the original HTML string.
-
-#### generateMap()
-
-Generates a map of the HTML string. This is used to map the manipulated HTML string back to the original HTML string.
-
 #### toString() => string
 
 Returns the manipulated HTML string.
@@ -192,14 +165,6 @@ Returns the manipulated HTML string.
 #### clone() => HtmlMod
 
 Returns a new `HtmlMod` instance with the same HTML string.
-
-#### flush() => this
-
-Reparses the HTML to synchronize the AST with string modifications. Required after any modifications before querying.
-
-Returns `this`.
-
-**Note:** The experimental version (see above) automatically maintains synchronization, making manual flush calls unnecessary.
 
 #### querySelector(selector: string) => HtmlModElement | null
 
@@ -217,11 +182,11 @@ The `HtmlModElement` class is the class that is used to manipulate the HTML. It'
 
 #### tagName: string
 
-The tag name of the element.
+The tag name of the element. This can be set.
 
 #### id: string
 
-The id of the element.
+The id of the element. This can be set.
 
 #### classList: string[]
 
@@ -351,6 +316,26 @@ Returns the HTML string. Same as `outerHTML`.
 Returns a new `HtmlModElement` instance with the same HTML string.
 
 Useful if you want to manipulate the HTML without affecting the original `HtmlMod` instance.
+
+## HtmlModText
+
+The `HtmlModText` class represents a text node in the HTML. It's returned as part of an element's `children` array.
+
+### Properties
+
+#### textContent: string
+
+The decoded text content of the node. This can be set (HTML entities will be escaped).
+
+#### innerHTML: string
+
+The raw HTML content of the text node. This can be set.
+
+### Methods
+
+#### toString() => string
+
+Returns the raw text node content.
 
 ## Types
 
