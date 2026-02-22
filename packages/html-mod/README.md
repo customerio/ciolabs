@@ -162,14 +162,6 @@ Removes empty lines from the start and end.
 
 Returns `true` if the resulting HTML is empty.
 
-#### generateDecodedMap()
-
-Generates a decoded map of the HTML string. This is used to map the manipulated HTML string back to the original HTML string.
-
-#### generateMap()
-
-Generates a map of the HTML string. This is used to map the manipulated HTML string back to the original HTML string.
-
 #### toString() => string
 
 Returns the manipulated HTML string.
