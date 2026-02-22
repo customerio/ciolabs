@@ -1,6 +1,6 @@
 {
   "name": "@ciolabs/html-mod",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Manipulate HTML strings with a Browser-like API",
   "author": "Customer.io <win@customer.io>",
   "license": "Apache-2.0 WITH Commons-Clause",
