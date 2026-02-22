@@ -1,5 +1,11 @@
 # @ciolabs/html-mod
 
+## 1.0.1
+
+### Patch Changes
+
+- [#41](https://github.com/customerio/ciolabs/pull/41) [`c19865b`](https://github.com/customerio/ciolabs/commit/c19865b1386e679053c4e57db3fd30c71fae7d1c) Thanks [@avigoldman](https://github.com/avigoldman)! - Update README to reflect that the auto-flush implementation is now the default. Remove outdated `flush()` and `isFlushed()` docs, add element reference stability examples, and add migration notes for users upgrading from older versions.
+
 ## 1.0.0
 
 ### Major Changes
