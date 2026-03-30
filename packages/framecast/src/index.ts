@@ -62,9 +62,9 @@ export class Framecast {
   private pendingFunctionCalls: Map<string, { timeout: number; resolve: Function; reject: Function }> = new Map();
 
   /**
-   * When true, broadcast() queues messages instead of sending them.
-   * Enabled by waitForReady({ queueMessages: true }) and disabled
-   * when the handshake completes (at which point the queue is flushed).
+   * When true, broadcast() queues messages instead of posting them.
+   * Set by waitForReady({ queueMessages: true }), cleared on
+   * handshake success (flush), timeout (discard), or clearQueue().
    */
   private _queueBroadcasts = false;
   private _broadcastQueue: any[] = [];
@@ -255,9 +255,7 @@ export class Framecast {
    * @param options.timeout Timeout in ms (default: 10000). Set to 0 to wait indefinitely.
    * @param options.queueMessages When true, broadcast() calls made while
    *   waiting are queued and automatically flushed once the handshake
-   *   completes. This prevents messages from being lost when the iframe
-   *   hasn't set up its listener yet. On timeout, queued messages are
-   *   flushed anyway (best-effort).
+   *   completes successfully. On timeout, queued messages are discarded.
    */
   waitForReady(options?: { interval?: number; timeout?: number; queueMessages?: boolean }): Promise<void> {
     const interval = options?.interval ?? 50;
@@ -268,68 +266,58 @@ export class Framecast {
     }
 
     return new Promise<void>((resolve, reject) => {
-      let resolved = false;
-      const off = this.off.bind(this);
+      let done = false;
+
+      const onReady = () => {
+        if (done) return;
+        done = true;
+        teardown();
+        // Flush queued messages — iframe is ready to receive them.
+        const queued = this._broadcastQueue;
+        this._broadcastQueue = [];
+        this._queueBroadcasts = false;
+        for (const data of queued) {
+          this.postMessage('broadcast', { data });
+        }
+        resolve();
+      };
+
+      const onTimeout = () => {
+        if (done) return;
+        done = true;
+        teardown();
+        // Discard queued messages — iframe isn't ready, they'd be lost.
+        this.clearQueue();
+        reject(new Error(`waitForReady timed out after ${timeout}ms`));
+      };
 
       const poll = () => {
-        if (resolved) return;
+        if (done) return;
         this.call('__framecast_ready')
-          .then(() => {
-            if (!resolved) {
-              cleanup(true);
-              resolve();
-            }
-          })
+          .then(onReady)
           .catch(() => {
-            // Expected when the iframe hasn't set up its listener yet.
-            // The poll will retry on the next interval.
+            // Expected — iframe hasn't set up its listener yet.
           });
       };
 
       const broadcastListener = (message: any) => {
-        if (resolved) return;
         if (message && typeof message === 'object' && message.type === '__framecast_ready') {
-          cleanup(true);
-          resolve();
+          onReady();
         }
       };
 
-      // Start polling and listening
       this.on('broadcast', broadcastListener);
       poll();
       const pollTimer = setInterval(poll, interval);
-      const timeoutTimer =
-        timeout > 0
-          ? setTimeout(() => {
-              if (!resolved) {
-                cleanup(false);
-                reject(new Error(`waitForReady timed out after ${timeout}ms`));
-              }
-            }, timeout)
-          : undefined;
+      const timeoutTimer = timeout > 0 ? setTimeout(onTimeout, timeout) : undefined;
 
-      const flushQueue = () => this.flushBroadcastQueue();
-      function cleanup(flush: boolean) {
-        resolved = true;
+      const off = this.off.bind(this);
+      const teardown = () => {
         clearInterval(pollTimer);
         if (timeoutTimer) clearTimeout(timeoutTimer);
         off('broadcast', broadcastListener);
-        if (flush) flushQueue();
-      }
+      };
     });
-  }
-
-  /**
-   * Flush any queued broadcasts and disable queuing mode.
-   * Called automatically when waitForReady() resolves successfully.
-   */
-  private flushBroadcastQueue(): void {
-    this._queueBroadcasts = false;
-    const queued = this._broadcastQueue;
-    this._broadcastQueue = [];
-    for (const data of queued) {
-      this.postMessage('broadcast', { data });
-    }
   }
 
   /**
