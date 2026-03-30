@@ -61,6 +61,14 @@ export class Framecast {
    */
   private pendingFunctionCalls: Map<string, { timeout: number; resolve: Function; reject: Function }> = new Map();
 
+  /**
+   * When true, broadcast() queues messages instead of posting them.
+   * Set by waitForReady({ queueMessages: true }), cleared on
+   * handshake success (flush), timeout (discard), or clearQueue().
+   */
+  private _queueBroadcasts = false;
+  private _broadcastQueue: any[] = [];
+
   constructor(target: Window, config?: Partial<FramecastConfig>) {
     if (!target) {
       throw new Error(`Framecast must be initialized with a window object`);
@@ -146,6 +154,10 @@ export class Framecast {
    * @param data Message to send.
    */
   broadcast(data: any): void {
+    if (this._queueBroadcasts) {
+      this._broadcastQueue.push(data);
+      return;
+    }
     this.postMessage('broadcast', { data });
   }
 
@@ -241,59 +253,81 @@ export class Framecast {
    *
    * @param options.interval Polling interval in ms (default: 50)
    * @param options.timeout Timeout in ms (default: 10000). Set to 0 to wait indefinitely.
+   * @param options.queueMessages When true, broadcast() calls made while
+   *   waiting are queued and automatically flushed once the handshake
+   *   completes successfully. On timeout, queued messages are discarded.
    */
-  waitForReady(options?: { interval?: number; timeout?: number }): Promise<void> {
+  waitForReady(options?: { interval?: number; timeout?: number; queueMessages?: boolean }): Promise<void> {
     const interval = options?.interval ?? 50;
     const timeout = options?.timeout ?? 10_000;
 
+    if (options?.queueMessages) {
+      this._queueBroadcasts = true;
+    }
+
     return new Promise<void>((resolve, reject) => {
-      let resolved = false;
-      const off = this.off.bind(this);
+      let done = false;
+
+      const onReady = () => {
+        if (done) return;
+        done = true;
+        teardown();
+        // Flush queued messages — iframe is ready to receive them.
+        const queued = this._broadcastQueue;
+        this._broadcastQueue = [];
+        this._queueBroadcasts = false;
+        for (const data of queued) {
+          this.postMessage('broadcast', { data });
+        }
+        resolve();
+      };
+
+      const onTimeout = () => {
+        if (done) return;
+        done = true;
+        teardown();
+        // Discard queued messages — iframe isn't ready, they'd be lost.
+        this.clearQueue();
+        reject(new Error(`waitForReady timed out after ${timeout}ms`));
+      };
 
       const poll = () => {
-        if (resolved) return;
+        if (done) return;
         this.call('__framecast_ready')
-          .then(() => {
-            if (!resolved) {
-              cleanup();
-              resolve();
-            }
-          })
+          .then(onReady)
           .catch(() => {
-            // Expected when the iframe hasn't set up its listener yet.
-            // The poll will retry on the next interval.
+            // Expected — iframe hasn't set up its listener yet.
           });
       };
 
       const broadcastListener = (message: any) => {
-        if (resolved) return;
         if (message && typeof message === 'object' && message.type === '__framecast_ready') {
-          cleanup();
-          resolve();
+          onReady();
         }
       };
 
-      // Start polling and listening
       this.on('broadcast', broadcastListener);
       poll();
       const pollTimer = setInterval(poll, interval);
-      const timeoutTimer =
-        timeout > 0
-          ? setTimeout(() => {
-              if (!resolved) {
-                cleanup();
-                reject(new Error(`waitForReady timed out after ${timeout}ms`));
-              }
-            }, timeout)
-          : undefined;
+      const timeoutTimer = timeout > 0 ? setTimeout(onTimeout, timeout) : undefined;
 
-      function cleanup() {
-        resolved = true;
+      const off = this.off.bind(this);
+      const teardown = () => {
         clearInterval(pollTimer);
         if (timeoutTimer) clearTimeout(timeoutTimer);
         off('broadcast', broadcastListener);
-      }
+      };
     });
+  }
+
+  /**
+   * Discard any queued broadcasts and disable queuing mode.
+   * Call this when tearing down (e.g. unmounting) to prevent stale
+   * messages from being flushed to a dead iframe.
+   */
+  clearQueue(): void {
+    this._queueBroadcasts = false;
+    this._broadcastQueue = [];
   }
 
   /**

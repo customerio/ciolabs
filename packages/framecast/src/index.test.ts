@@ -605,6 +605,106 @@ describe('Framecast', () => {
     });
   });
 
+  describe('queueMessages', () => {
+    it('queues broadcasts while waiting and flushes on ready', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 1000, queueMessages: true });
+
+      // These broadcasts should be queued, not sent
+      framecast.broadcast({ type: 'msg1', data: 'first' });
+      framecast.broadcast({ type: 'msg2', data: 'second' });
+
+      // Verify nothing was sent yet (only poll calls, no broadcast messages)
+      const broadcastsBefore = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type !== '__framecast_ready';
+      });
+      expect(
+        broadcastsBefore.filter(c => {
+          const m = superjson.parse(c[0]) as any;
+          return m.data?.type === 'msg1' || m.data?.type === 'msg2';
+        })
+      ).toHaveLength(0);
+
+      // Signal ready
+      simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+      await readyPromise;
+
+      // Now the queued messages should have been flushed
+      const broadcastsAfter = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && (message.data?.type === 'msg1' || message.data?.type === 'msg2');
+      });
+      expect(broadcastsAfter).toHaveLength(2);
+    });
+
+    it('does not flush queued messages on timeout', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 100, queueMessages: true });
+
+      framecast.broadcast({ type: 'queued', data: 'value' });
+
+      // Wait for timeout
+      await expect(readyPromise).rejects.toThrow('waitForReady timed out');
+
+      // Message should NOT have been flushed — iframe isn't ready
+      const flushed = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type === 'queued';
+      });
+      expect(flushed).toHaveLength(0);
+    });
+
+    it('clearQueue discards queued messages', () => {
+      framecast.waitForReady({ interval: 10, timeout: 1000, queueMessages: true });
+
+      framecast.broadcast({ type: 'will-discard', data: 'value' });
+      framecast.clearQueue();
+
+      // Simulate ready — nothing should flush since queue was cleared
+      simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+
+      const sent = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type === 'will-discard';
+      });
+      expect(sent).toHaveLength(0);
+    });
+
+    it('broadcasts normally after ready (no more queuing)', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 1000, queueMessages: true });
+
+      simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+      await readyPromise;
+
+      // Clear mock to only track new calls
+      mockTargetWindow.postMessage.mockClear();
+
+      // This should go through immediately, not be queued
+      framecast.broadcast({ type: 'after-ready', data: 'direct' });
+
+      const sent = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type === 'after-ready';
+      });
+      expect(sent).toHaveLength(1);
+    });
+
+    it('does not queue when queueMessages is false', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 1000, queueMessages: false });
+
+      framecast.broadcast({ type: 'not-queued', data: 'value' });
+
+      // Should be sent immediately
+      const sent = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type === 'not-queued';
+      });
+      expect(sent).toHaveLength(1);
+
+      simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+      await readyPromise;
+    });
+  });
+
   describe('state management', () => {
     it('creates state atoms with initial values', () => {
       const initialValue = { count: 0 };
