@@ -1,5 +1,11 @@
 # @ciolabs/framecast
 
+## 0.2.0
+
+### Minor Changes
+
+- [#46](https://github.com/customerio/ciolabs/pull/46) [`aabf68d`](https://github.com/customerio/ciolabs/commit/aabf68d967423cb831da63ffd3f3dccf13622ac5) Thanks [@avigoldman](https://github.com/avigoldman)! - Add `queueMessages` option to `waitForReady()` and public `clearQueue()` method. When `queueMessages: true`, `broadcast()` calls are automatically queued until the handshake completes, then flushed. On timeout, queued messages are discarded.
+
 ## 0.1.0
 
 ### Minor Changes
