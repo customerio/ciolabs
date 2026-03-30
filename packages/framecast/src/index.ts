@@ -61,6 +61,14 @@ export class Framecast {
    */
   private pendingFunctionCalls: Map<string, { timeout: number; resolve: Function; reject: Function }> = new Map();
 
+  /**
+   * When true, broadcast() queues messages instead of sending them.
+   * Enabled by waitForReady({ queueMessages: true }) and disabled
+   * when the handshake completes (at which point the queue is flushed).
+   */
+  private _queueBroadcasts = false;
+  private _broadcastQueue: any[] = [];
+
   constructor(target: Window, config?: Partial<FramecastConfig>) {
     if (!target) {
       throw new Error(`Framecast must be initialized with a window object`);
@@ -146,6 +154,10 @@ export class Framecast {
    * @param data Message to send.
    */
   broadcast(data: any): void {
+    if (this._queueBroadcasts) {
+      this._broadcastQueue.push(data);
+      return;
+    }
     this.postMessage('broadcast', { data });
   }
 
@@ -241,10 +253,19 @@ export class Framecast {
    *
    * @param options.interval Polling interval in ms (default: 50)
    * @param options.timeout Timeout in ms (default: 10000). Set to 0 to wait indefinitely.
+   * @param options.queueMessages When true, broadcast() calls made while
+   *   waiting are queued and automatically flushed once the handshake
+   *   completes. This prevents messages from being lost when the iframe
+   *   hasn't set up its listener yet. On timeout, queued messages are
+   *   flushed anyway (best-effort).
    */
-  waitForReady(options?: { interval?: number; timeout?: number }): Promise<void> {
+  waitForReady(options?: { interval?: number; timeout?: number; queueMessages?: boolean }): Promise<void> {
     const interval = options?.interval ?? 50;
     const timeout = options?.timeout ?? 10_000;
+
+    if (options?.queueMessages) {
+      this._queueBroadcasts = true;
+    }
 
     return new Promise<void>((resolve, reject) => {
       let resolved = false;
@@ -287,13 +308,28 @@ export class Framecast {
             }, timeout)
           : undefined;
 
+      const flushQueue = () => this.flushBroadcastQueue();
       function cleanup() {
         resolved = true;
         clearInterval(pollTimer);
         if (timeoutTimer) clearTimeout(timeoutTimer);
         off('broadcast', broadcastListener);
+        flushQueue();
       }
     });
+  }
+
+  /**
+   * Flush any queued broadcasts and disable queuing mode.
+   * Called automatically when waitForReady() resolves or times out.
+   */
+  private flushBroadcastQueue(): void {
+    this._queueBroadcasts = false;
+    const queued = this._broadcastQueue;
+    this._broadcastQueue = [];
+    for (const data of queued) {
+      this.postMessage('broadcast', { data });
+    }
   }
 
   /**
