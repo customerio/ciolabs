@@ -276,7 +276,7 @@ export class Framecast {
         this.call('__framecast_ready')
           .then(() => {
             if (!resolved) {
-              cleanup();
+              cleanup(true);
               resolve();
             }
           })
@@ -289,7 +289,7 @@ export class Framecast {
       const broadcastListener = (message: any) => {
         if (resolved) return;
         if (message && typeof message === 'object' && message.type === '__framecast_ready') {
-          cleanup();
+          cleanup(true);
           resolve();
         }
       };
@@ -302,26 +302,26 @@ export class Framecast {
         timeout > 0
           ? setTimeout(() => {
               if (!resolved) {
-                cleanup();
+                cleanup(false);
                 reject(new Error(`waitForReady timed out after ${timeout}ms`));
               }
             }, timeout)
           : undefined;
 
       const flushQueue = () => this.flushBroadcastQueue();
-      function cleanup() {
+      function cleanup(flush: boolean) {
         resolved = true;
         clearInterval(pollTimer);
         if (timeoutTimer) clearTimeout(timeoutTimer);
         off('broadcast', broadcastListener);
-        flushQueue();
+        if (flush) flushQueue();
       }
     });
   }
 
   /**
    * Flush any queued broadcasts and disable queuing mode.
-   * Called automatically when waitForReady() resolves or times out.
+   * Called automatically when waitForReady() resolves successfully.
    */
   private flushBroadcastQueue(): void {
     this._queueBroadcasts = false;
@@ -330,6 +330,16 @@ export class Framecast {
     for (const data of queued) {
       this.postMessage('broadcast', { data });
     }
+  }
+
+  /**
+   * Discard any queued broadcasts and disable queuing mode.
+   * Call this when tearing down (e.g. unmounting) to prevent stale
+   * messages from being flushed to a dead iframe.
+   */
+  clearQueue(): void {
+    this._queueBroadcasts = false;
+    this._broadcastQueue = [];
   }
 
   /**

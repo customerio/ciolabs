@@ -637,7 +637,7 @@ describe('Framecast', () => {
       expect(broadcastsAfter).toHaveLength(2);
     });
 
-    it('flushes queued messages on timeout', async () => {
+    it('does not flush queued messages on timeout', async () => {
       const readyPromise = framecast.waitForReady({ interval: 10, timeout: 100, queueMessages: true });
 
       framecast.broadcast({ type: 'queued', data: 'value' });
@@ -645,12 +645,28 @@ describe('Framecast', () => {
       // Wait for timeout
       await expect(readyPromise).rejects.toThrow('waitForReady timed out');
 
-      // Message should still have been flushed (best-effort)
+      // Message should NOT have been flushed — iframe isn't ready
       const flushed = mockTargetWindow.postMessage.mock.calls.filter(call => {
         const message = superjson.parse(call[0]) as any;
         return message.type === 'broadcast' && message.data?.type === 'queued';
       });
-      expect(flushed).toHaveLength(1);
+      expect(flushed).toHaveLength(0);
+    });
+
+    it('clearQueue discards queued messages', () => {
+      framecast.waitForReady({ interval: 10, timeout: 1000, queueMessages: true });
+
+      framecast.broadcast({ type: 'will-discard', data: 'value' });
+      framecast.clearQueue();
+
+      // Simulate ready — nothing should flush since queue was cleared
+      simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+
+      const sent = mockTargetWindow.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type === 'will-discard';
+      });
+      expect(sent).toHaveLength(0);
     });
 
     it('broadcasts normally after ready (no more queuing)', async () => {
