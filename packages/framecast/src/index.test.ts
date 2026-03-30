@@ -473,6 +473,138 @@ describe('Framecast', () => {
     });
   });
 
+  describe('ready handshake', () => {
+    it('signalReady registers function handler and broadcasts', () => {
+      framecast.signalReady();
+
+      // Should broadcast the ready message
+      const calls = mockTargetWindow.postMessage.mock.calls;
+      const readyBroadcast = calls.find(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast' && message.data?.type === '__framecast_ready';
+      });
+
+      expect(readyBroadcast).toBeDefined();
+    });
+
+    it('signalReady responds to __framecast_ready function calls', async () => {
+      framecast.signalReady();
+
+      // Simulate a ready check function call
+      simulateMessage('function:__framecast_ready', { id: 'ready-check-1', args: [] });
+
+      // Should respond with functionResult
+      await vi.waitFor(() => {
+        const calls = mockTargetWindow.postMessage.mock.calls;
+        const resultCall = calls.find(call => {
+          const message = superjson.parse(call[0]) as any;
+          return message.type === 'functionResult' && message.id === 'ready-check-1' && message.result === true;
+        });
+        expect(resultCall).toBeDefined();
+      });
+    });
+
+    it('waitForReady resolves when it receives a ready broadcast', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 1000 });
+
+      // Simulate the ready broadcast from the iframe
+      simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+
+      await expect(readyPromise).resolves.toBeUndefined();
+    });
+
+    it('waitForReady resolves when __framecast_ready function call succeeds', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 1000 });
+
+      // Get the function call that was sent (poll)
+      await vi.waitFor(() => {
+        const calls = mockTargetWindow.postMessage.mock.calls;
+        const readyCall = calls.find(call => {
+          const message = superjson.parse(call[0]) as any;
+          return message.type === 'function:__framecast_ready';
+        });
+        expect(readyCall).toBeDefined();
+      });
+
+      // Get the call ID and simulate a successful response
+      const calls = mockTargetWindow.postMessage.mock.calls;
+      const readyCall = calls.find(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'function:__framecast_ready';
+      })!;
+      const sentMessage = superjson.parse(readyCall[0]) as any;
+
+      simulateMessage('functionResult', { id: sentMessage.id, result: true });
+
+      await expect(readyPromise).resolves.toBeUndefined();
+    });
+
+    it('waitForReady times out if no ready signal', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 100 });
+
+      await expect(readyPromise).rejects.toThrow('waitForReady timed out after 100ms');
+    });
+
+    it('waitForReady does not timeout when timeout is 0', async () => {
+      const readyPromise = framecast.waitForReady({ interval: 10, timeout: 0 });
+
+      // Simulate ready after a short delay
+      setTimeout(() => {
+        simulateMessage('broadcast', { data: { type: '__framecast_ready' } });
+      }, 50);
+
+      await expect(readyPromise).resolves.toBeUndefined();
+    });
+
+    it('full handshake: signalReady + waitForReady', async () => {
+      // Create a second framecast pair simulating parent <-> iframe
+      const iframeMessageHandlers = new Map<string, Function>();
+      const mockIframeWindow: MockWindow = {
+        postMessage: vi.fn(),
+        addEventListener: vi.fn((type: string, handler: Function) => {
+          iframeMessageHandlers.set(type, handler);
+        }),
+        removeEventListener: vi.fn(),
+        setTimeout: global.setTimeout,
+        clearTimeout: global.clearTimeout,
+      };
+
+      // Parent framecast targets iframe window
+      const parentFramecast = new Framecast(mockIframeWindow as any, {
+        self: mockSelfWindow as any,
+        functionTimeoutMs: 1000,
+      });
+
+      // Iframe framecast targets parent (mockSelfWindow)
+      const iframeFramecast = new Framecast(mockSelfWindow as any, {
+        self: mockIframeWindow as any,
+        functionTimeoutMs: 1000,
+      });
+
+      // Wire up message forwarding: when parent posts to iframe, deliver it
+      mockIframeWindow.postMessage.mockImplementation((data: string, _origin: string) => {
+        const handler = iframeMessageHandlers.get('message');
+        handler?.({ data, origin: '*' });
+      });
+
+      // Wire up message forwarding: when iframe posts to parent, deliver it
+      mockSelfWindow.postMessage.mockImplementation((data: string, _origin: string) => {
+        const handler = messageHandlers.get('message');
+        handler?.({ data, origin: '*' });
+      });
+
+      // Parent waits for ready
+      const readyPromise = parentFramecast.waitForReady({ interval: 10, timeout: 1000 });
+
+      // Iframe signals ready after a short delay
+      setTimeout(() => {
+        iframeFramecast.signalReady();
+      }, 50);
+
+      await expect(readyPromise).resolves.toBeUndefined();
+    });
+  });
+
   describe('state management', () => {
     it('creates state atoms with initial values', () => {
       const initialValue = { count: 0 };

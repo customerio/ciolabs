@@ -217,6 +217,86 @@ export class Framecast {
   }
 
   /**
+   * Signals that this side of the framecast is ready to receive messages.
+   * Call this on the iframe side after setting up all listeners.
+   *
+   * Registers a `__framecast_ready` function handler so the parent can
+   * poll for readiness, and proactively broadcasts a ready message.
+   */
+  signalReady(): void {
+    this.on('function:__framecast_ready', async () => {
+      return true;
+    });
+
+    this.broadcast({ type: '__framecast_ready' });
+  }
+
+  /**
+   * Waits for the other side of the framecast to signal readiness.
+   * Call this on the parent side before sending messages to the iframe.
+   *
+   * Polls by calling the `__framecast_ready` function at a regular interval
+   * and also listens for a proactive ready broadcast from the iframe.
+   * Resolves when either succeeds.
+   *
+   * @param options.interval Polling interval in ms (default: 50)
+   * @param options.timeout Timeout in ms (default: 10000). Set to 0 to wait indefinitely.
+   */
+  waitForReady(options?: { interval?: number; timeout?: number }): Promise<void> {
+    const interval = options?.interval ?? 50;
+    const timeout = options?.timeout ?? 10_000;
+
+    return new Promise<void>((resolve, reject) => {
+      let resolved = false;
+      const off = this.off.bind(this);
+
+      const poll = () => {
+        if (resolved) return;
+        this.call('__framecast_ready')
+          .then(() => {
+            if (!resolved) {
+              cleanup();
+              resolve();
+            }
+          })
+          .catch(() => {
+            // Expected when the iframe hasn't set up its listener yet.
+            // The poll will retry on the next interval.
+          });
+      };
+
+      const broadcastListener = (message: any) => {
+        if (resolved) return;
+        if (message && typeof message === 'object' && message.type === '__framecast_ready') {
+          cleanup();
+          resolve();
+        }
+      };
+
+      // Start polling and listening
+      this.on('broadcast', broadcastListener);
+      poll();
+      const pollTimer = setInterval(poll, interval);
+      const timeoutTimer =
+        timeout > 0
+          ? setTimeout(() => {
+              if (!resolved) {
+                cleanup();
+                reject(new Error(`waitForReady timed out after ${timeout}ms`));
+              }
+            }, timeout)
+          : undefined;
+
+      function cleanup() {
+        resolved = true;
+        clearInterval(pollTimer);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        off('broadcast', broadcastListener);
+      }
+    });
+  }
+
+  /**
    * Evaluates the given function in the context of the target window
    * and returns the result.
    *
