@@ -240,7 +240,7 @@ export class Framecast {
    * Resolves when either succeeds.
    *
    * @param options.interval Polling interval in ms (default: 50)
-   * @param options.timeout Timeout in ms (default: 10000). Set to 0 for no timeout.
+   * @param options.timeout Timeout in ms (default: 10000). Set to 0 to wait indefinitely.
    */
   waitForReady(options?: { interval?: number; timeout?: number }): Promise<void> {
     const interval = options?.interval ?? 50;
@@ -260,7 +260,8 @@ export class Framecast {
             }
           })
           .catch(() => {
-            // Ignore errors — iframe not ready yet
+            // Expected when the iframe hasn't set up its listener yet.
+            // The poll will retry on the next interval.
           });
       };
 
