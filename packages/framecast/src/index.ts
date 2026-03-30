@@ -301,6 +301,7 @@ export class Framecast {
       };
 
       const broadcastListener = (message: any) => {
+        if (done) return;
         if (message && typeof message === 'object' && message.type === '__framecast_ready') {
           onReady();
         }
