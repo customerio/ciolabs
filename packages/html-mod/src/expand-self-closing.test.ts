@@ -73,6 +73,17 @@ describe('expandSelfClosing', () => {
     expect(h.querySelector('span')!.isSelfClosing).toBe(false);
   });
 
+  test('expands void element without trailing slash (caller responsibility to filter)', () => {
+    // htmlparser2 marks <br> as self-closing even without `/`
+    // expandSelfClosing will expand it — callers should check void elements
+    const h = new HtmlMod('<br>');
+    const element = h.querySelector('br')!;
+    expect(element.isSelfClosing).toBe(true);
+    element.expandSelfClosing();
+    expect(h.toString()).toBe('<br></br>');
+    expect(element.isSelfClosing).toBe(false);
+  });
+
   test('isSelfClosing returns false after expandSelfClosing', () => {
     const h = new HtmlMod('<x-image src="test.png" />');
     const element = h.querySelector('x-image')!;
