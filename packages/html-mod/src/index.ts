@@ -592,6 +592,52 @@ export class HtmlModElement {
     );
   }
 
+  /**
+   * Whether this element is self-closing (`<tag />` with no close tag).
+   */
+  get isSelfClosing(): boolean {
+    return isSelfClosing(this.__element);
+  }
+
+  /**
+   * Expand a self-closing element to have an explicit close tag.
+   * `<x-image src="..." />` becomes `<x-image src="..."></x-image>`
+   *
+   * No-op if the element already has a close tag.
+   *
+   * This is needed because browser innerHTML parsing only treats HTML
+   * void elements (img, br, hr, etc.) as self-closing. Any other
+   * self-closing tag becomes an opening tag that swallows subsequent
+   * siblings.
+   */
+  expandSelfClosing(): this {
+    if (!isSelfClosing(this.__element)) return this;
+
+    // Invalidate cached outerHTML since we're changing the element's structure
+    this.__htmlMod.__cachedOuterHTML.delete(this.__element);
+
+    const endIndex = this.__element.source.openTag.endIndex;
+    const closeTag = makeClosingTag(this.tagName);
+
+    if (hasTrailingSlash(this.__element, this.__htmlMod.__source)) {
+      // Replace ` />` or `/>` with `></tag>`
+      // Walk back from `/` to skip whitespace before the slash
+      let start = endIndex; // endIndex points to `>`
+      start--; // now at `/`
+      while (start > 0 && this.__htmlMod.__source[start - 1] === ' ') {
+        start--;
+      }
+      atomicOverwrite(this.__htmlMod, start, endIndex + 1, `>${closeTag}`, this.__element);
+    } else {
+      atomicAppendRight(this.__htmlMod, endIndex + 1, closeTag, this.__element);
+    }
+
+    // Update the AST to reflect the element is no longer self-closing
+    this.__element.source.openTag.isSelfClosing = false;
+
+    return this;
+  }
+
   get children() {
     return this.__element.children;
   }
