@@ -1,5 +1,13 @@
 # @ciolabs/html-mod
 
+## 1.1.0
+
+### Minor Changes
+
+- [#48](https://github.com/customerio/ciolabs/pull/48) [`a18b0c0`](https://github.com/customerio/ciolabs/commit/a18b0c0663f65e0e6280625aee8c6b0f99c68ffd) Thanks [@avigoldman](https://github.com/avigoldman)! - Add `isSelfClosing` getter and `expandSelfClosing()` method to `HtmlModElement`.
+  - `isSelfClosing` returns true when the element has no close tag (`<tag />`)
+  - `expandSelfClosing()` converts `<tag />` to `<tag></tag>`, updating both the source string and the AST
+
 ## 1.0.1
 
 ### Patch Changes
