@@ -72,4 +72,12 @@ describe('expandSelfClosing', () => {
     expect(h.querySelector('div')!.isSelfClosing).toBe(false);
     expect(h.querySelector('span')!.isSelfClosing).toBe(false);
   });
+
+  test('isSelfClosing returns false after expandSelfClosing', () => {
+    const h = new HtmlMod('<x-image src="test.png" />');
+    const element = h.querySelector('x-image')!;
+    expect(element.isSelfClosing).toBe(true);
+    element.expandSelfClosing();
+    expect(element.isSelfClosing).toBe(false);
+  });
 });

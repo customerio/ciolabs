@@ -613,6 +613,9 @@ export class HtmlModElement {
   expandSelfClosing(): this {
     if (!isSelfClosing(this.__element)) return this;
 
+    // Invalidate cached outerHTML since we're changing the element's structure
+    this.__htmlMod.__cachedOuterHTML.delete(this.__element);
+
     const endIndex = this.__element.source.openTag.endIndex;
     const closeTag = makeClosingTag(this.tagName);
 
@@ -624,10 +627,13 @@ export class HtmlModElement {
       while (start > 0 && this.__htmlMod.__source[start - 1] === ' ') {
         start--;
       }
-      this.__htmlMod.__overwrite(start, endIndex + 1, `>${closeTag}`);
+      atomicOverwrite(this.__htmlMod, start, endIndex + 1, `>${closeTag}`, this.__element);
     } else {
-      this.__htmlMod.__appendRight(endIndex + 1, closeTag);
+      atomicAppendRight(this.__htmlMod, endIndex + 1, closeTag, this.__element);
     }
+
+    // Update the AST to reflect the element is no longer self-closing
+    this.__element.source.openTag.isSelfClosing = false;
 
     return this;
   }
