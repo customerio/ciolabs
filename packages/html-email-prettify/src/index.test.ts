@@ -886,3 +886,57 @@ describe('preserved element sibling formatting', () => {
     expect(result).toContain('  <p>after</p>');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: multi-line conditional comment as only child
+// ---------------------------------------------------------------------------
+
+describe('multi-line conditional comment as only child', () => {
+  test('formats content inside comment when it is the only child', () => {
+    const result = format(`<div>
+<!--[if mso]>
+<table><tr><td>x</td></tr></table>
+<![endif]-->
+</div>`);
+
+    // The comment's inner content should be formatted
+    expect(result).toContain('<table>');
+    expect(result).toContain('<tr>');
+    expect(result).toContain('<td>x</td>');
+    // Inner content should have proper indentation (not left-aligned)
+    const lines = result.split('\n');
+    const tableLine = lines.find(l => l.includes('<table>'));
+    expect(tableLine).toBeDefined();
+    expect(tableLine!.startsWith(' ')).toBe(true);
+  });
+
+  test('multi-line conditional comment inner content has consistent indentation', () => {
+    const result = format('<!--[if mso]>\n<table><tr><td>x</td></tr></table>\n<![endif]-->');
+
+    // Should produce clean indentation, not ragged
+    expect(result).toContain('<table>');
+    expect(result).toContain('</table>');
+    // The table content should be indented relative to the table
+    expect(result).toMatch(/<tr>\s*\n\s+<td>/);
+  });
+
+  test('multi-line conditional with nested tables formats cleanly', () => {
+    const result = format(`<body>
+<!--[if mso]>
+<table cellpadding="0" cellspacing="0" border="0" width="600">
+<tr>
+<td>
+<![endif]-->
+<div>content</div>
+<!--[if mso]>
+</td>
+</tr>
+</table>
+<![endif]-->
+</body>`);
+
+    expect(result).toContain('<!--[if mso]>');
+    expect(result).toContain('<![endif]-->');
+    expect(result).toContain('<div>content</div>');
+  });
+});

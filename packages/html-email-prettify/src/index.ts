@@ -96,11 +96,14 @@ function formatChildren(
 ): void {
   const childArray = [...children];
 
-  // Determine if this list contains any block-level elements.
-  // If it's all inline / text / comments we leave it alone.
+  // Determine if this list contains any block-level content.
+  // If it's all inline / text we leave it alone.
   // Preserved elements (pre, code, textarea) count as block — we format
   // whitespace *around* them, just not inside them.
-  const hasBlock = childArray.some(child => isTag(child) && !isInline(child as SourceElement));
+  // Multi-line conditional comments also count — they need internal formatting.
+  const hasBlock = childArray.some(
+    child => (isTag(child) && !isInline(child as SourceElement)) || (isComment(child) && isMultiLineConditional(child))
+  );
 
   if (!hasBlock) return;
 
@@ -212,29 +215,38 @@ function formatInsideConditionalComment(
   const closeMatch = /<!\[endif]$/.exec(data);
   if (!openMatch || !closeMatch) return;
 
-  const innerHtml = data.slice(openMatch[0].length, data.length - closeMatch[0].length);
-  if (!innerHtml.trim()) return;
+  const rawInnerHtml = data.slice(openMatch[0].length, data.length - closeMatch[0].length);
+  const trimmedInnerHtml = rawInnerHtml.trim();
+  if (!trimmedInnerHtml) return;
 
-  // Format the inner HTML in a scoped HtmlMod
-  const innerMod = new HtmlMod(innerHtml);
-  const innerSingleLineRanges = buildSingleLineConditionalRanges(innerHtml);
+  // Format the inner HTML in a scoped HtmlMod.
+  // Trim first so the formatter sees clean HTML without leading/trailing
+  // whitespace that would produce bad indentation at the top level.
+  // Pass depth - 1 because formatChildren adds 1 for children — the
+  // inner content should be indented at `depth` level (matching where
+  // the comment sits in the outer document).
+  const innerMod = new HtmlMod(trimmedInnerHtml);
+  const innerSingleLineRanges = buildSingleLineConditionalRanges(trimmedInnerHtml);
   formatChildren(
     innerMod,
     innerMod.__dom.children as Iterable<SourceElement | SourceText>,
-    depth,
+    depth - 1,
     indent,
     innerSingleLineRanges
   );
 
-  let formatted = innerMod.__source;
+  // Align the close tag (<![endif]) with the open tag (<!--[if).
+  // The caller passes `depth + 1`, so `depth` here equals the comment's
+  // own indentation level in the outer document.
+  const commentIndent = indent.repeat(Math.max(0, depth));
+  let innerFormatted = innerMod.__source.trimEnd();
 
-  // Ensure leading newline and trailing newline + indent for alignment
-  const parentIndent = indent.repeat(Math.max(0, depth - 1));
-  formatted = formatted.startsWith('\n') ? formatted : `\n${formatted}`;
+  // Ensure a leading newline so content starts on the line after <!--[if]>
+  if (!innerFormatted.startsWith('\n')) {
+    innerFormatted = `\n${commentIndent}${innerFormatted}`;
+  }
 
-  formatted = formatted.endsWith('\n')
-    ? formatted.replace(/\n\s*$/, `\n${parentIndent}`)
-    : `${formatted}\n${parentIndent}`;
+  const formatted = `${innerFormatted}\n${commentIndent}`;
 
   const newData = `${openMatch[0]}${formatted}${closeMatch[0]}`;
   if (newData === data) return;
