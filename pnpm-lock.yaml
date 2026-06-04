@@ -142,6 +142,12 @@ importers:
         specifier: ^1.9.1
         version: 1.13.3
 
+  packages/html-element-display:
+    devDependencies:
+      html-ua-styles:
+        specifier: ^0.3.1
+        version: 0.3.1
+
   packages/html-email-formatter:
     dependencies:
       '@ciolabs/html-find-conditional-comments':
@@ -1946,6 +1952,9 @@ packages:
   html-tags@3.3.1:
     resolution: {integrity: sha512-ztqyC3kLto0e9WbNp0aeP+M3kTt+nbaIveGmUxAtZa+8iFgKLUOD4YKM5j+f3QD89bra7UeumolZHKuOXnTmeQ==}
     engines: {node: '>=8'}
+
+  html-ua-styles@0.3.1:
+    resolution: {integrity: sha512-VnvbuuUlgdBph8ZPPjdoYbf+Ii8kN81BC/gZYOYp2HFsuQX2VQjquWTMIvY7IqE7QNc9EGm/5VbNgJB37KvzuA==}
 
   htmlparser2@8.0.2:
     resolution: {integrity: sha512-GYdjWKDkbRLkZ5geuHs5NY1puJ+PXwP7+fHPRz06Eirsb9ugf6d8kkXav6ADhcODhFFPMIXyxkxSuMf3D6NCFA==}
@@ -5437,6 +5446,8 @@ snapshots:
   html-entities@2.6.0: {}
 
   html-tags@3.3.1: {}
+
+  html-ua-styles@0.3.1: {}
 
   htmlparser2@8.0.2:
     dependencies:

@@ -1,0 +1,39 @@
+{
+  "name": "@ciolabs/html-element-display",
+  "version": "0.0.1",
+  "description": "Default CSS display values for HTML elements per the WHATWG spec",
+  "author": "Customer.io <win@customer.io>",
+  "license": "Apache-2.0 WITH Commons-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/html-element-display"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-element-display#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "html-ua-styles": "^0.3.1"
+  }
+}
