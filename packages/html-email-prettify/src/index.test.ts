@@ -939,4 +939,50 @@ describe('multi-line conditional comment as only child', () => {
     expect(result).toContain('<![endif]-->');
     expect(result).toContain('<div>content</div>');
   });
+
+  test('multi-line conditional with closing tags only gets consistent indentation', () => {
+    const result = format(`<div>
+<!--[if mso]>
+</td>
+</tr>
+</table>
+<![endif]-->
+</div>`);
+
+    // Each closing tag line should have the same indentation
+    const lines = result.split('\n');
+    const closingTagLines = lines.filter(l => /^\s*<\/(?:td|tr|table)>/.test(l));
+    expect(closingTagLines.length).toBe(3);
+    const indents = closingTagLines.map(l => l.match(/^(\s*)/)?.[1] ?? '');
+    // All closing tags should have consistent indentation
+    expect(new Set(indents).size).toBe(1);
+    // And it should be indented (not at column 0)
+    expect(indents[0].length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: downlevel-revealed conditional comments
+// ---------------------------------------------------------------------------
+
+describe('downlevel-revealed conditional comments', () => {
+  test('does not insert whitespace inside single-line revealed conditional', () => {
+    const result = format(
+      '<!--[if !mso]><!--><div style="display:inline-block">A</div><div style="display:inline-block">B</div><!--<![endif]-->'
+    );
+
+    // The inline-block divs should stay adjacent
+    expect(result).toContain('</div><div style="display:inline-block">B</div>');
+    // No whitespace between the comments and the content
+    expect(result).toContain('<!--><div style="display:inline-block">A</div>');
+    expect(result).toContain('</div><!--<![endif]-->');
+  });
+
+  test('preserves revealed conditional with inline content', () => {
+    const result = format('<td><!--[if !mso]><!--><span>web only</span><!--<![endif]--></td>');
+
+    expect(result).toContain('<!--[if !mso]><!-->');
+    expect(result).toContain('<!--<![endif]-->');
+    expect(result).toContain('<span>web only</span>');
+  });
 });

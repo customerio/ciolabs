@@ -66,9 +66,22 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
   // We must not touch whitespace inside these.
   const singleLineRanges = buildSingleLineConditionalRanges(mod.__source);
 
+  // Build a set of comment data strings that belong to single-line
+  // bubble/revealed conditional comments.  These are the patterns
+  // like <!--[if !mso]><!-->...<!--<![endif]--> where inserting
+  // whitespace next to the comments would break inline-block layouts.
+  const singleLineBubbleCommentData = buildSingleLineBubbleCommentData(mod.__source);
+
   // Format the document tree.
   // Depth -1 so that top-level elements sit at indent 0.
-  formatChildren(mod, mod.__dom.children as Iterable<SourceElement | SourceText>, -1, indent, singleLineRanges);
+  formatChildren(
+    mod,
+    mod.__dom.children as Iterable<SourceElement | SourceText>,
+    -1,
+    indent,
+    singleLineRanges,
+    singleLineBubbleCommentData
+  );
 
   // Trim trailing whitespace on the document
   mod.trimEnd();
@@ -92,7 +105,8 @@ function formatChildren(
   children: Iterable<SourceElement | SourceText>,
   depth: number,
   indent: string,
-  singleLineRanges: Array<[number, number]>
+  singleLineRanges: Array<[number, number]>,
+  singleLineBubbleCommentData?: Set<string>
 ): void {
   const childArray = [...children];
 
@@ -135,10 +149,17 @@ function formatChildren(
       } else if (isComment(child)) {
         insertBeforeComment(mod, child, `\n${childIndent}`);
       }
-    } else if (previous && !isText(previous) && !(hasInlineBlockStyle(previous) && hasInlineBlockStyle(child))) {
+    } else if (
+      previous &&
+      !isText(previous) &&
+      !(hasInlineBlockStyle(previous) && hasInlineBlockStyle(child)) &&
+      !isBubbleCommentBoundary(previous, child, singleLineBubbleCommentData)
+    ) {
       // Two non-text nodes directly adjacent — insert whitespace between
-      // them.  Skip only when BOTH are display:inline-block — that's the
-      // email column pattern where any gap breaks the layout on iOS/Android.
+      // them.  Skip when:
+      // - BOTH are display:inline-block (email column pattern)
+      // - Either node is a comment belonging to a single-line bubble
+      //   conditional (e.g. <!--[if !mso]><!-->...<![endif]-->)
       if (isTag(previous)) {
         insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
       } else if (isComment(previous)) {
@@ -165,7 +186,8 @@ function formatChildren(
           element.children as Iterable<SourceElement | SourceText>,
           depth + 1,
           indent,
-          singleLineRanges
+          singleLineRanges,
+          singleLineBubbleCommentData
         );
       }
 
@@ -239,14 +261,20 @@ function formatInsideConditionalComment(
   // The caller passes `depth + 1`, so `depth` here equals the comment's
   // own indentation level in the outer document.
   const commentIndent = indent.repeat(Math.max(0, depth));
-  let innerFormatted = innerMod.__source.trimEnd();
 
-  // Ensure a leading newline so content starts on the line after <!--[if]>
-  if (!innerFormatted.startsWith('\n')) {
-    innerFormatted = `\n${commentIndent}${innerFormatted}`;
-  }
+  // When formatChildren was a no-op (e.g. closing tags like </td></tr></table>
+  // which htmlparser2 parses as text), re-indent every line to the comment's
+  // level.  Otherwise strip only the leading newline (formatChildren inserts
+  // one before the first child) but keep the indent.
+  const innerFormatted =
+    innerMod.__source === trimmedInnerHtml
+      ? trimmedInnerHtml
+          .split('\n')
+          .map(line => `${commentIndent}${line.trim()}`)
+          .join('\n')
+      : innerMod.__source.replace(/^\n/, '').trimEnd();
 
-  const formatted = `${innerFormatted}\n${commentIndent}`;
+  const formatted = `\n${innerFormatted}\n${commentIndent}`;
 
   const newData = `${openMatch[0]}${formatted}${closeMatch[0]}`;
   if (newData === data) return;
@@ -377,9 +405,60 @@ function isInsideSingleLineConditional(textNode: SourceText, ranges: Array<[numb
   return false;
 }
 
+/**
+ * Check whether either adjacent node is a comment that belongs to a
+ * single-line bubble/revealed conditional.  This protects patterns like
+ * `<!--[if !mso]><!-->...<![endif]-->` where inserting whitespace next
+ * to the comment would break inline-block layouts.
+ *
+ * Unlike position-range checks, this uses comment data strings which
+ * don't shift during formatting.
+ */
+function isBubbleCommentBoundary(
+  nodeA: SourceElement | SourceText | SourceChildNode,
+  nodeB: SourceElement | SourceText | SourceChildNode,
+  bubbleData?: Set<string>
+): boolean {
+  if (!bubbleData || bubbleData.size === 0) return false;
+  for (const node of [nodeA, nodeB]) {
+    if (isComment(node)) {
+      const data = (node as { data?: string }).data ?? '';
+      if (bubbleData.has(data)) return true;
+    }
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Single-line conditional comment detection
 // ---------------------------------------------------------------------------
+
+/**
+ * Collect the comment data strings for comments that form single-line
+ * bubble/revealed conditionals.  For `<!--[if !mso]><!-->...<![endif]-->`,
+ * the opening comment has data `[if !mso]><!` and the closing comment
+ * has data `<![endif]`.  Both are added to the set.
+ */
+function buildSingleLineBubbleCommentData(html: string): Set<string> {
+  const comments = findConditionalComments(html);
+  const dataSet = new Set<string>();
+
+  for (const comment of comments) {
+    if (!comment.bubble) continue;
+    const content = html.slice(comment.range[0] + comment.open.length, comment.range[1] - comment.close.length);
+    if (content.includes('\n')) continue;
+
+    // Extract the comment data from the open and close strings.
+    // <!--[if !mso]><!--> has comment data "[if !mso]><!"
+    // <!--<![endif]--> has comment data "<![endif]"
+    const openData = comment.open.slice(4, -3); // strip "<!--" and "-->"
+    const closeData = comment.close.slice(4, -3); // strip "<!--" and "-->"
+    if (openData) dataSet.add(openData);
+    if (closeData) dataSet.add(closeData);
+  }
+
+  return dataSet;
+}
 
 function buildSingleLineConditionalRanges(html: string): Array<[number, number]> {
   const comments = findConditionalComments(html);
