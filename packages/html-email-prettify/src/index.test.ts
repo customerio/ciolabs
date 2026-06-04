@@ -697,6 +697,13 @@ describe('whitespace-sensitive email patterns', () => {
     expect(result).toContain('</div><div style="display:inline-block;width:50%;">Col 2</div>');
   });
 
+  test('inline-block div next to block element gets separated', () => {
+    const result = format('<td><div style="display:inline-block;">A</div><p>B</p></td>');
+    // The p is not inline-block, so whitespace should be inserted
+    expect(result).toContain('</div>\n');
+    expect(result).toContain('<p>B</p>');
+  });
+
   test('adjacent regular divs get separated', () => {
     const result = format('<td><div>A</div><div>B</div></td>');
     expect(result).toContain('<div>A</div>\n');

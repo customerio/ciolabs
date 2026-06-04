@@ -1,6 +1,6 @@
 import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 import { HtmlMod, HtmlModElement, HtmlModText } from '@ciolabs/html-mod';
-import type { SourceElement, SourceText } from '@ciolabs/htmlparser2-source';
+import type { SourceElement, SourceText, SourceChildNode } from '@ciolabs/htmlparser2-source';
 import { isComment, isTag, isText } from '@ciolabs/htmlparser2-source';
 
 /**
@@ -132,11 +132,10 @@ function formatChildren(
       } else if (isComment(child)) {
         insertBeforeComment(mod, child, `\n${childIndent}`);
       }
-    } else if (previous && !isText(previous) && !hasInlineBlockStyle(previous) && !hasInlineBlockStyle(child)) {
+    } else if (previous && !isText(previous) && !(hasInlineBlockStyle(previous) && hasInlineBlockStyle(child))) {
       // Two non-text nodes directly adjacent — insert whitespace between
-      // them.  Skip when either has display:inline-block — adjacent
-      // inline-block elements are a common email column pattern where
-      // any added whitespace breaks the layout on iOS/Android.
+      // them.  Skip only when BOTH are display:inline-block — that's the
+      // email column pattern where any gap breaks the layout on iOS/Android.
       if (isTag(previous)) {
         insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
       } else if (isComment(previous)) {
@@ -335,7 +334,7 @@ function isPreserved(element: SourceElement): boolean {
   return PRESERVE_CONTENT.has(element.tagName);
 }
 
-function hasInlineBlockStyle(node: unknown): boolean {
+function hasInlineBlockStyle(node: SourceChildNode): boolean {
   if (!isTag(node)) return false;
   const style = (node as SourceElement).attribs?.style ?? '';
   return /display\s*:\s*inline-block/i.test(style);
