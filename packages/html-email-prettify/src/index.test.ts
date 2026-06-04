@@ -734,6 +734,58 @@ describe('whitespace-sensitive email patterns', () => {
     expect(result).toContain('<!--[if mso]><i hidden>&emsp;&nbsp;&#8203;</i><![endif]-->');
   });
 
+  test('adjacent block elements with no whitespace between them', () => {
+    const result = format('<div><p>hello</p><p>world</p></div>');
+    expect(result).toBe(`<div>\n  <p>hello</p>\n  <p>world</p>\n</div>`);
+  });
+
+  test('ghost table open/close in separate comments with compact content', () => {
+    const result = format(
+      '<!--[if mso]><table><tr><td><![endif]--><div><p>hello</p><p>world</p></div><!--[if mso]></td></tr></table><![endif]-->'
+    );
+
+    // Single-line conditional comments preserved
+    expect(result).toContain('<!--[if mso]><table><tr><td><![endif]-->');
+    expect(result).toContain('<!--[if mso]></td></tr></table><![endif]-->');
+    // Content between them is formatted
+    expect(result).toContain('<div>');
+    expect(result).toContain('  <p>hello</p>');
+    expect(result).toContain('  <p>world</p>');
+    expect(result).toContain('</div>');
+    // Comments are on their own lines, not glued to content
+    const lines = result.split('\n');
+    expect(lines[0].trim()).toBe('<!--[if mso]><table><tr><td><![endif]-->');
+    expect(lines.at(-1)!.trim()).toBe('<!--[if mso]></td></tr></table><![endif]-->');
+  });
+
+  test('ghost table with messy table content gets formatted', () => {
+    const result = format(
+      '<!--[if mso]><table><tr><td><![endif]-->\n<div><table><tr><td>cell1</td><td>cell2</td></tr><tr><td>cell3</td><td>cell4</td></tr></table></div>\n<!--[if mso]></td></tr></table><![endif]-->'
+    );
+
+    // Table inside should be properly indented
+    expect(result).toContain('  <table>');
+    expect(result).toContain('      <td>cell1</td>');
+    expect(result).toContain('      <td>cell3</td>');
+  });
+
+  test('html-mod insertion between ghost table comments gets formatted', () => {
+    const mod = new HtmlMod(
+      '<div><!--[if mso]><table><tr><td><![endif]--><p>original</p><!--[if mso]></td></tr></table><![endif]--></div>'
+    );
+    mod.querySelector('p')!.after('<table><tr><td>inserted</td></tr></table>');
+
+    prettify(mod);
+
+    expect(mod.__source).toContain('<p>original</p>');
+    expect(mod.__source).toContain('<td>inserted</td>');
+    // The inserted table should be properly indented
+    expect(mod.__source).toContain('  <table>');
+    // Both conditional comments preserved
+    expect(mod.__source).toContain('<!--[if mso]><table><tr><td><![endif]-->');
+    expect(mod.__source).toContain('<!--[if mso]></td></tr></table><![endif]-->');
+  });
+
   test('conditional comment wrapping an entire table structure', () => {
     const result = format(`<!--[if mso]>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" align="center">

@@ -109,6 +109,9 @@ function formatChildren(
 
   for (let index = 0; index < childArray.length; index++) {
     const child = childArray[index];
+    const previous = childArray[index - 1];
+    const isFirst = index === 0;
+    const isLast = index === childArray.length - 1;
 
     // --- Whitespace text nodes between siblings --------------------------
     // In a block context, normalize whitespace-only text nodes to the
@@ -116,28 +119,37 @@ function formatChildren(
     if (isText(child)) {
       const textNode = child as SourceText;
       if (isWhitespaceOnly(textNode.data) && !isInsideSingleLineConditional(textNode, singleLineRanges)) {
-        // Determine what indent to use: if this is the last child
-        // (whitespace before parent close tag), use parentIndent.
-        const isLast = index === childArray.length - 1;
         setTextContent(mod, textNode, `\n${isLast ? parentIndent : childIndent}`);
       }
       continue;
+    }
+
+    // --- Ensure leading whitespace before any non-text node ---------------
+    // If there's no text node before this child (either it's the first
+    // child, or the previous sibling is also a tag/comment), insert one.
+    if (isFirst) {
+      if (isTag(child)) {
+        insertBeforeIfNeeded(mod, child as SourceElement, `\n${childIndent}`);
+      } else if (isComment(child)) {
+        insertBeforeComment(mod, child, `\n${childIndent}`);
+      }
+    } else if (previous && !isText(previous)) {
+      // Two non-text nodes adjacent — insert whitespace between them.
+      // Use the previous node's end position to insert after it.
+      if (isTag(previous)) {
+        insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
+      } else if (isComment(previous)) {
+        insertAfterComment(mod, previous, `\n${childIndent}`);
+      }
     }
 
     // --- Element nodes ---------------------------------------------------
     if (isTag(child)) {
       const element = child as SourceElement;
 
-      // If first child and no leading text node, insert whitespace
-      const previous = childArray[index - 1];
-      if (!previous) {
-        insertBeforeIfNeeded(mod, element, `\n${childIndent}`);
-      }
-
-      // Skip recursion for inline elements — only adjust surrounding whitespace
+      // Skip recursion for inline elements
       if (isInline(element)) {
-        // If last child, ensure trailing whitespace before parent close
-        if (index === childArray.length - 1) {
+        if (isLast) {
           insertAfterIfNeeded(mod, element, `\n${parentIndent}`);
         }
         continue;
@@ -154,29 +166,16 @@ function formatChildren(
         );
       }
 
-      // Fix trailing whitespace (before next sibling or before parent close tag)
-      const next = childArray[index + 1];
-      if (!next) {
-        // Last child — ensure whitespace before parent close tag
+      // Ensure trailing whitespace if last child
+      if (isLast) {
         insertAfterIfNeeded(mod, element, `\n${parentIndent}`);
       }
     }
 
     // --- Comment nodes ----------------------------------------------------
     if (isComment(child)) {
-      // Fix leading whitespace before this comment
-      const previous = childArray[index - 1];
-      if (previous && isText(previous)) {
-        const textNode = previous as SourceText;
-        if (isWhitespaceOnly(textNode.data) && !isInsideSingleLineConditional(textNode, singleLineRanges)) {
-          setTextContent(mod, textNode, `\n${childIndent}`);
-        }
-      }
-
-      // Fix trailing whitespace
-      const next = childArray[index + 1];
-      if (!next) {
-        // Comment is last child — add whitespace before parent close
+      // Ensure trailing whitespace if last child
+      if (isLast) {
         insertAfterComment(mod, child, `\n${parentIndent}`);
       }
 
@@ -287,6 +286,19 @@ function insertAfterIfNeeded(mod: HtmlMod, element: SourceElement, whitespace: s
   if (charAfter === '<' || charAfter === undefined) {
     const wrapper = new HtmlModElement(element, mod);
     wrapper.after(whitespace);
+  }
+}
+
+function insertBeforeComment(
+  mod: HtmlMod,
+  commentNode: { startIndex: number; endIndex: number },
+  whitespace: string
+): void {
+  const startPos = commentNode.startIndex;
+  const charBefore = mod.__source[startPos - 1];
+  if (charBefore === '>' || charBefore === undefined) {
+    mod.__prependLeft(startPos, whitespace);
+    shiftPositionsAfter(mod.__dom.children, startPos, whitespace.length);
   }
 }
 
