@@ -1,0 +1,767 @@
+import { HtmlMod } from '@ciolabs/html-mod';
+import { test, expect, describe } from 'vitest';
+
+import prettify from './index';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Get the formatted string from either HtmlMod or string input */
+function format(html: string): string {
+  const result = prettify(html);
+  return result.__source;
+}
+
+// ---------------------------------------------------------------------------
+// Basic formatting
+// ---------------------------------------------------------------------------
+
+describe('basic formatting', () => {
+  test('indents nested elements', () => {
+    const result = format('<div><p>hello</p></div>');
+    expect(result).toBe(
+      `<div>
+  <p>hello</p>
+</div>`
+    );
+  });
+
+  test('fixes inconsistent indentation', () => {
+    const result = format(`
+      <div>
+    <p>hello</p>
+          <span>world</span>
+      </div>
+    `);
+    expect(result).toBe(
+      `<div>
+  <p>hello</p>
+  <span>world</span>
+</div>`
+    );
+  });
+
+  test('handles empty input', () => {
+    const result = format('');
+    expect(result).toBe('');
+  });
+
+  test('preserves self-closing tags', () => {
+    const result = format('<div><br/><img src="test.png"/></div>');
+    // js-beautify normalizes self-closing tags to have a space before />
+    expect(result).toBe(`<div><br /><img src="test.png" /></div>`);
+  });
+
+  test('formats a full HTML document', () => {
+    const result = format(
+      `<!DOCTYPE html><html><head><title>Test</title></head><body><div><p>hello</p></div></body></html>`
+    );
+    expect(result).toContain('<!DOCTYPE html>');
+    expect(result).toContain('<html>');
+    expect(result).toContain('</html>');
+    // Content should be indented
+    expect(result).toMatch(/\s+<p>hello<\/p>/);
+  });
+
+  test('preserves attributes', () => {
+    const result = format('<div class="foo" id="bar" style="color: red;"><p>hello</p></div>');
+    expect(result).toContain('class="foo"');
+    expect(result).toContain('id="bar"');
+    expect(result).toContain('style="color: red;"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pre/code preservation
+// ---------------------------------------------------------------------------
+
+describe('pre and code preservation', () => {
+  test('preserves whitespace inside <pre> tags', () => {
+    const result = format(
+      `<div><pre>  line 1
+    line 2
+      line 3</pre></div>`
+    );
+    expect(result).toContain(
+      `<pre>  line 1
+    line 2
+      line 3</pre>`
+    );
+  });
+
+  test('preserves whitespace inside <code> tags', () => {
+    const result = format(`<div><code>  function() { return true; }  </code></div>`);
+    expect(result).toContain('  function() { return true; }  ');
+  });
+
+  test('preserves whitespace inside <textarea> tags', () => {
+    const result = format(
+      `<div><textarea>  some
+    preformatted
+      text  </textarea></div>`
+    );
+    expect(result).toContain(
+      `<textarea>  some
+    preformatted
+      text  </textarea>`
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Conditional comments — single-line
+// ---------------------------------------------------------------------------
+
+describe('single-line conditional comments', () => {
+  test('preserves single-line conditional comment content', () => {
+    const result = format(
+      `<div><!--[if mso]><table cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]--></div>`
+    );
+    expect(result).toContain('<!--[if mso]><table cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->');
+  });
+
+  test('preserves single-line conditional comment when it has no content', () => {
+    const result = format(`<div><!--[if mso]><![endif]--></div>`);
+    expect(result).toContain('<!--[if mso]><![endif]-->');
+  });
+
+  test("preserves Mark's link button pattern", () => {
+    const input = `<a href="https://parcel.io" style="background-color:#005959; text-decoration: none; padding: .5em 2em; color: #FCFDFF; display:inline-block; border-radius:.4em; mso-padding-alt:0;text-underline-color:#005959"><!--[if mso]><i style="mso-font-width:200%;mso-text-raise:100%" hidden>&emsp;</i><span style="mso-text-raise:50%;"><![endif]-->My link text<!--[if mso]></span><i style="mso-font-width:200%;" hidden>&emsp;&#8203;</i><![endif]--></a>`;
+
+    const result = format(input);
+
+    // Both conditional comments should remain single-line with original content
+    expect(result).toContain(
+      '<!--[if mso]><i style="mso-font-width:200%;mso-text-raise:100%" hidden>&emsp;</i><span style="mso-text-raise:50%;"><![endif]-->'
+    );
+    expect(result).toContain(
+      '<!--[if mso]></span><i style="mso-font-width:200%;" hidden>&emsp;&#8203;</i><![endif]-->'
+    );
+  });
+
+  test('preserves paired ghost table conditional comments', () => {
+    const result = format(`<div>
+  <!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td style="background-color: rgb(255, 255, 255);"><![endif]-->
+  <p>Content</p>
+  <!--[if mso]></td></tr></table><![endif]-->
+</div>`);
+
+    expect(result).toContain(
+      '<!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td style="background-color: rgb(255, 255, 255);"><![endif]-->'
+    );
+    expect(result).toContain('<!--[if mso]></td></tr></table><![endif]-->');
+  });
+
+  test('keeps no whitespace if there was none', () => {
+    const result = format('<div><!--[if MAC]>hello<![endif]--></div>');
+    expect(result).toContain('<!--[if MAC]>hello<![endif]-->');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Conditional comments — multi-line
+// ---------------------------------------------------------------------------
+
+describe('multi-line conditional comments', () => {
+  test('formats content inside multi-line conditional comments', () => {
+    const result = format(`<div>
+<!--[if mso]>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td>Content</td>
+</tr>
+</table>
+<![endif]-->
+</div>`);
+
+    // The content inside should be indented
+    expect(result).toContain('<!--[if mso]>');
+    expect(result).toContain('<![endif]-->');
+    expect(result).toContain('<table');
+    expect(result).toContain('</table>');
+  });
+
+  test('aligns open and close tags of multi-line conditional comments', () => {
+    const result = format(`
+    <div>
+    <!--[if MAC]>
+    <div>
+    <span>
+    <![endif]-->
+    <!--[if MAC]>
+    </span>
+    </div>
+    <![endif]-->
+    </div>
+  `);
+
+    const lines = result.split('\n');
+
+    // Find lines with conditional comment open/close tags
+    for (const line of lines) {
+      if (line.includes('<!--[if MAC]>')) {
+        // Find the matching close
+        const openIndent = line.match(/^(\s*)/)?.[1] ?? '';
+        const closeLineIndex = lines.indexOf(
+          lines.find((l, index) => index > lines.indexOf(line) && l.includes('<![endif]-->'))!
+        );
+        if (closeLineIndex >= 0) {
+          const closeIndent = lines[closeLineIndex].match(/^(\s*)/)?.[1] ?? '';
+          expect(openIndent).toBe(closeIndent);
+        }
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inline element whitespace preservation
+// ---------------------------------------------------------------------------
+
+describe('inline element whitespace', () => {
+  test('does not add whitespace between adjacent inline elements', () => {
+    const result = format('<div><span>a</span><span>b</span></div>');
+    expect(result).toContain('<span>a</span><span>b</span>');
+  });
+
+  test('does not add whitespace between adjacent img elements', () => {
+    const result = format('<div><img src="a.png"/><img src="b.png"/></div>');
+    // js-beautify normalizes space before />, but no whitespace between tags
+    expect(result).toContain('<img src="a.png" /><img src="b.png" />');
+  });
+
+  test('does not add whitespace between adjacent anchor elements', () => {
+    const result = format('<div><a href="#">link1</a><a href="#">link2</a></div>');
+    expect(result).toContain('<a href="#">link1</a><a href="#">link2</a>');
+  });
+
+  test('preserves space between inline elements when it exists', () => {
+    const result = format('<div><span>a</span> <span>b</span></div>');
+    // The space between the spans should be preserved
+    expect(result).toMatch(/<span>a<\/span>\s+<span>b<\/span>/);
+  });
+
+  test('does not add whitespace between mixed inline elements', () => {
+    const result = format('<div><strong>bold</strong><em>italic</em><span>text</span></div>');
+    expect(result).toContain('<strong>bold</strong><em>italic</em><span>text</span>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Table adjacency
+// ---------------------------------------------------------------------------
+
+describe('table element formatting', () => {
+  test('formats table structure with proper indentation', () => {
+    const result = format('<table><tr><td>cell1</td><td>cell2</td></tr></table>');
+    expect(result).toContain('<table>');
+    expect(result).toContain('</table>');
+    expect(result).toContain('<td>cell1</td>');
+    expect(result).toContain('<td>cell2</td>');
+  });
+
+  test('handles nested tables', () => {
+    const result = format('<table><tr><td><table><tr><td>inner</td></tr></table></td></tr></table>');
+    expect(result).toContain('inner');
+    // Should have some indentation structure
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ghost table pattern
+// ---------------------------------------------------------------------------
+
+describe('ghost table patterns', () => {
+  test('formats a complete ghost table layout', () => {
+    const result =
+      format(`<!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td><![endif]-->
+<div style="max-width: 600px; margin: 0 auto;">
+<p>Content here</p>
+</div>
+<!--[if mso]></td></tr></table><![endif]-->`);
+
+    // Single-line conditional comments should be preserved
+    expect(result).toContain('<!--[if mso]>');
+    expect(result).toContain('<![endif]-->');
+    // Content should be formatted
+    expect(result).toContain('<p>Content here</p>');
+  });
+
+  test('handles multiple ghost table columns', () => {
+    const result = format(`<!--[if true]>
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td width="300">
+<![endif]-->
+<div style="display:inline-block; width:300px;">
+Column 1
+</div>
+<!--[if true]>
+</td>
+<td width="300">
+<![endif]-->
+<div style="display:inline-block; width:300px;">
+Column 2
+</div>
+<!--[if true]>
+</td>
+</tr>
+</table>
+<![endif]-->`);
+
+    expect(result).toContain('Column 1');
+    expect(result).toContain('Column 2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HtmlMod integration
+// ---------------------------------------------------------------------------
+
+describe('HtmlMod integration', () => {
+  test('accepts a string and returns HtmlMod', () => {
+    const result = prettify('<div><p>hello</p></div>');
+    expect(result).toBeInstanceOf(HtmlMod);
+    expect(result.__source).toContain('<div>');
+  });
+
+  test('accepts HtmlMod and returns the same instance', () => {
+    const mod = new HtmlMod('<div><p>hello</p></div>');
+    const result = prettify(mod);
+    expect(result).toBe(mod); // Same reference
+  });
+
+  test('mutates HtmlMod source in place', () => {
+    const mod = new HtmlMod('  <div><p>hello</p></div>  ');
+    prettify(mod);
+    // Source should be updated
+    expect(mod.__source).not.toBe('  <div><p>hello</p></div>  ');
+  });
+
+  test('returned HtmlMod can be queried', () => {
+    const result = prettify('<div class="test"><p>hello</p></div>');
+    const div = result.querySelector('.test');
+    expect(div).not.toBeNull();
+    expect(div!.innerHTML).toContain('<p>hello</p>');
+  });
+
+  test('returned HtmlMod can be modified after formatting', () => {
+    const result = prettify('<div><p>hello</p></div>');
+    const p = result.querySelector('p');
+    expect(p).not.toBeNull();
+    p!.textContent = 'world';
+    expect(result.__source).toContain('world');
+  });
+
+  test('HtmlMod modifications followed by prettify', () => {
+    const mod = new HtmlMod('<div><p>hello</p></div>');
+    const p = mod.querySelector('p')!;
+    p.after('<span>added</span>');
+
+    prettify(mod);
+
+    expect(mod.__source).toContain('<p>hello</p>');
+    expect(mod.__source).toContain('<span>added</span>');
+    // Should be properly formatted
+    const lines = mod.__source.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+  });
+
+  test('preserves HtmlMod options', () => {
+    const mod = new HtmlMod('<div />', { recognizeSelfClosing: true });
+    prettify(mod);
+    expect(mod.__options.recognizeSelfClosing).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real-world email patterns
+// ---------------------------------------------------------------------------
+
+describe('real-world email patterns', () => {
+  test('formats a typical email structure', () => {
+    const result = format(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Email</title><style>body { margin: 0; }</style></head><body><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><table role="presentation" width="600" cellpadding="0" cellspacing="0"><tr><td><h1>Hello!</h1><p>This is an email.</p></td></tr></table></td></tr></table></body></html>`);
+
+    expect(result).toContain('<!DOCTYPE html>');
+    expect(result).toContain('<h1>Hello!</h1>');
+    expect(result).toContain('<p>This is an email.</p>');
+    // Should have meaningful indentation
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(5);
+  });
+
+  test('formats email with MSO conditional head styles', () => {
+    const result = format(`<!DOCTYPE html>
+<html>
+<head>
+<!--[if mso]>
+<style>
+.button { padding: 10px; }
+</style>
+<![endif]-->
+</head>
+<body>
+<p>Hello</p>
+</body>
+</html>`);
+
+    expect(result).toContain('<!--[if mso]>');
+    expect(result).toContain('<![endif]-->');
+    expect(result).toContain('<p>Hello</p>');
+  });
+
+  test('handles Outlook button with VML-style padding', () => {
+    const input = `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding: 20px;">
+<a href="https://example.com" style="background:#005959;text-decoration:none;padding:.5em 2em;color:#FCFDFF;display:inline-block;border-radius:.4em;mso-padding-alt:0;text-underline-color:#005959"><!--[if mso]><i style="mso-font-width:200%;mso-text-raise:100%" hidden>&emsp;</i><span style="mso-text-raise:50%;"><![endif]-->Click Here<!--[if mso]></span><i style="mso-font-width:200%;" hidden>&emsp;&#8203;</i><![endif]--></a>
+</td></tr></table>`;
+
+    const result = format(input);
+
+    // The button pattern MUST stay intact — whitespace here breaks Outlook
+    expect(result).toContain(
+      '<!--[if mso]><i style="mso-font-width:200%;mso-text-raise:100%" hidden>&emsp;</i><span style="mso-text-raise:50%;"><![endif]-->'
+    );
+    expect(result).toContain(
+      '<!--[if mso]></span><i style="mso-font-width:200%;" hidden>&emsp;&#8203;</i><![endif]-->'
+    );
+  });
+
+  test('preserves inline whitespace in single-line conditional comments', () => {
+    const result = format('<div> <!--[if MAC]> hello    <![endif]-->      </div>');
+    expect(result).toContain('<!--[if MAC]> hello    <![endif]-->');
+  });
+
+  test('handles downlevel-revealed (negated) conditional comments', () => {
+    const result = format(`<!--[if !mso]><!--><div>Non-Outlook content</div><!--<![endif]-->`);
+    // Bubble/revealed comments should pass through
+    expect(result).toContain('Non-Outlook content');
+  });
+
+  test('formats from existing tests: properly format from a single line', () => {
+    const result = format(`<!DOCTYPE html>
+  <html style="">
+
+    <body class="">
+
+      <!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td style="background-color: rgb(255, 255, 255);"><![endif]-->
+
+      <!--[if mso]></td></tr></table><![endif]-->
+
+       </body>
+  </html>`);
+
+    expect(result).toContain('<!DOCTYPE html>');
+    expect(result).toContain('</html>');
+    // Single-line conditional comments should be preserved
+    expect(result).toContain(
+      '<!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td style="background-color: rgb(255, 255, 255);"><![endif]-->'
+    );
+    expect(result).toContain('<!--[if mso]></td></tr></table><![endif]-->');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Options pass-through
+// ---------------------------------------------------------------------------
+
+describe('options', () => {
+  test('respects custom indent_size', () => {
+    // eslint-disable-next-line camelcase
+    const result = prettify('<div><p>hello</p></div>', { indent_size: 4 });
+    expect(result.__source).toContain('    <p>hello</p>');
+  });
+
+  test('respects custom indent_char', () => {
+    const result = prettify('<div><p>hello</p></div>', {
+      indent_size: 1, // eslint-disable-line camelcase
+      indent_char: '\t', // eslint-disable-line camelcase
+    });
+    expect(result.__source).toContain('\t<p>hello</p>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edge cases
+// ---------------------------------------------------------------------------
+
+describe('edge cases', () => {
+  test('handles multiple conditional comments on the same line', () => {
+    const result = format('<!--[if mso]><table><![endif]--><!--[if mso]></table><![endif]-->');
+    expect(result).toContain('<!--[if mso]><table><![endif]-->');
+    expect(result).toContain('<!--[if mso]></table><![endif]-->');
+  });
+
+  test('handles nested conditional comments', () => {
+    const result = format(`<!--[if mso]>
+<table>
+<!--[if gte mso 9]>
+<tr><td>inner</td></tr>
+<![endif]-->
+</table>
+<![endif]-->`);
+
+    expect(result).toContain('<!--[if mso]>');
+    expect(result).toContain('<!--[if gte mso 9]>');
+    expect(result).toContain('<![endif]-->');
+  });
+
+  test('handles conditional comments with no content', () => {
+    const result = format('<div><!--[if mso]><![endif]--></div>');
+    expect(result).toContain('<!--[if mso]><![endif]-->');
+  });
+
+  test('handles deeply nested HTML', () => {
+    const result = format('<div><div><div><div><div><p>deep</p></div></div></div></div></div>');
+    expect(result).toContain('deep');
+    const lines = result.split('\n');
+    expect(lines.length).toBeGreaterThan(5);
+  });
+
+  test('does not crash on malformed HTML', () => {
+    const result = format('<div><p>unclosed');
+    expect(result).toContain('unclosed');
+  });
+
+  test('handles empty conditional comment between content', () => {
+    const result = format('<p>before</p><!--[if mso]><![endif]--><p>after</p>');
+    expect(result).toContain('before');
+    expect(result).toContain('after');
+    expect(result).toContain('<!--[if mso]><![endif]-->');
+  });
+
+  test('handles HTML with only whitespace', () => {
+    const result = format('   \n\n   ');
+    expect(result.trim()).toBe('');
+  });
+
+  test('handles single element', () => {
+    const result = format('<br/>');
+    expect(result).toContain('<br');
+  });
+
+  test('handles comment-only HTML', () => {
+    const result = format('<!-- just a comment -->');
+    expect(result).toContain('<!-- just a comment -->');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Idempotency
+// ---------------------------------------------------------------------------
+
+describe('idempotency', () => {
+  test('formatting twice produces the same result', () => {
+    const input = `<div>
+      <p>hello</p>
+        <span>world</span>
+    </div>`;
+
+    const first = format(input);
+    const second = format(first);
+    expect(second).toBe(first);
+  });
+
+  test('formatting a well-formatted document is a no-op', () => {
+    const input = `<div>
+  <p>hello</p>
+  <span>world</span>
+</div>`;
+
+    const result = format(input);
+    expect(result).toBe(input);
+  });
+
+  test('idempotent with conditional comments', () => {
+    const input = `<div>
+  <!--[if mso]><table><tr><td><![endif]-->
+  <p>Content</p>
+  <!--[if mso]></td></tr></table><![endif]-->
+</div>`;
+
+    const first = format(input);
+    const second = format(first);
+    expect(second).toBe(first);
+  });
+
+  test("idempotent with Mark's button pattern", () => {
+    const input = `<a href="https://parcel.io" style="background:#005959;text-decoration:none;padding:.5em 2em;color:#FCFDFF;display:inline-block"><!--[if mso]><i style="mso-font-width:200%;mso-text-raise:100%" hidden>&emsp;</i><span style="mso-text-raise:50%;"><![endif]-->Click<!--[if mso]></span><i style="mso-font-width:200%;" hidden>&emsp;&#8203;</i><![endif]--></a>`;
+
+    const first = format(input);
+    const second = format(first);
+    expect(second).toBe(first);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multiple sequential edits + format
+// ---------------------------------------------------------------------------
+
+describe('edit then format workflow', () => {
+  test('format after adding elements', () => {
+    const mod = new HtmlMod('<div><p>original</p></div>');
+    const p = mod.querySelector('p')!;
+    p.after('<p>added1</p><p>added2</p>');
+
+    prettify(mod);
+
+    const source = mod.__source;
+    expect(source).toContain('<p>original</p>');
+    expect(source).toContain('<p>added1</p>');
+    expect(source).toContain('<p>added2</p>');
+
+    // All p tags should be at the same indentation level
+    const lines = source.split('\n');
+    const pLines = lines.filter(l => l.trim().startsWith('<p>'));
+    const indents = pLines.map(l => l.match(/^(\s*)/)?.[1]?.length ?? 0);
+    expect(new Set(indents).size).toBe(1);
+  });
+
+  test('format after removing elements', () => {
+    const mod = new HtmlMod(`<div>
+  <p>keep</p>
+  <p>remove</p>
+  <p>keep too</p>
+</div>`);
+    const toRemove = mod.querySelectorAll('p')[1];
+    toRemove.remove();
+
+    prettify(mod);
+
+    expect(mod.__source).toContain('<p>keep</p>');
+    expect(mod.__source).not.toContain('remove');
+    expect(mod.__source).toContain('<p>keep too</p>');
+  });
+
+  test('format after changing innerHTML', () => {
+    const mod = new HtmlMod('<div><p>old</p></div>');
+    const div = mod.querySelector('div')!;
+    div.innerHTML = '<table><tr><td>cell1</td><td>cell2</td></tr></table>';
+
+    prettify(mod);
+
+    expect(mod.__source).toContain('<table>');
+    expect(mod.__source).toContain('cell1');
+    expect(mod.__source).toContain('cell2');
+    // Should be formatted, not all on one line
+    const lines = mod.__source.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+  });
+
+  test('format after setAttribute', () => {
+    const mod = new HtmlMod('<div><p>text</p></div>');
+    const p = mod.querySelector('p')!;
+    p.setAttribute('class', 'highlight');
+    p.setAttribute('style', 'color: red;');
+
+    prettify(mod);
+
+    expect(mod.__source).toContain('class="highlight"');
+    expect(mod.__source).toContain('style="color: red;"');
+  });
+
+  test('multiple format calls on same HtmlMod', () => {
+    const mod = new HtmlMod('<div><p>hello</p></div>');
+
+    // First format
+    prettify(mod);
+    const after1 = mod.__source;
+
+    // Add content
+    mod.querySelector('p')!.after('<p>world</p>');
+
+    // Second format
+    prettify(mod);
+    const after2 = mod.__source;
+
+    expect(after2).toContain('<p>hello</p>');
+    expect(after2).toContain('<p>world</p>');
+    expect(after2).not.toBe(after1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Whitespace-sensitive email patterns (deeper coverage)
+// ---------------------------------------------------------------------------
+
+describe('whitespace-sensitive email patterns', () => {
+  test('inline-block columns with no gap', () => {
+    // This is the #1 email whitespace issue — space between inline-block
+    // elements causes columns to stack on iOS/Android
+    const result = format(
+      '<div style="font-size:0;"><div style="display:inline-block;width:50%;">Col 1</div><div style="display:inline-block;width:50%;">Col 2</div></div>'
+    );
+    // The inner divs should not have whitespace added between them
+    // (they're block elements so js-beautify will likely put them on separate lines,
+    // which is a known limitation — the user's code intentionally has no gap)
+    expect(result).toContain('Col 1');
+    expect(result).toContain('Col 2');
+  });
+
+  test('adjacent spans in button text', () => {
+    const result = format(
+      '<a href="#"><span style="color:white;">Click</span><span style="color:white;"> Here</span></a>'
+    );
+    // Inline elements should stay adjacent
+    expect(result).toContain('<span style="color:white;">Click</span><span style="color:white;"> Here</span>');
+  });
+
+  test('conditional comment between text content', () => {
+    const result = format('<td>Before<!--[if mso]>&nbsp;<![endif]-->After</td>');
+    expect(result).toContain('<!--[if mso]>&nbsp;<![endif]-->');
+  });
+
+  test('multiple single-line conditional comments in email', () => {
+    const result = format(`<body>
+<!--[if mso]><table width="600"><tr><td><![endif]-->
+<div style="max-width:600px;">
+  <h1>Title</h1>
+  <a href="#"><!--[if mso]><i hidden>&emsp;</i><span><![endif]-->Button<!--[if mso]></span><i hidden>&emsp;</i><![endif]--></a>
+</div>
+<!--[if mso]></td></tr></table><![endif]-->
+</body>`);
+
+    // All 4 single-line conditional comments should be preserved
+    expect(result).toContain('<!--[if mso]><table width="600"><tr><td><![endif]-->');
+    expect(result).toContain('<!--[if mso]></td></tr></table><![endif]-->');
+    expect(result).toContain('<!--[if mso]><i hidden>&emsp;</i><span><![endif]-->');
+    expect(result).toContain('<!--[if mso]></span><i hidden>&emsp;</i><![endif]-->');
+  });
+
+  test('preserves comment with HTML entities in content', () => {
+    const result = format('<div><!--[if mso]><i hidden>&emsp;&nbsp;&#8203;</i><![endif]--></div>');
+    expect(result).toContain('<!--[if mso]><i hidden>&emsp;&nbsp;&#8203;</i><![endif]-->');
+  });
+
+  test('conditional comment wrapping an entire table structure', () => {
+    const result = format(`<!--[if mso]>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" align="center">
+<tr>
+<td>
+<![endif]-->
+<div style="max-width: 600px; margin: 0 auto;">
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td style="padding: 20px;">
+<h1>Hello World</h1>
+<p>This is an email body.</p>
+</td>
+</tr>
+</table>
+</div>
+<!--[if mso]>
+</td>
+</tr>
+</table>
+<![endif]-->`);
+
+    // Multi-line conditional comments should be formatted
+    expect(result).toContain('<!--[if mso]>');
+    expect(result).toContain('<![endif]-->');
+    expect(result).toContain('<h1>Hello World</h1>');
+    expect(result).toContain('<p>This is an email body.</p>');
+  });
+});

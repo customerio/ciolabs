@@ -166,6 +166,24 @@ importers:
         specifier: ^7.0.16
         version: 7.1.3
 
+  packages/html-email-prettify:
+    dependencies:
+      '@ciolabs/html-find-conditional-comments':
+        specifier: workspace:*
+        version: link:../html-find-conditional-comments
+      '@ciolabs/html-mod':
+        specifier: workspace:*
+        version: link:../html-mod
+      '@ciolabs/html-process-conditional-comments':
+        specifier: workspace:*
+        version: link:../html-process-conditional-comments
+      '@types/js-beautify':
+        specifier: ^1.13.3
+        version: 1.14.3
+      js-beautify:
+        specifier: ~1.13.4
+        version: 1.13.13
+
   packages/html-find-conditional-comments: {}
 
   packages/html-mod:

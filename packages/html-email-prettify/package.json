@@ -1,0 +1,42 @@
+{
+  "name": "@ciolabs/html-email-prettify",
+  "version": "0.0.1",
+  "description": "Format and prettify HTML email content with email-safe whitespace handling",
+  "author": "Customer.io <win@customer.io>",
+  "license": "Apache-2.0 WITH Commons-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerio/ciolabs.git",
+    "directory": "packages/html-email-prettify"
+  },
+  "homepage": "https://github.com/customerio/ciolabs/tree/main/packages/html-email-prettify#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ciolabs/html-find-conditional-comments": "workspace:*",
+    "@ciolabs/html-mod": "workspace:*",
+    "@ciolabs/html-process-conditional-comments": "workspace:*",
+    "@types/js-beautify": "^1.13.3",
+    "js-beautify": "~1.13.4"
+  }
+}
