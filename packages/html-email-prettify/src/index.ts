@@ -364,8 +364,8 @@ function buildSingleLineConditionalRanges(html: string): Array<[number, number]>
 // ---------------------------------------------------------------------------
 
 interface AstNode {
-  startIndex: number;
-  endIndex: number;
+  startIndex: number | null;
+  endIndex: number | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   children?: Iterable<any>;
   data?: string;
@@ -386,6 +386,14 @@ interface AstNode {
  */
 function shiftPositionsAfter(nodes: Iterable<AstNode>, afterPos: number, delta: number): void {
   for (const node of nodes) {
+    if (node.startIndex == null || node.endIndex == null) {
+      // Recurse into children even if this node has no position
+      if (node.children) {
+        shiftPositionsAfter(node.children, afterPos, delta);
+      }
+      continue;
+    }
+
     if (node.startIndex >= afterPos) {
       node.startIndex += delta;
       node.endIndex += delta;
