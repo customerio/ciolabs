@@ -98,9 +98,9 @@ function formatChildren(
 
   // Determine if this list contains any block-level elements.
   // If it's all inline / text / comments we leave it alone.
-  const hasBlock = childArray.some(
-    child => isTag(child) && !isInline(child as SourceElement) && !isPreserved(child as SourceElement)
-  );
+  // Preserved elements (pre, code, textarea) count as block — we format
+  // whitespace *around* them, just not inside them.
+  const hasBlock = childArray.some(child => isTag(child) && !isInline(child as SourceElement));
 
   if (!hasBlock) return;
 
@@ -125,21 +125,26 @@ function formatChildren(
     }
 
     // --- Ensure leading whitespace before any non-text node ---------------
-    // If there's no text node before this child (either it's the first
-    // child, or the previous sibling is also a tag/comment), insert one.
     if (isFirst) {
+      // First child — insert whitespace after parent open tag.
       if (isTag(child)) {
         insertBeforeIfNeeded(mod, child as SourceElement, `\n${childIndent}`);
       } else if (isComment(child)) {
         insertBeforeComment(mod, child, `\n${childIndent}`);
       }
     } else if (previous && !isText(previous)) {
-      // Two non-text nodes adjacent — insert whitespace between them.
-      // Use the previous node's end position to insert after it.
-      if (isTag(previous)) {
-        insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
-      } else if (isComment(previous)) {
-        insertAfterComment(mod, previous, `\n${childIndent}`);
+      // Two non-text nodes directly adjacent.  Insert whitespace between
+      // them UNLESS both are <div>s — adjacent divs are commonly used as
+      // display:inline-block columns in email where any whitespace breaks
+      // the layout.
+      const previousIsDiv = isTag(previous) && (previous as SourceElement).tagName === 'div';
+      const currentIsDiv = isTag(child) && (child as SourceElement).tagName === 'div';
+      if (!(previousIsDiv && currentIsDiv)) {
+        if (isTag(previous)) {
+          insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
+        } else if (isComment(previous)) {
+          insertAfterComment(mod, previous, `\n${childIndent}`);
+        }
       }
     }
 
@@ -249,15 +254,21 @@ function formatInsideConditionalComment(
 
   mod.__source = mod.__source.slice(0, dataStart) + newData + mod.__source.slice(dataStart + oldLength);
 
-  // Update the comment node and track the delta
   const delta = newLength - oldLength;
-  commentNode.data = newData;
-  commentNode.endIndex += delta;
 
-  // Shift all nodes after this comment
+  // Shift sibling nodes BEFORE touching the comment itself.
+  // shiftPositionsAfter uses `endIndex + 1` as boundary — at this point
+  // commentNode.endIndex is still the original value, so the walk won't
+  // match the comment in the `startIndex >= afterPos` branch and can
+  // only hit the `endIndex >= afterPos` branch.  But we're about to
+  // set endIndex ourselves, so shift first to avoid double-counting.
   if (delta !== 0) {
     shiftPositionsAfter(mod.__dom.children, endIndex + 1, delta);
   }
+
+  // Now update the comment node itself.
+  commentNode.data = newData;
+  commentNode.endIndex += delta;
 }
 
 // ---------------------------------------------------------------------------

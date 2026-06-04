@@ -688,15 +688,13 @@ describe('edit then format workflow', () => {
 describe('whitespace-sensitive email patterns', () => {
   test('inline-block columns with no gap', () => {
     // This is the #1 email whitespace issue — space between inline-block
-    // elements causes columns to stack on iOS/Android
+    // elements causes columns to stack on iOS/Android.
+    // When two elements are directly adjacent (no whitespace text node),
+    // the formatter must NOT insert whitespace between them.
     const result = format(
       '<div style="font-size:0;"><div style="display:inline-block;width:50%;">Col 1</div><div style="display:inline-block;width:50%;">Col 2</div></div>'
     );
-    // The inner divs should not have whitespace added between them
-    // (they're block elements so js-beautify will likely put them on separate lines,
-    // which is a known limitation — the user's code intentionally has no gap)
-    expect(result).toContain('Col 1');
-    expect(result).toContain('Col 2');
+    expect(result).toContain('</div><div style="display:inline-block;width:50%;">Col 2</div>');
   });
 
   test('adjacent spans in button text', () => {
@@ -813,5 +811,62 @@ describe('whitespace-sensitive email patterns', () => {
     expect(result).toContain('<![endif]-->');
     expect(result).toContain('<h1>Hello World</h1>');
     expect(result).toContain('<p>This is an email body.</p>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: multi-line conditional comment followed by content
+// ---------------------------------------------------------------------------
+
+describe('multi-line conditional comment AST integrity', () => {
+  test('comment ranges do not bleed into following elements', () => {
+    const mod = prettify('<!--[if mso]>\n<table><tr><td>x</td></tr></table>\n<![endif]--><div><p>after</p></div>');
+
+    // The <div> should be queryable and its positions correct
+    const div = mod.querySelector('div');
+    expect(div).not.toBeNull();
+    expect(div!.innerHTML).toContain('<p>after</p>');
+    expect(div!.outerHTML).toContain('<div>');
+
+    // The <p> inside should also be valid
+    const paragraph = mod.querySelector('p');
+    expect(paragraph).not.toBeNull();
+    expect(paragraph!.textContent).toBe('after');
+  });
+
+  test('further edits after formatting multi-line comments stay valid', () => {
+    const mod = prettify('<!--[if mso]>\n<table><tr><td>x</td></tr></table>\n<![endif]--><div><p>after</p></div>');
+
+    // Modify content after the conditional comment
+    const paragraph = mod.querySelector('p')!;
+    paragraph.textContent = 'changed';
+
+    expect(mod.__source).toContain('changed');
+    expect(mod.__source).toContain('<![endif]-->');
+    // The change should not corrupt the conditional comment
+    expect(mod.__source).not.toContain('changed</td>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: preserved elements treated as block for sibling formatting
+// ---------------------------------------------------------------------------
+
+describe('preserved element sibling formatting', () => {
+  test('pre inside div gets indentation around it', () => {
+    const result = format('<div><pre>  line1\n  line2</pre></div>');
+    expect(result).toBe(`<div>\n  <pre>  line1\n  line2</pre>\n</div>`);
+  });
+
+  test('textarea inside div gets indentation around it', () => {
+    const result = format('<div><textarea>content</textarea></div>');
+    expect(result).toBe(`<div>\n  <textarea>content</textarea>\n</div>`);
+  });
+
+  test('pre alongside other elements gets formatted correctly', () => {
+    const result = format('<div><p>before</p><pre>  preserved  </pre><p>after</p></div>');
+    expect(result).toContain('  <p>before</p>');
+    expect(result).toContain('  <pre>  preserved  </pre>');
+    expect(result).toContain('  <p>after</p>');
   });
 });
