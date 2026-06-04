@@ -49,8 +49,8 @@ describe('basic formatting', () => {
 
   test('preserves self-closing tags', () => {
     const result = format('<div><br/><img src="test.png"/></div>');
-    // js-beautify normalizes self-closing tags to have a space before />
-    expect(result).toBe(`<div><br /><img src="test.png" /></div>`);
+    // AST-based formatter preserves original self-closing syntax
+    expect(result).toBe(`<div><br/><img src="test.png"/></div>`);
   });
 
   test('formats a full HTML document', () => {
@@ -227,8 +227,7 @@ describe('inline element whitespace', () => {
 
   test('does not add whitespace between adjacent img elements', () => {
     const result = format('<div><img src="a.png"/><img src="b.png"/></div>');
-    // js-beautify normalizes space before />, but no whitespace between tags
-    expect(result).toContain('<img src="a.png" /><img src="b.png" />');
+    expect(result).toContain('<img src="a.png"/><img src="b.png"/>');
   });
 
   test('does not add whitespace between adjacent anchor elements', () => {
@@ -469,16 +468,15 @@ describe('real-world email patterns', () => {
 // ---------------------------------------------------------------------------
 
 describe('options', () => {
-  test('respects custom indent_size', () => {
-    // eslint-disable-next-line camelcase
-    const result = prettify('<div><p>hello</p></div>', { indent_size: 4 });
+  test('respects custom indentSize', () => {
+    const result = prettify('<div><p>hello</p></div>', { indentSize: 4 });
     expect(result.__source).toContain('    <p>hello</p>');
   });
 
-  test('respects custom indent_char', () => {
+  test('respects custom indentChar', () => {
     const result = prettify('<div><p>hello</p></div>', {
-      indent_size: 1, // eslint-disable-line camelcase
-      indent_char: '\t', // eslint-disable-line camelcase
+      indentSize: 1,
+      indentChar: '\t',
     });
     expect(result.__source).toContain('\t<p>hello</p>');
   });

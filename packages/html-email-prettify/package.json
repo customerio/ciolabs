@@ -35,8 +35,6 @@
   "dependencies": {
     "@ciolabs/html-find-conditional-comments": "workspace:*",
     "@ciolabs/html-mod": "workspace:*",
-    "@ciolabs/html-process-conditional-comments": "workspace:*",
-    "@types/js-beautify": "^1.13.3",
-    "js-beautify": "~1.13.4"
+    "@ciolabs/htmlparser2-source": "workspace:*"
   }
 }

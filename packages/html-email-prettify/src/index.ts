@@ -1,13 +1,12 @@
 import findConditionalComments from '@ciolabs/html-find-conditional-comments';
-import { HtmlMod } from '@ciolabs/html-mod';
-import { preprocess, postprocess } from '@ciolabs/html-process-conditional-comments';
-import jsBeautify from 'js-beautify';
+import { HtmlMod, HtmlModElement, HtmlModText } from '@ciolabs/html-mod';
+import type { SourceElement, SourceText } from '@ciolabs/htmlparser2-source';
+import { isComment, isTag, isText } from '@ciolabs/htmlparser2-source';
 
 /**
- * Inline HTML elements — a formatter must never introduce whitespace
- * between adjacent inline elements when none existed in the source.
+ * Inline HTML elements — we never add newlines around these.
  */
-const INLINE_ELEMENTS = [
+const INLINE_ELEMENTS = new Set([
   'a',
   'abbr',
   'b',
@@ -35,195 +34,393 @@ const INLINE_ELEMENTS = [
   'time',
   'u',
   'var',
-];
+]);
 
-export type PrettifyOptions = jsBeautify.HTMLBeautifyOptions;
+/**
+ * Elements whose content whitespace must never be touched.
+ */
+const PRESERVE_CONTENT = new Set(['pre', 'code', 'textarea']);
+
+export interface PrettifyOptions {
+  /** Number of spaces per indent level (default 2) */
+  indentSize?: number;
+  /** Character to use for indentation (default ' ') */
+  indentChar?: string;
+}
 
 /**
  * Format and prettify HTML email content.
  *
- * Accepts an `HtmlMod` instance or a raw HTML string.
- * - If `HtmlMod`, the instance is mutated in place and returned.
- * - If `string`, a new `HtmlMod` is created from the formatted result.
+ * Walks the html-mod AST and adjusts whitespace text nodes in place —
+ * no re-parse, no full-string rewrite.  The `HtmlMod` instance stays
+ * live with valid positions throughout.
  *
- * Email-safe: preserves whitespace inside single-line conditional
- * comments, `<pre>`, `<code>`, and between adjacent inline elements.
+ * - If `HtmlMod`, the instance is mutated in place and returned.
+ * - If `string`, a new `HtmlMod` is created, formatted, and returned.
  */
 export default function prettify(input: HtmlMod | string, options?: PrettifyOptions): HtmlMod {
-  const isHtmlMod = input instanceof HtmlMod;
-  let html = isHtmlMod ? input.__source : input;
+  const mod = input instanceof HtmlMod ? input : new HtmlMod(input);
+  const indent = (options?.indentChar ?? ' ').repeat(options?.indentSize ?? 2);
 
-  // Step 1: Record single-line conditional comments so we can restore them
-  const originalComments = findConditionalComments(html);
-  const singleLineSnapshots: SingleLineSnapshot[] = [];
+  // Build a set of character ranges for single-line conditional comments.
+  // We must not touch whitespace inside these.
+  const singleLineRanges = buildSingleLineConditionalRanges(mod.__source);
 
-  for (const [commentIndex, comment] of originalComments.entries()) {
-    const content = html.slice(comment.range[0] + comment.open.length, comment.range[1] - comment.close.length);
+  // Format the document tree.
+  // Depth -1 so that top-level elements sit at indent 0.
+  formatChildren(mod, mod.__dom.children as Iterable<SourceElement | SourceText>, -1, indent, singleLineRanges);
 
-    if (!content.includes('\n')) {
-      singleLineSnapshots.push({
-        index: commentIndex,
-        content,
-        open: comment.open,
-        close: comment.close,
-      });
+  // Trim trailing whitespace on the document
+  mod.trimEnd();
+  // Trim leading empty lines
+  mod.trimStart();
+
+  return mod;
+}
+
+// ---------------------------------------------------------------------------
+// Core formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Walk `children` and ensure correct indentation between block-level
+ * siblings.  Operates entirely through HtmlMod text-node mutations so
+ * the AST stays in sync.
+ */
+function formatChildren(
+  mod: HtmlMod,
+  children: Iterable<SourceElement | SourceText>,
+  depth: number,
+  indent: string,
+  singleLineRanges: Array<[number, number]>
+): void {
+  const childArray = [...children];
+
+  // Determine if this list contains any block-level elements.
+  // If it's all inline / text / comments we leave it alone.
+  const hasBlock = childArray.some(
+    child => isTag(child) && !isInline(child as SourceElement) && !isPreserved(child as SourceElement)
+  );
+
+  if (!hasBlock) return;
+
+  const childIndent = indent.repeat(Math.max(0, depth + 1));
+  const parentIndent = indent.repeat(Math.max(0, depth));
+
+  for (let index = 0; index < childArray.length; index++) {
+    const child = childArray[index];
+
+    // --- Whitespace text nodes between siblings --------------------------
+    // In a block context, normalize whitespace-only text nodes to the
+    // correct indentation regardless of what follows (block or inline).
+    if (isText(child)) {
+      const textNode = child as SourceText;
+      if (isWhitespaceOnly(textNode.data) && !isInsideSingleLineConditional(textNode, singleLineRanges)) {
+        // Determine what indent to use: if this is the last child
+        // (whitespace before parent close tag), use parentIndent.
+        const isLast = index === childArray.length - 1;
+        setTextContent(mod, textNode, `\n${isLast ? parentIndent : childIndent}`);
+      }
+      continue;
+    }
+
+    // --- Element nodes ---------------------------------------------------
+    if (isTag(child)) {
+      const element = child as SourceElement;
+
+      // If first child and no leading text node, insert whitespace
+      const previous = childArray[index - 1];
+      if (!previous) {
+        insertBeforeIfNeeded(mod, element, `\n${childIndent}`);
+      }
+
+      // Skip recursion for inline elements — only adjust surrounding whitespace
+      if (isInline(element)) {
+        // If last child, ensure trailing whitespace before parent close
+        if (index === childArray.length - 1) {
+          insertAfterIfNeeded(mod, element, `\n${parentIndent}`);
+        }
+        continue;
+      }
+
+      // Recurse into children (unless content is preserved)
+      if (!isPreserved(element) && element.children.length > 0) {
+        formatChildren(
+          mod,
+          element.children as Iterable<SourceElement | SourceText>,
+          depth + 1,
+          indent,
+          singleLineRanges
+        );
+      }
+
+      // Fix trailing whitespace (before next sibling or before parent close tag)
+      const next = childArray[index + 1];
+      if (!next) {
+        // Last child — ensure whitespace before parent close tag
+        insertAfterIfNeeded(mod, element, `\n${parentIndent}`);
+      }
+    }
+
+    // --- Comment nodes ----------------------------------------------------
+    if (isComment(child)) {
+      // Fix leading whitespace before this comment
+      const previous = childArray[index - 1];
+      if (previous && isText(previous)) {
+        const textNode = previous as SourceText;
+        if (isWhitespaceOnly(textNode.data) && !isInsideSingleLineConditional(textNode, singleLineRanges)) {
+          setTextContent(mod, textNode, `\n${childIndent}`);
+        }
+      }
+
+      // Fix trailing whitespace
+      const next = childArray[index + 1];
+      if (!next) {
+        // Comment is last child — add whitespace before parent close
+        insertAfterComment(mod, child, `\n${parentIndent}`);
+      }
+
+      // Format inside multi-line conditional comments
+      if (isMultiLineConditional(child)) {
+        formatInsideConditionalComment(mod, child, depth + 1, indent, singleLineRanges);
+      }
     }
   }
-
-  // Step 2: Preprocess conditional comments — expose inner HTML for formatting
-  html = preprocess(html);
-
-  // Step 3: Format with js-beautify
-  // eslint-disable-next-line camelcase
-  html = jsBeautify.html(html, {
-    indent_size: 2, // eslint-disable-line camelcase
-    indent_char: ' ', // eslint-disable-line camelcase
-    wrap_line_length: 0, // eslint-disable-line camelcase
-    preserve_newlines: true, // eslint-disable-line camelcase
-    max_preserve_newlines: 1, // eslint-disable-line camelcase
-    indent_inner_html: true, // eslint-disable-line camelcase
-    extra_liners: [], // eslint-disable-line camelcase
-    content_unformatted: ['pre', 'code', 'textarea'], // eslint-disable-line camelcase
-    inline: INLINE_ELEMENTS,
-    unformatted: [],
-    ...options,
-  });
-
-  // Step 4: Postprocess conditional comments — close them back up
-  html = postprocess(html);
-
-  // Step 5: Restore single-line conditional comments to their original content
-  html = restoreSingleLineComments(html, singleLineSnapshots);
-
-  // Step 6: Align open/close indentation of multi-line conditional comments
-  html = alignConditionalComments(html);
-
-  // Step 7: Return HtmlMod
-  if (isHtmlMod) {
-    resetHtmlMod(input, html);
-    return input;
-  }
-
-  return new HtmlMod(html);
 }
 
 // ---------------------------------------------------------------------------
-// Internal types
-// ---------------------------------------------------------------------------
-
-interface SingleLineSnapshot {
-  /** Index in the original findConditionalComments array */
-  index: number;
-  /** The HTML content between open and close (no newlines) */
-  content: string;
-  /** The opening syntax, e.g. `<!--[if mso]>` */
-  open: string;
-  /** The closing syntax, e.g. `<![endif]-->` */
-  close: string;
-}
-
-// ---------------------------------------------------------------------------
-// Restore single-line conditional comments
+// Multi-line conditional comment formatting
 // ---------------------------------------------------------------------------
 
 /**
- * After formatting, conditional comments that were originally on a single
- * line may have been expanded across multiple lines.  This puts them back.
+ * Format the HTML content inside a multi-line conditional comment.
  *
- * We match by index position in the `findConditionalComments` array and
- * verify the open/close strings still match before restoring.
+ * The comment content looks like: `[if mso]>\n<table>...\n<![endif]`
+ * We extract the inner HTML, format it in a temporary HtmlMod, and
+ * splice the result back into the comment.
  */
-function restoreSingleLineComments(html: string, snapshots: SingleLineSnapshot[]): string {
-  if (snapshots.length === 0) return html;
+function formatInsideConditionalComment(
+  mod: HtmlMod,
+  commentNode: { startIndex: number; endIndex: number; data: string },
+  depth: number,
+  indent: string,
+  _singleLineRanges: Array<[number, number]>
+): void {
+  const { data, startIndex, endIndex } = commentNode;
 
-  const comments = findConditionalComments(html);
+  // Extract the opening conditional (e.g., "[if mso]>") and closing (e.g., "<![endif]")
+  const openMatch = /^\[if\s[^]*?]>/.exec(data);
+  const closeMatch = /<!\[endif]$/.exec(data);
+  if (!openMatch || !closeMatch) return;
 
-  // Process in reverse so earlier indices aren't shifted by replacements
-  for (const snapshot of [...snapshots].reverse()) {
-    if (snapshot.index >= comments.length) continue;
-    const formatted = comments[snapshot.index];
+  const innerHtml = data.slice(openMatch[0].length, data.length - closeMatch[0].length);
+  if (!innerHtml.trim()) return;
 
-    // Safety: make sure it's the same comment
-    if (formatted.open !== snapshot.open || formatted.close !== snapshot.close) continue;
+  // Format the inner HTML in a scoped HtmlMod
+  const innerMod = new HtmlMod(innerHtml);
+  const innerSingleLineRanges = buildSingleLineConditionalRanges(innerHtml);
+  formatChildren(
+    innerMod,
+    innerMod.__dom.children as Iterable<SourceElement | SourceText>,
+    depth,
+    indent,
+    innerSingleLineRanges
+  );
 
-    const restored = snapshot.open + snapshot.content + snapshot.close;
-    html = html.slice(0, formatted.range[0]) + restored + html.slice(formatted.range[1]);
+  let formatted = innerMod.__source;
+
+  // Ensure leading newline and trailing newline + indent for alignment
+  const parentIndent = indent.repeat(Math.max(0, depth - 1));
+  formatted = formatted.startsWith('\n') ? formatted : `\n${formatted}`;
+
+  formatted = formatted.endsWith('\n')
+    ? formatted.replace(/\n\s*$/, `\n${parentIndent}`)
+    : `${formatted}\n${parentIndent}`;
+
+  const newData = `${openMatch[0]}${formatted}${closeMatch[0]}`;
+  if (newData === data) return;
+
+  // Overwrite the comment content in the source string.
+  // Comment source in htmlparser2: <!--DATA-->
+  // startIndex points to '<', data starts at startIndex + 4 (after '<!--')
+  const dataStart = startIndex + 4;
+  const dataEnd = endIndex - 2; // before '-->'
+  const oldLength = dataEnd - dataStart;
+  const { length: newLength } = newData;
+
+  mod.__source = mod.__source.slice(0, dataStart) + newData + mod.__source.slice(dataStart + oldLength);
+
+  // Update the comment node and track the delta
+  const delta = newLength - oldLength;
+  commentNode.data = newData;
+  commentNode.endIndex += delta;
+
+  // Shift all nodes after this comment
+  if (delta !== 0) {
+    shiftPositionsAfter(mod.__dom.children, endIndex + 1, delta);
   }
-
-  return html;
 }
 
 // ---------------------------------------------------------------------------
-// Align conditional comment indentation
+// Text node helpers
 // ---------------------------------------------------------------------------
 
-/**
- * For multi-line conditional comments, ensure the opening and closing
- * tags sit at the same indentation level.
- */
-function alignConditionalComments(html: string): string {
-  const comments = findConditionalComments(html);
+function setTextContent(mod: HtmlMod, textNode: SourceText, content: string): void {
+  if (textNode.data === content) return;
+  const textWrapper = new HtmlModText(textNode, mod);
+  textWrapper.innerHTML = content;
+}
 
-  // Collect alignment adjustments
-  const adjustments: Array<[number, number, string]> = [];
+function insertBeforeIfNeeded(mod: HtmlMod, element: SourceElement, whitespace: string): void {
+  // Check if there's already whitespace before this element
+  const charBefore = mod.__source[element.source.openTag.startIndex - 1];
+  if (charBefore === '>' || charBefore === undefined) {
+    // No whitespace — insert via element wrapper
+    const wrapper = new HtmlModElement(element, mod);
+    wrapper.before(whitespace);
+  }
+}
+
+function insertAfterIfNeeded(mod: HtmlMod, element: SourceElement, whitespace: string): void {
+  const endPos = element.source.closeTag?.endIndex ?? element.endIndex + 1;
+  const charAfter = mod.__source[endPos];
+  if (charAfter === '<' || charAfter === undefined) {
+    const wrapper = new HtmlModElement(element, mod);
+    wrapper.after(whitespace);
+  }
+}
+
+function insertAfterComment(
+  mod: HtmlMod,
+  commentNode: { startIndex: number; endIndex: number },
+  whitespace: string
+): void {
+  const endPos = commentNode.endIndex + 1;
+  const charAfter = mod.__source[endPos];
+  if (charAfter === '<' || charAfter === undefined) {
+    mod.__appendRight(endPos, whitespace);
+    // Shift nodes after
+    shiftPositionsAfter(mod.__dom.children, endPos, whitespace.length);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Classification helpers
+// ---------------------------------------------------------------------------
+
+function isInline(element: SourceElement): boolean {
+  return INLINE_ELEMENTS.has(element.tagName);
+}
+
+function isPreserved(element: SourceElement): boolean {
+  return PRESERVE_CONTENT.has(element.tagName);
+}
+
+function isWhitespaceOnly(string_: string): boolean {
+  return /^\s*$/.test(string_);
+}
+
+function isMultiLineConditional(node: { data?: string }): boolean {
+  if (!node.data) return false;
+  const { data } = node;
+  if (!data.startsWith('[if ')) return false;
+  if (!data.endsWith('<![endif]')) return false;
+  // Extract inner content
+  const openMatch = /^\[if\s[^]*?]>/.exec(data);
+  if (!openMatch) return false;
+  const inner = data.slice(openMatch[0].length, data.length - '<![endif]'.length);
+  return inner.includes('\n');
+}
+
+function isInsideSingleLineConditional(textNode: SourceText, ranges: Array<[number, number]>): boolean {
+  for (const [start, end] of ranges) {
+    if (textNode.startIndex >= start && textNode.endIndex <= end) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Single-line conditional comment detection
+// ---------------------------------------------------------------------------
+
+function buildSingleLineConditionalRanges(html: string): Array<[number, number]> {
+  const comments = findConditionalComments(html);
+  const ranges: Array<[number, number]> = [];
 
   for (const comment of comments) {
-    const commentChars = new Set(html.slice(comment.range[0], comment.range[1]));
-    if (!commentChars.has('\n') && !commentChars.has('\r')) continue;
-
-    const { whitespace: openWs } = parseLastLine(html.slice(0, Math.max(0, comment.range[0])));
-
-    const { whitespace: closeWs, text: closeText } = parseLastLine(
-      html.slice(comment.range[0], comment.range[1] - comment.close.length)
-    );
-
-    if (openWs.length === closeWs.length) continue;
-
-    if (openWs.length > closeWs.length) {
-      // Reduce opening indent to match closing
-      adjustments.push([comment.range[0] - openWs.length, comment.range[0], closeWs]);
-    } else {
-      // Reduce closing indent to match opening
-      const closeFullLength = closeWs.length + closeText.length;
-      adjustments.push([
-        comment.range[1] - comment.close.length - closeFullLength,
-        comment.range[1] - comment.close.length - closeText.length,
-        openWs,
-      ]);
+    const content = html.slice(comment.range[0] + comment.open.length, comment.range[1] - comment.close.length);
+    if (!content.includes('\n')) {
+      ranges.push(comment.range);
     }
   }
 
-  // Apply adjustments from end to start so indices stay valid
-  adjustments.sort((a, b) => b[0] - a[0]);
-  for (const [start, end, replacement] of adjustments) {
-    html = html.slice(0, start) + replacement + html.slice(end);
-  }
-
-  return html;
-}
-
-function parseLastLine(string_: string): { whitespace: string; text: string } {
-  const lastLine = string_.split('\n').at(-1) ?? '';
-  const match = /^[^\S\n\r]*/.exec(lastLine);
-  const whitespace = match ? match[0] : '';
-  const text = lastLine.slice(whitespace.length);
-  return { whitespace, text };
+  return ranges;
 }
 
 // ---------------------------------------------------------------------------
-// HtmlMod mutation
+// Position shifting
 // ---------------------------------------------------------------------------
+
+interface AstNode {
+  startIndex: number;
+  endIndex: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  children?: Iterable<any>;
+  data?: string;
+  source?: {
+    openTag: { startIndex: number; endIndex: number };
+    closeTag?: { startIndex: number; endIndex: number } | null;
+    attributes?: Array<{
+      name: { startIndex: number; endIndex: number };
+      value?: { startIndex: number; endIndex: number } | null;
+      source: { startIndex: number; endIndex: number };
+    }>;
+  };
+}
 
 /**
- * Reset an existing HtmlMod so its internal state reflects `newSource`.
- * We create a throwaway HtmlMod to parse the source, then copy
- * the parsed DOM and bookkeeping into the original instance.
+ * After a raw string mutation, shift all AST node positions that come
+ * after `afterPos` by `delta` characters.
  */
-function resetHtmlMod(mod: HtmlMod, newSource: string): void {
-  const fresh = new HtmlMod(newSource, mod.__options);
-  mod.__source = fresh.__source;
-  mod.__dom = fresh.__dom;
-  mod.__astUpdater = fresh.__astUpdater;
-  mod.__cachedInnerHTML = new WeakMap();
-  mod.__cachedOuterHTML = new WeakMap();
+function shiftPositionsAfter(nodes: Iterable<AstNode>, afterPos: number, delta: number): void {
+  for (const node of nodes) {
+    if (node.startIndex >= afterPos) {
+      node.startIndex += delta;
+      node.endIndex += delta;
+
+      // For tag elements, shift source positions too
+      if (node.source?.openTag) {
+        node.source.openTag.startIndex += delta;
+        node.source.openTag.endIndex += delta;
+        if (node.source.closeTag) {
+          node.source.closeTag.startIndex += delta;
+          node.source.closeTag.endIndex += delta;
+        }
+        for (const attribute of node.source.attributes ?? []) {
+          attribute.name.startIndex += delta;
+          attribute.name.endIndex += delta;
+          if (attribute.value) {
+            attribute.value.startIndex += delta;
+            attribute.value.endIndex += delta;
+          }
+          attribute.source.startIndex += delta;
+          attribute.source.endIndex += delta;
+        }
+      }
+    } else if (node.endIndex >= afterPos) {
+      // Node spans the edit point — only shift endIndex
+      node.endIndex += delta;
+      if (node.source?.closeTag && node.source.closeTag.startIndex >= afterPos) {
+        node.source.closeTag.startIndex += delta;
+        node.source.closeTag.endIndex += delta;
+      }
+    }
+
+    // Recurse into children
+    if (node.children) {
+      shiftPositionsAfter(node.children, afterPos, delta);
+    }
+  }
 }
