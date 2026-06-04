@@ -985,4 +985,42 @@ describe('downlevel-revealed conditional comments', () => {
     expect(result).toContain('<!--<![endif]-->');
     expect(result).toContain('<span>web only</span>');
   });
+
+  test('stale ranges: bubble conditional after formatted content stays protected', () => {
+    // Repro: formatting compact tables BEFORE a bubble conditional shifts
+    // positions.  The bubble conditional content must still be protected.
+    const result = format(
+      '<div><table><tr><td>cell</td></tr></table></div><!--[if !mso]><!--><p>A</p> <p>B</p><!--<![endif]-->'
+    );
+
+    // The space between <p>A</p> and <p>B</p> must survive — it's inside
+    // a single-line bubble conditional.
+    expect(result).toContain('<p>A</p> <p>B</p>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: legacy inline elements
+// ---------------------------------------------------------------------------
+
+describe('legacy inline elements', () => {
+  test('font tags stay adjacent', () => {
+    const result = format('<p><font>A</font><font>B</font></p>');
+    expect(result).toContain('<font>A</font><font>B</font>');
+  });
+
+  test('strike tags stay adjacent', () => {
+    const result = format('<p><strike>old</strike><b>new</b></p>');
+    expect(result).toContain('<strike>old</strike><b>new</b>');
+  });
+
+  test('big and tt tags stay inline', () => {
+    const result = format('<p><big>large</big><tt>mono</tt></p>');
+    expect(result).toContain('<big>large</big><tt>mono</tt>');
+  });
+
+  test('wbr stays inline', () => {
+    const result = format('<p>longword<wbr/>here</p>');
+    expect(result).toContain('longword<wbr/>here');
+  });
 });
