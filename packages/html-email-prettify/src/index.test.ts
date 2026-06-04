@@ -697,6 +697,15 @@ describe('whitespace-sensitive email patterns', () => {
     expect(result).toContain('</div><div style="display:inline-block;width:50%;">Col 2</div>');
   });
 
+  test('adjacent regular divs get separated', () => {
+    const result = format('<td><div>A</div><div>B</div></td>');
+    expect(result).toContain('<div>A</div>\n');
+    expect(result).toContain('<div>B</div>');
+    // Both divs should be on separate lines
+    const lines = result.split('\n').filter(l => l.includes('<div>'));
+    expect(lines.length).toBe(2);
+  });
+
   test('adjacent spans in button text', () => {
     const result = format(
       '<a href="#"><span style="color:white;">Click</span><span style="color:white;"> Here</span></a>'

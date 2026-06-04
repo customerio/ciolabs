@@ -132,19 +132,15 @@ function formatChildren(
       } else if (isComment(child)) {
         insertBeforeComment(mod, child, `\n${childIndent}`);
       }
-    } else if (previous && !isText(previous)) {
-      // Two non-text nodes directly adjacent.  Insert whitespace between
-      // them UNLESS both are <div>s — adjacent divs are commonly used as
-      // display:inline-block columns in email where any whitespace breaks
-      // the layout.
-      const previousIsDiv = isTag(previous) && (previous as SourceElement).tagName === 'div';
-      const currentIsDiv = isTag(child) && (child as SourceElement).tagName === 'div';
-      if (!(previousIsDiv && currentIsDiv)) {
-        if (isTag(previous)) {
-          insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
-        } else if (isComment(previous)) {
-          insertAfterComment(mod, previous, `\n${childIndent}`);
-        }
+    } else if (previous && !isText(previous) && !hasInlineBlockStyle(previous) && !hasInlineBlockStyle(child)) {
+      // Two non-text nodes directly adjacent — insert whitespace between
+      // them.  Skip when either has display:inline-block — adjacent
+      // inline-block elements are a common email column pattern where
+      // any added whitespace breaks the layout on iOS/Android.
+      if (isTag(previous)) {
+        insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
+      } else if (isComment(previous)) {
+        insertAfterComment(mod, previous, `\n${childIndent}`);
       }
     }
 
@@ -337,6 +333,12 @@ function isInline(element: SourceElement): boolean {
 
 function isPreserved(element: SourceElement): boolean {
   return PRESERVE_CONTENT.has(element.tagName);
+}
+
+function hasInlineBlockStyle(node: unknown): boolean {
+  if (!isTag(node)) return false;
+  const style = (node as SourceElement).attribs?.style ?? '';
+  return /display\s*:\s*inline-block/i.test(style);
 }
 
 function isWhitespaceOnly(string_: string): boolean {
