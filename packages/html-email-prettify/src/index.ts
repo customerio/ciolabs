@@ -136,7 +136,12 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
   // Depth -1 so that top-level elements sit at indent 0.
   formatChildren(mod, mod.__dom.children as Iterable<SourceElement | SourceText>, -1, resolved);
 
-  if (resolved.wrapAttributes !== false && resolved.maxLineLength > 0) {
+  // Wrap attributes when: force/force-aligned (always), or auto with maxLineLength > 0
+  if (
+    resolved.wrapAttributes === 'force' ||
+    resolved.wrapAttributes === 'force-aligned' ||
+    (resolved.wrapAttributes === 'auto' && resolved.maxLineLength > 0)
+  ) {
     wrapLongAttributes(mod, resolved);
   }
 
@@ -291,12 +296,11 @@ function formatInsideConditionalComment(
 
   mod.__source = mod.__source.slice(0, dataStart) + newData + mod.__source.slice(dataStart + oldLength);
 
-  // Update comment node before the full tree walk so it doesn't get
-  // double-shifted.  Then shift everything after the original end.
   const netDelta = newData.length - oldLength;
-  commentNode.data = newData;
-  commentNode.endIndex += netDelta;
 
+  // Shift sibling positions FIRST, then update the comment node.
+  // __trackDelta walks the full tree — if we update commentNode.endIndex
+  // before the walk, the walker can double-shift it.
   if (netDelta !== 0) {
     mod.__trackDelta({
       operationType: 'appendRight',
@@ -305,6 +309,9 @@ function formatInsideConditionalComment(
       delta: netDelta,
     });
   }
+
+  commentNode.data = newData;
+  commentNode.endIndex += netDelta;
 }
 
 // ---------------------------------------------------------------------------

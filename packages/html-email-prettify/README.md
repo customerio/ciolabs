@@ -2,7 +2,9 @@
 
 Format and prettify HTML email content with email-safe whitespace handling.
 
-Built on top of [`@ciolabs/html-mod`](../html-mod) — walks the AST and adjusts whitespace text nodes directly using position-tracked operations. No re-parse, no external formatting libraries. The `HtmlMod` instance stays live with valid positions throughout.
+Built on top of [`@ciolabs/html-mod`](../html-mod) — walks the AST and adjusts whitespace text nodes using position-tracked operations. No external formatting libraries. The returned `HtmlMod` has a fully consistent AST for further edits.
+
+**Note:** `prettify()` re-parses internally to sync the AST after formatting. Any `HtmlModElement` handles captured before calling `prettify(mod)` will be stale — re-query after formatting.
 
 ## Install
 
@@ -28,7 +30,8 @@ console.log(mod.toString());
 const doc = new HtmlMod('<div><p>original</p></div>');
 doc.querySelector('p').after('<table><tr><td>added</td></tr></table>');
 prettify(doc);
-// doc is now formatted with the new table properly indented
+// doc is now formatted — re-query elements after prettify
+const p = doc.querySelector('p');
 ```
 
 ## Options
@@ -39,13 +42,13 @@ prettify(input, {
   indentSize: 2, // default: 2
   indentChar: ' ', // default: ' ' (use '\t' for tabs)
 
-  // Line length & attribute wrapping
-  maxLineLength: 120, // default: 0 (off) — wrap attributes when tag exceeds this
+  // Attribute wrapping
+  maxLineLength: 120, // default: 0 (off) — triggers auto wrapping
   // default: 'auto'
   wrapAttributes:
     'auto' | //   wrap only when exceeding maxLineLength
-    'force' | //   always wrap, one attribute per line
-    'force-aligned' | //   always wrap, align to first attribute
+    'force' | //   always wrap, one attribute per line (no maxLineLength needed)
+    'force-aligned' | //   always wrap, align to first attribute (no maxLineLength needed)
     false, //   never wrap
 
   // Whitespace
@@ -55,7 +58,7 @@ prettify(input, {
 
 ## Attribute wrapping
 
-When `maxLineLength` is set and a tag's opening line exceeds it, attributes are broken onto new lines. Uses the "break before attribute" style which saves a character:
+Attributes are broken onto new lines using the "break before attribute" style, which saves a character:
 
 ```html
 <!-- Before -->
@@ -67,6 +70,8 @@ When `maxLineLength` is set and a tag's opening line exceeds it, attributes are 
   </table>
 </table>
 ```
+
+Tags that start mid-line (e.g. `<p>Hello <a href="...">`) are not wrapped — only tags at the start of a line.
 
 ## Email-specific whitespace rules
 

@@ -1374,3 +1374,39 @@ describe('attribute wrapping + pre content', () => {
     expect(result.__source).toContain('line1\n\n\nline2');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: multi-line conditional comment double-shift
+// ---------------------------------------------------------------------------
+
+describe('conditional comment position tracking', () => {
+  test('content after multi-line conditional is properly formatted', () => {
+    const result = format(
+      '<body><!--[if mso]>\n<table><tr><td>x</td></tr></table>\n<![endif]--><div>after</div></body>'
+    );
+    // The <div> should be on its own line, not glued to <![endif]-->
+    expect(result).toMatch(/<!\[endif]-->\n/);
+    expect(result).toContain('<div>after</div>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: force wrap without maxLineLength
+// ---------------------------------------------------------------------------
+
+describe('force wrap without maxLineLength', () => {
+  test('wrapAttributes force works without maxLineLength', () => {
+    const result = prettify('<p class="x" id="y">hello</p>', {
+      wrapAttributes: 'force',
+    });
+    expect(result.__source).toContain('<p\n');
+  });
+
+  test('wrapAttributes force-aligned works without maxLineLength', () => {
+    const result = prettify('<p class="x" id="y">hello</p>', {
+      wrapAttributes: 'force-aligned',
+    });
+    expect(result.__source).toMatch(/<p class="x"/);
+    expect(result.__source).toMatch(/\n\s+id="y"/);
+  });
+});
