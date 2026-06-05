@@ -75,7 +75,7 @@ export interface PrettifyOptions {
  * - If `string`, a new `HtmlMod` is created, formatted, and returned.
  */
 export default function prettify(input: HtmlMod | string, options?: PrettifyOptions): HtmlMod {
-  const mod = input instanceof HtmlMod ? input : new HtmlMod(input);
+  const mod = typeof input === 'string' ? new HtmlMod(input) : input;
   const indent = (options?.indentChar ?? ' ').repeat(options?.indentSize ?? 2);
 
   // Collect comment data strings for single-line bubble/revealed
@@ -387,11 +387,11 @@ function insertAfterComment(
 // ---------------------------------------------------------------------------
 
 function isInline(element: SourceElement): boolean {
-  return INLINE_ELEMENTS.has(element.tagName);
+  return INLINE_ELEMENTS.has(element.tagName.toLowerCase());
 }
 
 function isPreserved(element: SourceElement): boolean {
-  return PRESERVE_CONTENT.has(element.tagName);
+  return PRESERVE_CONTENT.has(element.tagName.toLowerCase());
 }
 
 function hasInlineBlockStyle(node: SourceChildNode): boolean {
@@ -400,8 +400,13 @@ function hasInlineBlockStyle(node: SourceChildNode): boolean {
   return /display\s*:\s*inline-block/i.test(style);
 }
 
+/**
+ * Whether a string contains only HTML formatting whitespace (tab, newline,
+ * form-feed, carriage return, space).  Does NOT match \u00A0 (NBSP) or
+ * other Unicode spaces — those are semantic content.
+ */
 function isWhitespaceOnly(string_: string): boolean {
-  return /^\s*$/.test(string_);
+  return /^[\t\n\f\r ]*$/.test(string_);
 }
 
 function isMultiLineConditional(node: { data?: string }): boolean {

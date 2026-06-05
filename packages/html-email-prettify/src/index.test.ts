@@ -1095,3 +1095,68 @@ describe('DOCTYPE formatting', () => {
     expect(result).toContain('<!DOCTYPE html>');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: NBSP and Unicode spaces
+// ---------------------------------------------------------------------------
+
+describe('NBSP preservation', () => {
+  test('NBSP between block elements is not treated as formatting whitespace', () => {
+    const result = format('<td><p>A</p>\u00A0<p>B</p></td>');
+    expect(result).toContain('\u00A0');
+  });
+
+  test('NBSP text node is not replaced with indentation', () => {
+    const result = format('<div><p>hello</p>\u00A0<p>world</p></div>');
+    // The NBSP should survive — it's content, not formatting
+    expect(result).toContain('\u00A0');
+  });
+
+  test('regular whitespace between blocks is still normalized', () => {
+    const result = format('<div><p>hello</p>   \n   <p>world</p></div>');
+    // Regular whitespace is formatting — should be normalized
+    expect(result).toContain('<p>hello</p>\n');
+    expect(result).toContain('<p>world</p>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: case-insensitive tag names
+// ---------------------------------------------------------------------------
+
+describe('uppercase tag names', () => {
+  test('uppercase inline elements stay adjacent', () => {
+    const mod = new HtmlMod('<p><SPAN>A</SPAN><SPAN>B</SPAN></p>', { lowerCaseTags: false });
+    prettify(mod);
+    expect(mod.__source).toContain('<SPAN>A</SPAN><SPAN>B</SPAN>');
+  });
+
+  test('uppercase block elements get formatted', () => {
+    const mod = new HtmlMod('<DIV><P>hello</P></DIV>', { lowerCaseTags: false });
+    prettify(mod);
+    expect(mod.__source).toContain('\n');
+  });
+
+  test('uppercase pre content is preserved', () => {
+    const mod = new HtmlMod('<DIV><PRE>  preserved  </PRE></DIV>', { lowerCaseTags: false });
+    prettify(mod);
+    expect(mod.__source).toContain('  preserved  ');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: string vs HtmlMod input detection
+// ---------------------------------------------------------------------------
+
+describe('input type detection', () => {
+  test('string input returns HtmlMod', () => {
+    const result = prettify('<div><p>hello</p></div>');
+    expect(result.__source).toBeDefined();
+  });
+
+  test('HtmlMod input returns same instance', () => {
+    const mod = new HtmlMod('<div><p>hello</p></div>');
+    const result = prettify(mod);
+    expect(result).toBe(mod);
+  });
+});
