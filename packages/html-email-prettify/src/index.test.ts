@@ -1300,6 +1300,24 @@ describe('AST consistency', () => {
     expect(p!.getAttribute('class')).toBe('test');
     expect(p!.innerHTML).toBe('hello');
   });
+
+  test('textContent reflects collapsed blank lines', () => {
+    const mod = prettify('<p>a\n\n\nb</p>');
+    const p = mod.querySelector('p');
+    expect(p).not.toBeNull();
+    // After collapse, the triple newline becomes double
+    expect(p!.textContent).toBe('a\n\nb');
+  });
+
+  test('no phantom text nodes after trailing whitespace trim', () => {
+    const mod = prettify('<div>x</div>   ');
+    // Source should be trimmed
+    expect(mod.__source).toBe('<div>x</div>');
+    // Should be queryable
+    const div = mod.querySelector('div');
+    expect(div).not.toBeNull();
+    expect(div!.innerHTML).toBe('x');
+  });
 });
 
 // ---------------------------------------------------------------------------
