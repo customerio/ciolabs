@@ -531,6 +531,18 @@ describe('options', () => {
     expect(result.__source).toMatch(/\n\s+border="0"/);
   });
 
+  test('AST is consistent after force wrapping — edits work', () => {
+    const mod = prettify('<div class="x" id="y"><p>hello</p></div>', {
+      wrapAttributes: 'force',
+    });
+    const p = mod.querySelector('p');
+    expect(p).not.toBeNull();
+    expect(p!.textContent).toBe('hello');
+    p!.textContent = 'world';
+    expect(mod.__source).toContain('world');
+    expect(mod.__source).not.toContain('hello');
+  });
+
   test('wrapAttributes false: never wraps', () => {
     const result = prettify('<p class="intro" style="color: red; font-size: 16px;" id="main">hello</p>', {
       maxLineLength: 20,

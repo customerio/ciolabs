@@ -424,7 +424,9 @@ function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
   }
 
   if (newSource !== mod.__source) {
-    mod.__source = newSource;
+    // Wrapping rewrites opening tags across the document — each tag's
+    // attribute positions shift independently.  Re-parse to sync the AST.
+    resetHtmlMod(mod, newSource);
   }
 }
 
