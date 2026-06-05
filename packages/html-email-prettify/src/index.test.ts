@@ -480,6 +480,69 @@ describe('options', () => {
     });
     expect(result.__source).toContain('\t<p>hello</p>');
   });
+
+  test('maxLineLength + wrapAttributes auto: wraps long tags', () => {
+    const result = prettify(
+      '<div><p class="intro" style="color: red; font-size: 16px; line-height: 1.5;" id="main">hello</p></div>',
+      { maxLineLength: 40 }
+    );
+    // Attributes should be wrapped onto separate lines
+    expect(result.__source).toContain('<p\n');
+    expect(result.__source).toMatch(/class="intro"/);
+    expect(result.__source).toMatch(/style="color: red/);
+    expect(result.__source).toMatch(/id="main"/);
+  });
+
+  test('maxLineLength: short tags are not wrapped', () => {
+    const result = prettify('<div><p class="x">hello</p></div>', {
+      maxLineLength: 80,
+    });
+    // Short tag stays on one line
+    expect(result.__source).toContain('<p class="x">hello</p>');
+  });
+
+  test('wrapAttributes force: always wraps even short tags', () => {
+    const result = prettify('<div><p class="x" id="y">hello</p></div>', {
+      maxLineLength: 200,
+      wrapAttributes: 'force',
+    });
+    expect(result.__source).toContain('<p\n');
+  });
+
+  test('wrapAttributes force-aligned: aligns to first attribute', () => {
+    const result = prettify('<table cellpadding="0" cellspacing="0" border="0"><tr><td>x</td></tr></table>', {
+      maxLineLength: 40,
+      wrapAttributes: 'force-aligned',
+    });
+    // First attribute on same line as tag, subsequent aligned
+    expect(result.__source).toMatch(/<table cellpadding="0"/);
+    expect(result.__source).toMatch(/\n\s+cellspacing="0"/);
+    expect(result.__source).toMatch(/\n\s+border="0"/);
+  });
+
+  test('wrapAttributes false: never wraps', () => {
+    const result = prettify('<p class="intro" style="color: red; font-size: 16px;" id="main">hello</p>', {
+      maxLineLength: 20,
+      wrapAttributes: false,
+    });
+    // Should stay on one line despite exceeding maxLineLength
+    expect(result.__source).not.toContain('<p\n');
+  });
+
+  test('collapseBlankLines: multiple blank lines become one', () => {
+    const result = prettify('<div>\n\n\n\n<p>hello</p>\n\n\n\n<p>world</p>\n\n\n\n</div>');
+    // No runs of 3+ newlines
+    expect(result.__source).not.toMatch(/\n{3,}/);
+  });
+
+  test('collapseBlankLines false: does not collapse blank lines', () => {
+    // Use a pre-formatted string where blank lines are already part of
+    // inline content that the formatter doesn't touch
+    const mod = new HtmlMod('<p>line 1\n\n\nline 2</p>');
+    prettify(mod, { collapseBlankLines: false });
+    // The triple newline inside <p> content should survive
+    expect(mod.__source).toContain('\n\n\n');
+  });
 });
 
 // ---------------------------------------------------------------------------

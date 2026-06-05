@@ -35,21 +35,42 @@ prettify(doc);
 
 ```typescript
 prettify(input, {
-  indentSize: 4, // default: 2
-  indentChar: '\t', // default: ' '
+  // Indentation
+  indentSize: 2, // default: 2
+  indentChar: ' ', // default: ' ' (use '\t' for tabs)
+
+  // Line length & attribute wrapping
+  maxLineLength: 120, // default: 0 (off) — wrap attributes when tag exceeds this
+  // default: 'auto'
+  wrapAttributes:
+    'auto' | //   wrap only when exceeding maxLineLength
+    'force' | //   always wrap, one attribute per line
+    'force-aligned' | //   always wrap, align to first attribute
+    false, //   never wrap
+
+  // Whitespace
+  collapseBlankLines: true, // default: true — collapse 2+ blank lines to one
+
+  // Conditional comments
+  indentAfterConditionalComments: true, // default: true
+  // Set false to keep content at the same indent as the comment
 });
 ```
 
-## What it does
+## Attribute wrapping
 
-- Indents block elements with correct nesting depth
-- Leaves inline elements alone (no added gaps between `<span>`, `<a>`, `<img>`, `<font>`, etc.)
-- Preserves single-line conditional comments verbatim (MSO buttons, ghost tables)
-- Formats content inside multi-line conditional comments
-- Consistent indentation for closing-tag-only conditional comments
-- Protects downlevel-revealed bubble comments (`<!--[if !mso]><!-->...<!--<![endif]-->`)
-- Skips whitespace insertion between adjacent `display:inline-block` elements
-- Never touches `<pre>`, `<code>`, `<textarea>` content
+When `maxLineLength` is set and a tag's opening line exceeds it, attributes are broken onto new lines. Uses the "break before attribute" style which saves a character:
+
+```html
+<!-- Before -->
+<table cellpadding="0" cellspacing="0" border="0" width="600" align="center">
+  <!-- After (wrapAttributes: 'auto' or 'force') -->
+  <table cellpadding="0" cellspacing="0" border="0" width="600" align="center">
+    <!-- After (wrapAttributes: 'force-aligned') -->
+    <table cellpadding="0" cellspacing="0" border="0" width="600" align="center"></table>
+  </table>
+</table>
+```
 
 ## Email-specific whitespace rules
 
@@ -62,6 +83,7 @@ The formatter is aware of patterns where adding whitespace breaks email renderin
 | Single-line conditional comments | Content preserved verbatim                                   |
 | Bubble/revealed conditionals     | No whitespace inserted next to `<!--[if !mso]><!-->`         |
 | `<pre>`, `<code>`, `<textarea>`  | Internal content never touched                               |
+| NBSP (`\u00A0`)                  | Treated as semantic content, never stripped                  |
 
 ## License
 
