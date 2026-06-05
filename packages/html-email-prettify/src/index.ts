@@ -2,10 +2,30 @@ import { HtmlMod, HtmlModElement, HtmlModText } from '@ciolabs/html-mod';
 import type { SourceElement, SourceText, SourceChildNode } from '@ciolabs/htmlparser2-source';
 import { isComment, isDirective, isTag, isText } from '@ciolabs/htmlparser2-source';
 
-/**
- * Inline HTML elements — we never add newlines around these.
- * Includes legacy/deprecated tags still common in email HTML.
- */
+// Position delta helpers — matches the shape expected by HtmlMod.__trackDelta.
+// Inlined to avoid sub-path import issues with moduleResolution: node.
+const removeDelta = (start: number, end: number) => ({
+  operationType: 'remove' as const,
+  mutationStart: start,
+  mutationEnd: end,
+  delta: -(end - start),
+});
+const prependLeftDelta = (index: number, content: string) => ({
+  operationType: 'prependLeft' as const,
+  mutationStart: index,
+  mutationEnd: index,
+  delta: content.length,
+});
+const appendRightDelta = (index: number, content: string) => ({
+  operationType: 'appendRight' as const,
+  mutationStart: index,
+  mutationEnd: index,
+  delta: content.length,
+});
+
+// TODO: Replace with `isInlineElement` from `@ciolabs/html-element-display`
+// once that package is merged. It covers the full WHATWG spec including
+// table-related display types which this hardcoded set does not.
 const INLINE_ELEMENTS = new Set([
   'a',
   'abbr',
@@ -51,9 +71,6 @@ const INLINE_ELEMENTS = new Set([
   'wbr',
 ]);
 
-/**
- * Elements whose content whitespace must never be touched.
- */
 const PRESERVE_CONTENT = new Set(['pre', 'code', 'textarea']);
 
 export interface PrettifyOptions {
@@ -65,8 +82,6 @@ export interface PrettifyOptions {
 
   /**
    * Maximum line length before attribute wrapping kicks in (default 0 = off).
-   * When an opening tag exceeds this length, attributes are wrapped onto
-   * new lines (one per line, indented to align or by one indent level).
    */
   maxLineLength?: number;
 
@@ -84,23 +99,13 @@ export interface PrettifyOptions {
    * (default true).
    */
   collapseBlankLines?: boolean;
-
-  /**
-   * Whether to increase indentation depth for content that appears
-   * after a conditional comment.  When `false`, content after
-   * `<!--[if mso]>...<![endif]-->` stays at the same indent level
-   * as the comment itself (default true).
-   */
-  indentAfterConditionalComments?: boolean;
 }
 
-/** Resolved options with defaults applied */
 interface ResolvedOptions {
   indent: string;
   maxLineLength: number;
   wrapAttributes: 'auto' | 'force' | 'force-aligned' | false;
   collapseBlankLines: boolean;
-  indentAfterConditionalComments: boolean;
 }
 
 function resolveOptions(options?: PrettifyOptions): ResolvedOptions {
@@ -111,7 +116,6 @@ function resolveOptions(options?: PrettifyOptions): ResolvedOptions {
     maxLineLength: options?.maxLineLength ?? 0,
     wrapAttributes: options?.wrapAttributes ?? 'auto',
     collapseBlankLines: options?.collapseBlankLines ?? true,
-    indentAfterConditionalComments: options?.indentAfterConditionalComments ?? true,
   };
 }
 
@@ -129,21 +133,17 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
   const mod = typeof input === 'string' ? new HtmlMod(input) : input;
   const resolved = resolveOptions(options);
 
-  // Format the document tree.
   // Depth -1 so that top-level elements sit at indent 0.
   formatChildren(mod, mod.__dom.children as Iterable<SourceElement | SourceText>, -1, resolved);
 
-  // Wrap long opening tags by breaking attributes onto new lines.
   if (resolved.wrapAttributes !== false && resolved.maxLineLength > 0) {
     wrapLongAttributes(mod, resolved);
   }
 
-  // Collapse consecutive blank lines.
   if (resolved.collapseBlankLines) {
     collapseConsecutiveBlankLines(mod);
   }
 
-  // Trim only HTML formatting whitespace at document boundaries.
   trimFormattingWhitespace(mod);
 
   return mod;
@@ -153,11 +153,6 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
 // Core formatting
 // ---------------------------------------------------------------------------
 
-/**
- * Walk `children` and ensure correct indentation between block-level
- * siblings.  Operates entirely through HtmlMod text-node mutations so
- * the AST stays in sync.
- */
 function formatChildren(
   mod: HtmlMod,
   children: Iterable<SourceElement | SourceText>,
@@ -167,7 +162,6 @@ function formatChildren(
   const childArray = [...children];
   const { indent } = options;
 
-  // Determine if this list contains any block-level content.
   const hasBlock = childArray.some(
     child =>
       (isTag(child) && !isInline(child as SourceElement)) ||
@@ -177,9 +171,7 @@ function formatChildren(
 
   if (!hasBlock) return;
 
-  // Build a set of child indices protected by single-line bubble conditionals.
   const protectedIndices = buildProtectedBubbleIndices(childArray);
-
   const childIndent = indent.repeat(Math.max(0, depth + 1));
   const parentIndent = indent.repeat(Math.max(0, depth));
 
@@ -189,7 +181,7 @@ function formatChildren(
     const isFirst = index === 0;
     const isLast = index === childArray.length - 1;
 
-    // --- Whitespace text nodes between siblings --------------------------
+    // --- Whitespace text nodes -------------------------------------------
     if (isText(child)) {
       const textNode = child as SourceText;
       const nextSibling = childArray[index + 1];
@@ -202,24 +194,16 @@ function formatChildren(
       continue;
     }
 
-    // --- Ensure leading whitespace before any non-text node ---------------
+    // --- Leading whitespace for non-text nodes ---------------------------
     if (isFirst) {
-      if (isTag(child)) {
-        insertBeforeIfNeeded(mod, child as SourceElement, `\n${childIndent}`);
-      } else if (isComment(child) || isDirective(child)) {
-        insertBeforeComment(mod, child, `\n${childIndent}`);
-      }
+      insertWhitespaceBefore(mod, child, `\n${childIndent}`);
     } else if (
       previous &&
       !isText(previous) &&
       !(hasInlineBlockStyle(previous) && hasInlineBlockStyle(child)) &&
       !protectedIndices.has(index)
     ) {
-      if (isTag(previous)) {
-        insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
-      } else if (isComment(previous) || isDirective(previous)) {
-        insertAfterComment(mod, previous, `\n${childIndent}`);
-      }
+      insertWhitespaceAfter(mod, previous, `\n${childIndent}`);
     }
 
     // --- Element nodes ---------------------------------------------------
@@ -227,36 +211,28 @@ function formatChildren(
       const element = child as SourceElement;
 
       if (isInline(element)) {
-        if (isLast) {
-          insertAfterIfNeeded(mod, element, `\n${parentIndent}`);
-        }
+        if (isLast) insertWhitespaceAfter(mod, element, `\n${parentIndent}`);
         continue;
       }
 
-      // Recurse into children (unless content is preserved)
       if (!isPreserved(element) && element.children.length > 0) {
         formatChildren(mod, element.children as Iterable<SourceElement | SourceText>, depth + 1, options);
       }
 
-      if (isLast) {
-        insertAfterIfNeeded(mod, element, `\n${parentIndent}`);
-      }
+      if (isLast) insertWhitespaceAfter(mod, element, `\n${parentIndent}`);
     }
 
-    // --- Comment nodes ----------------------------------------------------
+    // --- Comment nodes ---------------------------------------------------
     if (isComment(child)) {
-      if (isLast) {
-        insertAfterComment(mod, child, `\n${parentIndent}`);
-      }
-
+      if (isLast) insertWhitespaceAfter(mod, child, `\n${parentIndent}`);
       if (isMultiLineConditional(child)) {
         formatInsideConditionalComment(mod, child, depth + 1, options);
       }
     }
 
-    // --- Directive nodes (<!DOCTYPE html>, etc.) --------------------------
+    // --- Directive nodes (<!DOCTYPE html>, etc.) -------------------------
     if (isDirective(child) && isLast) {
-      insertAfterComment(mod, child, `\n${parentIndent}`);
+      insertWhitespaceAfter(mod, child, `\n${parentIndent}`);
     }
   }
 }
@@ -287,6 +263,8 @@ function formatInsideConditionalComment(
 
   const commentIndent = indent.repeat(Math.max(0, depth));
 
+  // When formatChildren was a no-op (e.g. closing tags parsed as text),
+  // re-indent every line.  Otherwise use the formatter's output.
   const innerFormatted =
     innerMod.__source === trimmedInnerHtml
       ? trimmedInnerHtml
@@ -296,25 +274,29 @@ function formatInsideConditionalComment(
       : innerMod.__source.replace(/^\n/, '').replace(/[\t\n\f\r ]+$/, '');
 
   const formatted = `\n${innerFormatted}\n${commentIndent}`;
-
   const newData = `${openMatch[0]}${formatted}${closeMatch[0]}`;
   if (newData === data) return;
 
-  const dataStart = startIndex + 4;
-  const dataEnd = endIndex - 2;
+  const dataStart = startIndex + 4; // after '<!--'
+  const dataEnd = endIndex - 2; // before '-->'
   const oldLength = dataEnd - dataStart;
-  const { length: newLength } = newData;
 
   mod.__source = mod.__source.slice(0, dataStart) + newData + mod.__source.slice(dataStart + oldLength);
 
-  const delta = newLength - oldLength;
-
-  if (delta !== 0) {
-    shiftPositionsAfter(mod.__dom.children, endIndex + 1, delta);
-  }
-
+  // Update comment node before the full tree walk so it doesn't get
+  // double-shifted.  Then shift everything after the original end.
+  const netDelta = newData.length - oldLength;
   commentNode.data = newData;
-  commentNode.endIndex += delta;
+  commentNode.endIndex += netDelta;
+
+  if (netDelta !== 0) {
+    mod.__trackDelta({
+      operationType: 'appendRight',
+      mutationStart: endIndex + 1,
+      mutationEnd: endIndex + 1,
+      delta: netDelta,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -323,55 +305,38 @@ function formatInsideConditionalComment(
 
 /**
  * Wrap attributes on opening tags that exceed `maxLineLength`.
- * Breaks before each attribute onto a new line — saves one character
- * compared to breaking after, and keeps lines short without adding
- * a space character:
+ * Uses the "break before attribute" style:
  * ```
  * <p
  *   style="margin:1em 0">
  * ```
  *
- * Uses regex on the source string after structural formatting.
+ * Rewrites the inside of opening tags in a single pass.  Each tag's
+ * attribute positions shift independently, making incremental AST
+ * updates impractical — a re-parse is the correct approach here.
  */
 function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
   const { maxLineLength, wrapAttributes, indent } = options;
-
-  // Match opening tags with attributes: <tagname attr1="val" attr2="val" ...>
-  // Captures: (1) tag start `<tagname`, (2) attributes block, (3) closing `>` or `/>`
   const openTagRegex = /(<[a-z][\da-z-]*)((?:\s+[^\s/=>]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)+)(\s*\/?>)/gi;
 
   let newSource = mod.__source;
   let offset = 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   for (const match of mod.__source.matchAll(openTagRegex)) {
     const fullMatch = match[0];
-    const tagStart = match[1]; // e.g. "<p"
-    const attributesPart = match[2]; // e.g. ' class="x" style="y"'
-    const closing = match[3]; // e.g. ">" or " />"
+    const tagStart = match[1];
+    const attributesPart = match[2];
+    const closing = match[3];
     const matchIndex = match.index;
 
-    // Calculate the line this tag starts on to get indentation
     const lineStart = mod.__source.lastIndexOf('\n', matchIndex) + 1;
     const leadingWhitespace = mod.__source.slice(lineStart, matchIndex);
-    const tagLineLength = leadingWhitespace.length + fullMatch.length;
 
-    // For 'auto' mode, skip tags that fit on one line
-    if (wrapAttributes === 'auto' && tagLineLength <= maxLineLength) {
-      continue;
-    }
+    if (wrapAttributes === 'auto' && leadingWhitespace.length + fullMatch.length <= maxLineLength) continue;
 
-    // Parse individual attributes
-    const attributes: string[] = [];
-    const attributeRegex = /\s+([^\s/=>]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)/g;
-    let attributeMatch;
-    while ((attributeMatch = attributeRegex.exec(attributesPart)) !== null) {
-      attributes.push(attributeMatch[1]);
-    }
-
+    const attributes = parseAttributes(attributesPart);
     if (attributes.length === 0) continue;
 
-    // Build wrapped replacement
     let replacement: string;
     if (wrapAttributes === 'force-aligned') {
       const alignIndent = ' '.repeat(leadingWhitespace.length + tagStart.length + 1);
@@ -389,96 +354,113 @@ function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
       replacement += closing;
     }
 
-    // Apply replacement at shifted position
     const shiftedIndex = matchIndex + offset;
     newSource = newSource.slice(0, shiftedIndex) + replacement + newSource.slice(shiftedIndex + fullMatch.length);
     offset += replacement.length - fullMatch.length;
   }
 
   if (newSource !== mod.__source) {
-    const fresh = new HtmlMod(newSource, mod.__options);
-    mod.__source = fresh.__source;
-    mod.__dom = fresh.__dom;
-    mod.__astUpdater = fresh.__astUpdater;
-    mod.__cachedInnerHTML = new WeakMap();
-    mod.__cachedOuterHTML = new WeakMap();
+    resetHtmlMod(mod, newSource);
   }
 }
 
+function parseAttributes(attributesPart: string): string[] {
+  const attributes: string[] = [];
+  const regex = /\s+([^\s/=>]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)/g;
+  let match;
+  while ((match = regex.exec(attributesPart)) !== null) {
+    attributes.push(match[1]);
+  }
+  return attributes;
+}
+
 // ---------------------------------------------------------------------------
-// Whitespace collapsing
+// Post-processing
 // ---------------------------------------------------------------------------
 
 /**
- * Collapse runs of 2+ consecutive blank lines into a single blank line.
+ * Collapse runs of 3+ consecutive newlines into 2 (one blank line).
+ * Processes from end to start so positions stay valid.
  */
 function collapseConsecutiveBlankLines(mod: HtmlMod): void {
-  const collapsed = mod.__source.replaceAll(/\n{3,}/g, '\n\n');
-  if (collapsed !== mod.__source) {
-    const fresh = new HtmlMod(collapsed, mod.__options);
-    mod.__source = fresh.__source;
-    mod.__dom = fresh.__dom;
-    mod.__astUpdater = fresh.__astUpdater;
-    mod.__cachedInnerHTML = new WeakMap();
-    mod.__cachedOuterHTML = new WeakMap();
+  const matches = [...mod.__source.matchAll(/\n{3,}/g)];
+  if (matches.length === 0) return;
+
+  for (let index = matches.length - 1; index >= 0; index--) {
+    const match = matches[index];
+    const start = match.index + 2;
+    const end = match.index + match[0].length;
+    mod.__source = mod.__source.slice(0, start) + mod.__source.slice(end);
+    mod.__trackDelta(removeDelta(start, end));
+  }
+
+  mod.__cachedInnerHTML = new WeakMap();
+  mod.__cachedOuterHTML = new WeakMap();
+}
+
+function trimFormattingWhitespace(mod: HtmlMod): void {
+  const leadingMatch = /^[\t\n\f\r ]+/.exec(mod.__source);
+  if (leadingMatch) {
+    const { length } = leadingMatch[0];
+    mod.__source = mod.__source.slice(length);
+    mod.__trackDelta(removeDelta(0, length));
+  }
+
+  const trailingMatch = /[\t\n\f\r ]+$/.exec(mod.__source);
+  if (trailingMatch) {
+    mod.__source = mod.__source.slice(0, -trailingMatch[0].length);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Text node helpers
+// Whitespace insertion
 // ---------------------------------------------------------------------------
 
 function setTextContent(mod: HtmlMod, textNode: SourceText, content: string): void {
   if (textNode.data === content) return;
-  const textWrapper = new HtmlModText(textNode, mod);
-  textWrapper.innerHTML = content;
+  new HtmlModText(textNode, mod).innerHTML = content;
 }
 
-function insertBeforeIfNeeded(mod: HtmlMod, element: SourceElement, whitespace: string): void {
-  const charBefore = mod.__source[element.source.openTag.startIndex - 1];
-  if (charBefore === '>' || charBefore === undefined) {
-    const wrapper = new HtmlModElement(element, mod);
-    wrapper.before(whitespace);
-  }
-}
-
-function insertAfterIfNeeded(mod: HtmlMod, element: SourceElement, whitespace: string): void {
-  const endPos = element.source.closeTag?.endIndex ?? element.endIndex + 1;
-  const charAfter = mod.__source[endPos];
-  if (charAfter === '<' || charAfter === undefined) {
-    const wrapper = new HtmlModElement(element, mod);
-    wrapper.after(whitespace);
-  }
-}
-
-function insertBeforeComment(
+function insertWhitespaceBefore(
   mod: HtmlMod,
-  commentNode: { startIndex: number; endIndex: number },
+  node: SourceElement | SourceText | SourceChildNode,
   whitespace: string
 ): void {
-  const startPos = commentNode.startIndex;
+  const startPos = isTag(node)
+    ? (node as SourceElement).source.openTag.startIndex
+    : (node as { startIndex: number }).startIndex;
   const charBefore = mod.__source[startPos - 1];
-  if (charBefore === '>' || charBefore === undefined) {
+  if (charBefore !== '>' && charBefore !== undefined) return;
+
+  if (isTag(node)) {
+    new HtmlModElement(node as SourceElement, mod).before(whitespace);
+  } else {
     mod.__prependLeft(startPos, whitespace);
-    shiftPositionsAfter(mod.__dom.children, startPos, whitespace.length);
+    mod.__trackDelta(prependLeftDelta(startPos, whitespace));
   }
 }
 
-function insertAfterComment(
+function insertWhitespaceAfter(
   mod: HtmlMod,
-  commentNode: { startIndex: number; endIndex: number },
+  node: SourceElement | SourceText | SourceChildNode,
   whitespace: string
 ): void {
-  const endPos = commentNode.endIndex + 1;
+  const endPos = isTag(node)
+    ? ((node as SourceElement).source.closeTag?.endIndex ?? (node as SourceElement).endIndex + 1)
+    : (node as { endIndex: number }).endIndex + 1;
   const charAfter = mod.__source[endPos];
-  if (charAfter === '<' || charAfter === undefined) {
+  if (charAfter !== '<' && charAfter !== undefined) return;
+
+  if (isTag(node)) {
+    new HtmlModElement(node as SourceElement, mod).after(whitespace);
+  } else {
     mod.__appendRight(endPos, whitespace);
-    shiftPositionsAfter(mod.__dom.children, endPos, whitespace.length);
+    mod.__trackDelta(appendRightDelta(endPos, whitespace));
   }
 }
 
 // ---------------------------------------------------------------------------
-// Classification helpers
+// Classification
 // ---------------------------------------------------------------------------
 
 function isInline(element: SourceElement): boolean {
@@ -498,12 +480,10 @@ function hasInlineBlockStyle(node: SourceChildNode): boolean {
   return /display\s*:\s*inline-block/i.test(style);
 }
 
-/** Bubble open comment data ends with `><!`: e.g. `[if !mso]><!` */
 function isBubbleOpenData(data: string): boolean {
   return /\[if\s/i.test(data) && data.endsWith('><!');
 }
 
-/** Bubble close comment data: e.g. `<![endif]` */
 function isBubbleCloseData(data: string): boolean {
   return /\[endif]/i.test(data) && data.startsWith('<!');
 }
@@ -512,22 +492,8 @@ function isWhitespaceOnly(string_: string): boolean {
   return /^[\t\n\f\r ]*$/.test(string_);
 }
 
-/** Strip leading and trailing HTML formatting whitespace, preserving NBSP. */
 function trimFormatting(string_: string): string {
   return string_.replace(/^[\t\n\f\r ]+/, '').replace(/[\t\n\f\r ]+$/, '');
-}
-
-function trimFormattingWhitespace(mod: HtmlMod): void {
-  const leadingMatch = /^[\t\n\f\r ]+/.exec(mod.__source);
-  if (leadingMatch) {
-    mod.__source = mod.__source.slice(leadingMatch[0].length);
-    shiftPositionsAfter(mod.__dom.children, 0, -leadingMatch[0].length);
-  }
-
-  const trailingMatch = /[\t\n\f\r ]+$/.exec(mod.__source);
-  if (trailingMatch) {
-    mod.__source = mod.__source.slice(0, -trailingMatch[0].length);
-  }
 }
 
 function isMultiLineConditional(node: { data?: string }): boolean {
@@ -543,6 +509,15 @@ function isMultiLineConditional(node: { data?: string }): boolean {
   return inner.includes('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Bubble conditional protection
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a set of child indices protected by single-line bubble conditional
+ * pairs.  Identifies open/close structurally in the sibling list so a
+ * single-line bubble doesn't accidentally protect a later multi-line one.
+ */
 function buildProtectedBubbleIndices(childArray: Array<SourceElement | SourceText | SourceChildNode>): Set<number> {
   const protectedSet = new Set<number>();
 
@@ -570,9 +545,7 @@ function buildProtectedBubbleIndices(childArray: Array<SourceElement | SourceTex
           }
           break;
         }
-        if (isBubbleOpenData(siblingData)) {
-          break;
-        }
+        if (isBubbleOpenData(siblingData)) break;
       }
     }
   }
@@ -581,67 +554,14 @@ function buildProtectedBubbleIndices(childArray: Array<SourceElement | SourceTex
 }
 
 // ---------------------------------------------------------------------------
-// Position shifting
+// HtmlMod reset (for operations that must re-parse)
 // ---------------------------------------------------------------------------
 
-interface AstNode {
-  startIndex: number | null;
-  endIndex: number | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  children?: Iterable<any>;
-  data?: string;
-  source?: {
-    openTag: { startIndex: number; endIndex: number };
-    closeTag?: { startIndex: number; endIndex: number } | null;
-    attributes?: Array<{
-      name: { startIndex: number; endIndex: number };
-      value?: { startIndex: number; endIndex: number } | null;
-      source: { startIndex: number; endIndex: number };
-    }>;
-  };
-}
-
-function shiftPositionsAfter(nodes: Iterable<AstNode>, afterPos: number, delta: number): void {
-  for (const node of nodes) {
-    if (node.startIndex == null || node.endIndex == null) {
-      if (node.children) {
-        shiftPositionsAfter(node.children, afterPos, delta);
-      }
-      continue;
-    }
-
-    if (node.startIndex >= afterPos) {
-      node.startIndex += delta;
-      node.endIndex += delta;
-
-      if (node.source?.openTag) {
-        node.source.openTag.startIndex += delta;
-        node.source.openTag.endIndex += delta;
-        if (node.source.closeTag) {
-          node.source.closeTag.startIndex += delta;
-          node.source.closeTag.endIndex += delta;
-        }
-        for (const attribute of node.source.attributes ?? []) {
-          attribute.name.startIndex += delta;
-          attribute.name.endIndex += delta;
-          if (attribute.value) {
-            attribute.value.startIndex += delta;
-            attribute.value.endIndex += delta;
-          }
-          attribute.source.startIndex += delta;
-          attribute.source.endIndex += delta;
-        }
-      }
-    } else if (node.endIndex >= afterPos) {
-      node.endIndex += delta;
-      if (node.source?.closeTag && node.source.closeTag.startIndex >= afterPos) {
-        node.source.closeTag.startIndex += delta;
-        node.source.closeTag.endIndex += delta;
-      }
-    }
-
-    if (node.children) {
-      shiftPositionsAfter(node.children, afterPos, delta);
-    }
-  }
+function resetHtmlMod(mod: HtmlMod, newSource: string): void {
+  const fresh = new HtmlMod(newSource, mod.__options);
+  mod.__source = fresh.__source;
+  mod.__dom = fresh.__dom;
+  mod.__astUpdater = fresh.__astUpdater;
+  mod.__cachedInnerHTML = new WeakMap();
+  mod.__cachedOuterHTML = new WeakMap();
 }

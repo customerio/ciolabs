@@ -50,10 +50,6 @@ prettify(input, {
 
   // Whitespace
   collapseBlankLines: true, // default: true — collapse 2+ blank lines to one
-
-  // Conditional comments
-  indentAfterConditionalComments: true, // default: true
-  // Set false to keep content at the same indent as the comment
 });
 ```
 
