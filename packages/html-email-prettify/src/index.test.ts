@@ -245,6 +245,11 @@ describe('inline element whitespace', () => {
     const result = format('<div><strong>bold</strong><em>italic</em><span>text</span></div>');
     expect(result).toContain('<strong>bold</strong><em>italic</em><span>text</span>');
   });
+
+  test('adjacent inline elements stay together even with block siblings', () => {
+    const result = format('<div><p>x</p><span>a</span><span>b</span></div>');
+    expect(result).toContain('<span>a</span><span>b</span>');
+  });
 });
 
 // ---------------------------------------------------------------------------

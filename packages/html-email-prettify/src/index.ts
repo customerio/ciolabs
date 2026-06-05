@@ -214,6 +214,7 @@ function formatChildren(
     } else if (
       previous &&
       !isText(previous) &&
+      !areBothInline(previous, child) &&
       !(hasInlineBlockStyle(previous) && hasInlineBlockStyle(child)) &&
       !protectedIndices.has(index)
     ) {
@@ -548,6 +549,13 @@ function isInline(element: SourceElement): boolean {
 
 function isPreserved(element: SourceElement): boolean {
   return PRESERVE_CONTENT.has(element.tagName.toLowerCase());
+}
+
+function areBothInline(
+  nodeA: SourceElement | SourceText | SourceChildNode,
+  nodeB: SourceElement | SourceText | SourceChildNode
+): boolean {
+  return isTag(nodeA) && isTag(nodeB) && isInline(nodeA as SourceElement) && isInline(nodeB as SourceElement);
 }
 
 function hasInlineBlockStyle(node: SourceChildNode): boolean {
