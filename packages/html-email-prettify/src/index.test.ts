@@ -1344,8 +1344,33 @@ describe('attribute wrapping safety', () => {
       '<div><p>Hello <a href="https://example.com" style="color: red; text-decoration: none; font-weight: bold;">link</a></p></div>',
       { maxLineLength: 40 }
     );
-    // The <p>Hello text should not appear on attribute lines
+    // Inline <a> starts mid-line — should not be wrapped
     expect(result.__source).toContain('Hello');
     expect(result.__source).toContain('link</a>');
+    // No corrupted lines with "<p>Hello" as indent
+    expect(result.__source).not.toMatch(/<p>Hello\s+href=/);
+  });
+
+  test('mid-line inline tag is not wrapped', () => {
+    const result = prettify('<p>Hello <a href="https://example.com" style="color: red;">link</a></p>', {
+      maxLineLength: 20,
+    });
+    // The <a> starts after "Hello " — not at line start, so skip wrapping
+    expect(result.__source).not.toContain('<a\n');
+    expect(result.__source).toContain('Hello <a');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: attribute wrapping + pre preservation
+// ---------------------------------------------------------------------------
+
+describe('attribute wrapping + pre content', () => {
+  test('blank lines inside pre survive when wrapping shifts positions', () => {
+    const result = prettify(
+      '<div><p class="long-class-name" style="color: red; font-size: 16px;">x</p><pre>line1\n\n\nline2</pre></div>',
+      { maxLineLength: 40 }
+    );
+    expect(result.__source).toContain('line1\n\n\nline2');
   });
 });

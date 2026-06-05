@@ -140,18 +140,19 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
     wrapLongAttributes(mod, resolved);
   }
 
+  // Re-sync AST after formatting + wrapping.  formatChildren uses a mix of
+  // AST-aware ops (HtmlModElement.before/after) and raw string ops (for
+  // comments/directives) that track deltas but don't create text nodes.
+  // wrapLongAttributes rewrites opening tags.  Re-parsing here ensures
+  // positions are valid for collapse/trim, and that any HtmlModElement
+  // handles captured before prettify() are detached cleanly.
+  resetHtmlMod(mod, mod.__source);
+
   if (resolved.collapseBlankLines) {
     collapseConsecutiveBlankLines(mod);
   }
 
   trimFormattingWhitespace(mod);
-
-  // Re-sync the AST to match the final source.  Formatting uses a mix of
-  // AST-aware operations (HtmlModElement.before/after, HtmlModText.innerHTML)
-  // and raw string operations (for comments/directives).  The raw operations
-  // track position deltas but don't create/remove AST text nodes.  A final
-  // re-parse ensures the AST is fully consistent for downstream consumers.
-  resetHtmlMod(mod, mod.__source);
 
   return mod;
 }
@@ -381,9 +382,14 @@ function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
     const lastAttributeEnd = element.source.attributes.at(-1)!.source.endIndex + 1;
     const closing = openTagSource.slice(lastAttributeEnd - startIndex);
 
-    // Build replacement
+    // Derive indentation from the whitespace-only prefix on this line.
+    // If the tag starts mid-line (e.g. <p>Hello <a ...), the prefix
+    // contains non-whitespace content — skip wrapping for inline tags
+    // that don't start at the beginning of a line.
     const lineStart = newSource.lastIndexOf('\n', startIndex) + 1;
-    const leadingWhitespace = newSource.slice(lineStart, startIndex);
+    const linePrefix = newSource.slice(lineStart, startIndex);
+    if (!/^[\t ]*$/.test(linePrefix)) continue;
+    const leadingWhitespace = linePrefix;
 
     let replacement: string;
     if (wrapAttributes === 'force-aligned') {
