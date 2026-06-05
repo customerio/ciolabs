@@ -244,7 +244,8 @@ function formatInsideConditionalComment(
   if (!openMatch || !closeMatch) return;
 
   const rawInnerHtml = data.slice(openMatch[0].length, data.length - closeMatch[0].length);
-  const trimmedInnerHtml = rawInnerHtml.trim();
+  // Trim only HTML formatting whitespace — preserve NBSP and Unicode spaces
+  const trimmedInnerHtml = rawInnerHtml.replace(/^[\t\n\f\r ]+/, '').replace(/[\t\n\f\r ]+$/, '');
   if (!trimmedInnerHtml) return;
 
   // Format the inner HTML in a scoped HtmlMod.
@@ -269,9 +270,9 @@ function formatInsideConditionalComment(
     innerMod.__source === trimmedInnerHtml
       ? trimmedInnerHtml
           .split('\n')
-          .map(line => `${commentIndent}${line.trim()}`)
+          .map(line => `${commentIndent}${trimFormatting(line)}`)
           .join('\n')
-      : innerMod.__source.replace(/^\n/, '').trimEnd();
+      : innerMod.__source.replace(/^\n/, '').replace(/[\t\n\f\r ]+$/, '');
 
   const formatted = `\n${innerFormatted}\n${commentIndent}`;
 
@@ -370,7 +371,11 @@ function isPreserved(element: SourceElement): boolean {
 
 function hasInlineBlockStyle(node: SourceChildNode): boolean {
   if (!isTag(node)) return false;
-  const style = (node as SourceElement).attribs?.style ?? '';
+  const { attribs } = node as SourceElement;
+  if (!attribs) return false;
+  // Case-insensitive attribute lookup to handle lowerCaseAttributeNames: false
+  const styleKey = Object.keys(attribs).find(k => k.toLowerCase() === 'style');
+  const style = styleKey ? attribs[styleKey] : '';
   return /display\s*:\s*inline-block/i.test(style);
 }
 
@@ -391,6 +396,11 @@ function isBubbleCloseData(data: string): boolean {
  */
 function isWhitespaceOnly(string_: string): boolean {
   return /^[\t\n\f\r ]*$/.test(string_);
+}
+
+/** Strip leading and trailing HTML formatting whitespace, preserving NBSP. */
+function trimFormatting(string_: string): string {
+  return string_.replace(/^[\t\n\f\r ]+/, '').replace(/[\t\n\f\r ]+$/, '');
 }
 
 /**

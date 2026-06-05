@@ -1178,3 +1178,39 @@ describe('input type detection', () => {
     expect(result).toBe(mod);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: uppercase STYLE attribute with inline-block
+// ---------------------------------------------------------------------------
+
+describe('uppercase STYLE attribute', () => {
+  test('inline-block columns with uppercase STYLE stay adjacent (no text node)', () => {
+    const mod = new HtmlMod(
+      '<div><div STYLE="display:inline-block">A</div><div STYLE="display:inline-block">B</div></div>',
+      { lowerCaseAttributeNames: false }
+    );
+    prettify(mod);
+    expect(mod.__source).toContain('</div><div STYLE="display:inline-block">B</div>');
+  });
+
+  test('inline-block columns with uppercase STYLE stay adjacent (whitespace text node)', () => {
+    const mod = new HtmlMod(
+      '<div><div STYLE="display:inline-block">A</div> <div STYLE="display:inline-block">B</div></div>',
+      { lowerCaseAttributeNames: false }
+    );
+    prettify(mod);
+    // The space between should NOT become a newline
+    expect(mod.__source).not.toMatch(/<\/div>\n\s*<div STYLE="display:inline-block">B/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: NBSP inside multi-line conditional comments
+// ---------------------------------------------------------------------------
+
+describe('NBSP in conditional comments', () => {
+  test('NBSP inside multi-line conditional is preserved', () => {
+    const result = format('<!--[if mso]>\n\u00A0<span>x</span>\n<![endif]-->');
+    expect(result).toContain('\u00A0');
+  });
+});
