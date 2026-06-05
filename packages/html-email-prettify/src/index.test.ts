@@ -250,6 +250,12 @@ describe('inline element whitespace', () => {
     const result = format('<div><p>x</p><span>a</span><span>b</span></div>');
     expect(result).toContain('<span>a</span><span>b</span>');
   });
+
+  test('whitespace text node between inline siblings is preserved', () => {
+    const result = format('<div><p>x</p><span>a</span>   <span>b</span></div>');
+    // The spaces between spans should not become a newline+indent
+    expect(result).not.toMatch(/<span>a<\/span>\n\s+<span>b<\/span>/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -547,6 +553,12 @@ describe('options', () => {
     prettify(mod, { collapseBlankLines: false });
     // The triple newline inside <p> content should survive
     expect(mod.__source).toContain('\n\n\n');
+  });
+
+  test('collapseBlankLines: collapses indented blank lines', () => {
+    const result = prettify('<div>\n  \n  \n  <p>hello</p>\n  \n  \n</div>');
+    // Indented blank lines should be collapsed too
+    expect(result.__source).not.toMatch(/(?:\n[\t ]*){2}\n/);
   });
 });
 
@@ -1404,6 +1416,17 @@ describe('attribute wrapping safety', () => {
 // ---------------------------------------------------------------------------
 // Regression: attribute wrapping + pre preservation
 // ---------------------------------------------------------------------------
+
+describe('attribute wrapping inside conditional comments', () => {
+  test('force wraps attributes inside multi-line conditional comments', () => {
+    const result = prettify(
+      '<!--[if mso]>\n<table cellpadding="0" cellspacing="0" border="0" width="600"><tr><td>x</td></tr></table>\n<![endif]-->',
+      { wrapAttributes: 'force' }
+    );
+    // The table inside the conditional should have wrapped attributes
+    expect(result.__source).toContain('<table\n');
+  });
+});
 
 describe('attribute wrapping + pre content', () => {
   test('blank lines inside pre survive when wrapping shifts positions', () => {

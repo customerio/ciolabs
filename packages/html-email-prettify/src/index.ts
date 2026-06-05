@@ -201,8 +201,9 @@ function formatChildren(
       const nextSibling = childArray[index + 1];
       const betweenInlineBlocks =
         previous && nextSibling && hasInlineBlockStyle(previous) && hasInlineBlockStyle(nextSibling);
+      const betweenInlines = previous && nextSibling && areBothInline(previous, nextSibling);
 
-      if (isWhitespaceOnly(textNode.data) && !betweenInlineBlocks && !protectedIndices.has(index)) {
+      if (isWhitespaceOnly(textNode.data) && !betweenInlineBlocks && !betweenInlines && !protectedIndices.has(index)) {
         setTextContent(mod, textNode, `\n${isLast ? parentIndent : childIndent}`);
       }
       continue;
@@ -263,7 +264,7 @@ function formatInsideConditionalComment(
   options: ResolvedOptions
 ): void {
   const { data, startIndex, endIndex } = commentNode;
-  const { indent } = options;
+  const { indent, wrapAttributes, maxLineLength } = options;
 
   const openMatch = /^\[if\s[^]*?]>/i.exec(data);
   const closeMatch = /<!\[endif]$/i.exec(data);
@@ -275,6 +276,17 @@ function formatInsideConditionalComment(
 
   const innerMod = new HtmlMod(trimmedInnerHtml);
   formatChildren(innerMod, innerMod.__dom.children as Iterable<SourceElement | SourceText>, depth - 1, options);
+
+  // Also wrap attributes inside the conditional comment content
+  if (
+    wrapAttributes === 'force' ||
+    wrapAttributes === 'force-aligned' ||
+    (wrapAttributes === 'auto' && maxLineLength > 0)
+  ) {
+    // Re-parse innerMod so the AST is valid for the wrap walk
+    resetHtmlMod(innerMod, innerMod.__source);
+    wrapLongAttributes(innerMod, options);
+  }
 
   const commentIndent = indent.repeat(Math.max(0, depth));
 
@@ -437,7 +449,10 @@ function collapseConsecutiveBlankLines(mod: HtmlMod): void {
   // Build a set of character ranges to protect
   const protectedRanges = buildPreservedContentRanges(mod);
 
-  const matches = [...mod.__source.matchAll(/\n{3,}/g)];
+  // Match 2+ consecutive blank lines — a blank line is \n followed by
+  // optional whitespace then another \n.  This catches both `\n\n\n`
+  // and `\n  \n  \n` (indented blank lines).
+  const matches = [...mod.__source.matchAll(/\n([\t ]*\n){2,}/g)];
   if (matches.length === 0) return;
 
   // Process from end to start so positions stay valid
@@ -448,10 +463,12 @@ function collapseConsecutiveBlankLines(mod: HtmlMod): void {
     // Skip if this match is inside a preserved element
     if (protectedRanges.some(([start, end]) => matchStart >= start && matchStart < end)) continue;
 
-    const start = matchStart + 2;
+    // Replace the entire match with \n\n (one blank line)
+    const replacement = '\n\n';
+    const start = matchStart;
     const end = matchStart + match[0].length;
-    mod.__source = mod.__source.slice(0, start) + mod.__source.slice(end);
-    mod.__trackDelta(removeDelta(start, end));
+    mod.__source = mod.__source.slice(0, start) + replacement + mod.__source.slice(end);
+    mod.__trackDelta(removeDelta(start + replacement.length, end));
   }
 
   mod.__cachedInnerHTML = new WeakMap();
