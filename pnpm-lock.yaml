@@ -168,9 +168,6 @@ importers:
 
   packages/html-email-prettify:
     dependencies:
-      '@ciolabs/html-find-conditional-comments':
-        specifier: workspace:*
-        version: link:../html-find-conditional-comments
       '@ciolabs/html-mod':
         specifier: workspace:*
         version: link:../html-mod

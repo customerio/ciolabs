@@ -1,4 +1,3 @@
-import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 import { HtmlMod, HtmlModElement, HtmlModText } from '@ciolabs/html-mod';
 import type { SourceElement, SourceText, SourceChildNode } from '@ciolabs/htmlparser2-source';
 import { isComment, isDirective, isTag, isText } from '@ciolabs/htmlparser2-source';
@@ -78,18 +77,13 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
   const mod = typeof input === 'string' ? new HtmlMod(input) : input;
   const indent = (options?.indentChar ?? ' ').repeat(options?.indentSize ?? 2);
 
-  // Collect comment data strings for single-line bubble/revealed
-  // conditionals.  Position-independent — survives formatting mutations.
-  const bubbleCommentData = buildSingleLineBubbleCommentData(mod.__source);
-
   // Format the document tree.
   // Depth -1 so that top-level elements sit at indent 0.
-  formatChildren(mod, mod.__dom.children as Iterable<SourceElement | SourceText>, -1, indent, bubbleCommentData);
+  formatChildren(mod, mod.__dom.children as Iterable<SourceElement | SourceText>, -1, indent);
 
-  // Trim trailing whitespace on the document
-  mod.trimEnd();
-  // Trim leading empty lines
-  mod.trimStart();
+  // Trim only HTML formatting whitespace at document boundaries.
+  // Preserve NBSP (\u00A0) and other semantic Unicode spaces.
+  trimFormattingWhitespace(mod);
 
   return mod;
 }
@@ -107,8 +101,7 @@ function formatChildren(
   mod: HtmlMod,
   children: Iterable<SourceElement | SourceText>,
   depth: number,
-  indent: string,
-  bubbleCommentData: Set<string>
+  indent: string
 ): void {
   const childArray = [...children];
 
@@ -126,11 +119,10 @@ function formatChildren(
 
   if (!hasBlock) return;
 
-  // Check if any sibling is a bubble comment — if so, text nodes between
-  // bubble comment pairs are protected (position-independent check).
-  const hasBubbleSibling = childArray.some(
-    child => isComment(child) && bubbleCommentData.has((child as { data?: string }).data ?? '')
-  );
+  // Build a set of child indices that are protected by single-line bubble
+  // conditional pairs.  Computed per sibling list so a single-line bubble
+  // doesn't accidentally protect a multi-line bubble later in the same list.
+  const protectedIndices = buildProtectedBubbleIndices(childArray);
 
   const childIndent = indent.repeat(Math.max(0, depth + 1));
   const parentIndent = indent.repeat(Math.max(0, depth));
@@ -145,7 +137,7 @@ function formatChildren(
     // In a block context, normalize whitespace-only text nodes to the
     // correct indentation regardless of what follows (block or inline).
     // Skip when:
-    // - The text sits between bubble comment pairs (single-line conditional)
+    // - The index is protected by a single-line bubble conditional pair
     // - The text separates two display:inline-block elements (column gap)
     if (isText(child)) {
       const textNode = child as SourceText;
@@ -153,11 +145,7 @@ function formatChildren(
       const betweenInlineBlocks =
         previous && nextSibling && hasInlineBlockStyle(previous) && hasInlineBlockStyle(nextSibling);
 
-      if (
-        isWhitespaceOnly(textNode.data) &&
-        !betweenInlineBlocks &&
-        !(hasBubbleSibling && isTextBetweenBubbleComments(index, childArray, bubbleCommentData))
-      ) {
+      if (isWhitespaceOnly(textNode.data) && !betweenInlineBlocks && !protectedIndices.has(index)) {
         setTextContent(mod, textNode, `\n${isLast ? parentIndent : childIndent}`);
       }
       continue;
@@ -175,13 +163,12 @@ function formatChildren(
       previous &&
       !isText(previous) &&
       !(hasInlineBlockStyle(previous) && hasInlineBlockStyle(child)) &&
-      !isBubbleCommentBoundary(previous, child, bubbleCommentData)
+      !protectedIndices.has(index)
     ) {
       // Two non-text nodes directly adjacent — insert whitespace between
       // them.  Skip when:
       // - BOTH are display:inline-block (email column pattern)
-      // - Either node is a comment belonging to a single-line bubble
-      //   conditional (e.g. <!--[if !mso]><!-->...<![endif]-->)
+      // - The index is protected by a single-line bubble conditional pair
       if (isTag(previous)) {
         insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
       } else if (isComment(previous) || isDirective(previous)) {
@@ -203,13 +190,7 @@ function formatChildren(
 
       // Recurse into children (unless content is preserved)
       if (!isPreserved(element) && element.children.length > 0) {
-        formatChildren(
-          mod,
-          element.children as Iterable<SourceElement | SourceText>,
-          depth + 1,
-          indent,
-          bubbleCommentData
-        );
+        formatChildren(mod, element.children as Iterable<SourceElement | SourceText>, depth + 1, indent);
       }
 
       // Ensure trailing whitespace if last child
@@ -273,14 +254,7 @@ function formatInsideConditionalComment(
   // inner content should be indented at `depth` level (matching where
   // the comment sits in the outer document).
   const innerMod = new HtmlMod(trimmedInnerHtml);
-  const innerBubbleData = buildSingleLineBubbleCommentData(trimmedInnerHtml);
-  formatChildren(
-    innerMod,
-    innerMod.__dom.children as Iterable<SourceElement | SourceText>,
-    depth - 1,
-    indent,
-    innerBubbleData
-  );
+  formatChildren(innerMod, innerMod.__dom.children as Iterable<SourceElement | SourceText>, depth - 1, indent);
 
   // Align the close tag (<![endif]) with the open tag (<!--[if).
   // The caller passes `depth + 1`, so `depth` here equals the comment's
@@ -400,6 +374,16 @@ function hasInlineBlockStyle(node: SourceChildNode): boolean {
   return /display\s*:\s*inline-block/i.test(style);
 }
 
+/** Bubble open comment data ends with `><!`: e.g. `[if !mso]><!` */
+function isBubbleOpenData(data: string): boolean {
+  return /\[if\s/i.test(data) && data.endsWith('><!');
+}
+
+/** Bubble close comment data: e.g. `<![endif]` */
+function isBubbleCloseData(data: string): boolean {
+  return /\[endif]/i.test(data) && data.startsWith('<!');
+}
+
 /**
  * Whether a string contains only HTML formatting whitespace (tab, newline,
  * form-feed, carriage return, space).  Does NOT match \u00A0 (NBSP) or
@@ -407,6 +391,24 @@ function hasInlineBlockStyle(node: SourceChildNode): boolean {
  */
 function isWhitespaceOnly(string_: string): boolean {
   return /^[\t\n\f\r ]*$/.test(string_);
+}
+
+/**
+ * Trim only HTML formatting whitespace (tab, newline, form-feed, carriage
+ * return, space) from the start and end of the document.  Unlike JS
+ * String.trim(), this preserves NBSP and other Unicode spaces.
+ */
+function trimFormattingWhitespace(mod: HtmlMod): void {
+  const leadingMatch = /^[\t\n\f\r ]+/.exec(mod.__source);
+  if (leadingMatch) {
+    mod.__source = mod.__source.slice(leadingMatch[0].length);
+    shiftPositionsAfter(mod.__dom.children, 0, -leadingMatch[0].length);
+  }
+
+  const trailingMatch = /[\t\n\f\r ]+$/.exec(mod.__source);
+  if (trailingMatch) {
+    mod.__source = mod.__source.slice(0, -trailingMatch[0].length);
+  }
 }
 
 function isMultiLineConditional(node: { data?: string }): boolean {
@@ -424,120 +426,56 @@ function isMultiLineConditional(node: { data?: string }): boolean {
 }
 
 /**
- * Check whether a text node at `index` in `childArray` sits between
- * an open and close comment that form a single-line bubble conditional.
+ * Build a set of child indices that are protected by single-line bubble
+ * conditional comment pairs.  Walks the sibling list to find bubble open
+ * comments (data matches `[if ...`), then checks if the matching close
+ * (data matches `[endif]`) appears without any newlines in between.
+ * Only the indices between a matched single-line pair are protected.
  *
- * Tracks matched pairs so two separate conditionals in the same list
- * don't falsely protect the gap between them.  Open comments have data
- * containing `[if` and close comments have data containing `[endif]`.
+ * This per-sibling-list approach means a single-line bubble doesn't
+ * accidentally protect a later multi-line bubble with the same data.
  */
-function isTextBetweenBubbleComments(
-  index: number,
-  childArray: Array<SourceElement | SourceText | SourceChildNode>,
-  bubbleData: Set<string>
-): boolean {
-  // Scan backwards for the nearest bubble OPEN comment (data has "[if")
-  let foundOpen = false;
-  for (let before = index - 1; before >= 0; before--) {
-    const node = childArray[before];
+function buildProtectedBubbleIndices(childArray: Array<SourceElement | SourceText | SourceChildNode>): Set<number> {
+  const protectedSet = new Set<number>();
+
+  for (let index = 0; index < childArray.length; index++) {
+    const node = childArray[index];
     if (!isComment(node)) continue;
     const data = (node as { data?: string }).data ?? '';
-    if (!bubbleData.has(data)) continue;
+    // Bubble open comments end with "><!": <!--[if !mso]><!-->
+    // Downlevel-hidden comments contain the full content and end with <![endif]
+    if (!isBubbleOpenData(data)) continue;
 
-    if (/\[if\s/i.test(data)) {
-      // Found an open — but only if there's no close between it and us
-      // (which would mean a complete conditional before our text node)
-      foundOpen = true;
-      break;
+    // Found a bubble open — scan forward for the matching close
+    let hasNewline = false;
+    for (let after = index + 1; after < childArray.length; after++) {
+      const sibling = childArray[after];
+
+      // Check for newlines in text nodes between open and close
+      if (isText(sibling) && (sibling as SourceText).data.includes('\n')) {
+        hasNewline = true;
+      }
+
+      if (isComment(sibling)) {
+        const siblingData = (sibling as { data?: string }).data ?? '';
+        if (isBubbleCloseData(siblingData)) {
+          // Found matching close — protect everything between if single-line
+          if (!hasNewline) {
+            for (let protect = index; protect <= after; protect++) {
+              protectedSet.add(protect);
+            }
+          }
+          break;
+        }
+        if (isBubbleOpenData(siblingData)) {
+          // Hit another open before finding close — stop
+          break;
+        }
+      }
     }
-    if (/\[endif]/i.test(data)) {
-      // Hit a close comment before finding an open — we're outside
-      return false;
-    }
-  }
-  if (!foundOpen) return false;
-
-  // Scan forwards for the matching bubble CLOSE comment (data has "[endif]")
-  for (let after = index + 1; after < childArray.length; after++) {
-    const node = childArray[after];
-    if (!isComment(node)) continue;
-    const data = (node as { data?: string }).data ?? '';
-    if (!bubbleData.has(data)) continue;
-
-    if (/\[endif]/i.test(data)) {
-      return true;
-    }
-    if (/\[if\s/i.test(data)) {
-      // Hit a new open before finding the close — we're outside
-      return false;
-    }
-  }
-  return false;
-}
-
-/**
- * Check whether two adjacent non-text nodes are both inside the same
- * single-line bubble conditional.  Returns true only when:
- * - nodeA is a bubble open comment and nodeB is content after it, OR
- * - nodeA is content and nodeB is a bubble close comment
- *
- * Does NOT protect the gap between a close and a subsequent open —
- * that's between two separate conditionals and should be formatted.
- */
-function isBubbleCommentBoundary(
-  nodeA: SourceElement | SourceText | SourceChildNode,
-  nodeB: SourceElement | SourceText | SourceChildNode,
-  bubbleData: Set<string>
-): boolean {
-  if (bubbleData.size === 0) return false;
-
-  // nodeA is a bubble open → nodeB is inside the conditional
-  if (isComment(nodeA)) {
-    const data = (nodeA as { data?: string }).data ?? '';
-    if (bubbleData.has(data) && /\[if\s/i.test(data)) return true;
   }
 
-  // nodeB is a bubble close → nodeA is inside the conditional
-  if (isComment(nodeB)) {
-    const data = (nodeB as { data?: string }).data ?? '';
-    if (bubbleData.has(data) && /\[endif]/i.test(data)) return true;
-  }
-
-  return false;
-}
-
-// ---------------------------------------------------------------------------
-// Single-line bubble conditional comment detection
-// ---------------------------------------------------------------------------
-
-/**
- * Collect the comment data strings for comments that form single-line
- * bubble/revealed conditionals.  For `<!--[if !mso]><!-->...<![endif]-->`,
- * the opening comment has data `[if !mso]><!` and the closing comment
- * has data `<![endif]`.  Both are added to the set.
- *
- * These are used for position-independent checks that survive source
- * mutations during formatting.
- */
-function buildSingleLineBubbleCommentData(html: string): Set<string> {
-  const comments = findConditionalComments(html);
-  const dataSet = new Set<string>();
-
-  for (const comment of comments) {
-    if (!comment.bubble) continue;
-    const content = html.slice(comment.range[0] + comment.open.length, comment.range[1] - comment.close.length);
-    if (content.includes('\n')) continue;
-
-    // Extract the comment data from the open and close strings.
-    // <!--[if !mso]><!--> has comment data "[if !mso]><!"
-    // <!--<![endif]--> has comment data "<![endif]"
-    const openData = comment.open.slice(4, -3); // strip "<!--" and "-->"
-    const closeData = comment.close.slice(4, -3); // strip "<!--" and "-->"
-    if (openData) dataSet.add(openData);
-    if (closeData) dataSet.add(closeData);
-  }
-
-  return dataSet;
+  return protectedSet;
 }
 
 // ---------------------------------------------------------------------------

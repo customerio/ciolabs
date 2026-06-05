@@ -33,7 +33,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ciolabs/html-find-conditional-comments": "workspace:*",
     "@ciolabs/html-mod": "workspace:*",
     "@ciolabs/htmlparser2-source": "workspace:*"
   }

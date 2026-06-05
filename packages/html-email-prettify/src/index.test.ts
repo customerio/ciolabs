@@ -1022,6 +1022,18 @@ describe('downlevel-revealed conditional comments', () => {
     // The <p> between them should be on its own line (formatted)
     expect(result).toMatch(/\n\s+<p>middle<\/p>/);
   });
+
+  test('single-line bubble does not protect later multi-line bubble', () => {
+    // First conditional is single-line, second is multi-line.
+    // The multi-line one's <p> should still be indented.
+    const result = format(
+      '<div><!--[if !mso]><!--><span>A</span><!--<![endif]--><!--[if !mso]><!-->\n<p>B</p>\n<!--<![endif]--></div>'
+    );
+
+    expect(result).toContain('<span>A</span>');
+    // The <p>B</p> inside the multi-line conditional should be formatted
+    expect(result).toMatch(/\n\s+<p>B<\/p>/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1117,6 +1129,12 @@ describe('NBSP preservation', () => {
     // Regular whitespace is formatting — should be normalized
     expect(result).toContain('<p>hello</p>\n');
     expect(result).toContain('<p>world</p>');
+  });
+
+  test('NBSP at document boundaries is preserved', () => {
+    const result = format('\u00A0<div><p>x</p></div>\u00A0');
+    expect(result.startsWith('\u00A0')).toBe(true);
+    expect(result.endsWith('\u00A0')).toBe(true);
   });
 });
 
