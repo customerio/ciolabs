@@ -1091,6 +1091,13 @@ describe('downlevel-revealed conditional comments', () => {
     expect(result).toMatch(/\n\s+<p>middle<\/p>/);
   });
 
+  test('spaced revealed conditional is also protected', () => {
+    // <!--[if !mso]><!-- --> with a space before --> is a valid variant
+    const result = format('<!--[if !mso]><!-- --><span>A</span><!-- <![endif]-->');
+    // Content should stay adjacent to comments
+    expect(result).toContain('--><span>A</span><!--');
+  });
+
   test('single-line bubble does not protect later multi-line bubble', () => {
     // First conditional is single-line, second is multi-line.
     // The multi-line one's <p> should still be indented.

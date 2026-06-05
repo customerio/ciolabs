@@ -567,12 +567,14 @@ function hasInlineBlockStyle(node: SourceChildNode): boolean {
   return /display\s*:\s*inline-block/i.test(style);
 }
 
+/** Bubble open: `<!--[if !mso]><!-->` or `<!--[if !mso]><!-- -->` */
 function isBubbleOpenData(data: string): boolean {
-  return /\[if\s/i.test(data) && data.endsWith('><!');
+  return /\[if\s/i.test(data) && /><!\s*$/.test(data);
 }
 
+/** Bubble close: `<!--<![endif]-->` or `<!-- <![endif]-->` */
 function isBubbleCloseData(data: string): boolean {
-  return /\[endif]/i.test(data) && data.startsWith('<!');
+  return /\[endif]/i.test(data) && /^\s*<!/.test(data);
 }
 
 function isWhitespaceOnly(string_: string): boolean {
