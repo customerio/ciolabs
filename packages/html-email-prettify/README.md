@@ -2,9 +2,9 @@
 
 Format and prettify HTML email content with email-safe whitespace handling.
 
-Built on top of [`@ciolabs/html-mod`](../html-mod) — walks the AST and adjusts whitespace text nodes using position-tracked operations. No external formatting libraries. The returned `HtmlMod` has a fully consistent AST for further edits.
+Built on top of [`@ciolabs/html-mod`](../html-mod) — walks the AST and adjusts whitespace text nodes using position-tracked operations. No external formatting libraries. The returned `HtmlMod` has a consistent AST for further edits.
 
-**Note:** `prettify()` re-parses internally to sync the AST after formatting. Any `HtmlModElement` handles captured before calling `prettify(mod)` will be stale — re-query after formatting.
+Most formatting operations are AST-aware (no re-parse). Attribute wrapping and blank-line collapse trigger a re-parse only when they make changes. `HtmlModElement` handles captured before `prettify(mod)` may be stale if those features are active — re-query after formatting.
 
 ## Install
 

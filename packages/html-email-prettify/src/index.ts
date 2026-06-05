@@ -122,12 +122,9 @@ function resolveOptions(options?: PrettifyOptions): ResolvedOptions {
 /**
  * Format and prettify HTML email content.
  *
- * Walks the html-mod AST and adjusts whitespace text nodes, then
- * re-parses to sync the AST.  The returned `HtmlMod` has a consistent
- * AST for further edits.
- *
- * **Note:** Any `HtmlModElement` handles captured before calling
- * `prettify(mod)` will be stale — re-query after formatting.
+ * Walks the html-mod AST and adjusts whitespace text nodes in place.
+ * Attribute wrapping and blank-line collapse trigger a re-parse only
+ * when they make changes.
  *
  * - If `HtmlMod`, the instance is mutated in place and returned.
  * - If `string`, a new `HtmlMod` is created, formatted, and returned.
@@ -153,12 +150,6 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
   }
 
   trimFormattingWhitespace(mod);
-
-  // Final re-parse to sync the AST with the source.  Formatting uses a mix
-  // of AST-aware ops and raw string mutations.  Collapse and trim further
-  // mutate __source.  This ensures the returned HtmlMod has a consistent
-  // AST for downstream querySelector/textContent/innerHTML.
-  resetHtmlMod(mod, mod.__source);
 
   return mod;
 }
@@ -274,7 +265,7 @@ function formatInsideConditionalComment(
   const trimmedInnerHtml = trimFormatting(rawInnerHtml);
   if (!trimmedInnerHtml) return;
 
-  const innerMod = new HtmlMod(trimmedInnerHtml);
+  const innerMod = new HtmlMod(trimmedInnerHtml, mod.__options);
   formatChildren(innerMod, innerMod.__dom.children as Iterable<SourceElement | SourceText>, depth - 1, options);
 
   // Also wrap attributes inside the conditional comment content
@@ -446,33 +437,34 @@ function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
  * Skips content inside preserved elements (pre, code, textarea).
  */
 function collapseConsecutiveBlankLines(mod: HtmlMod): void {
-  // Build a set of character ranges to protect
   const protectedRanges = buildPreservedContentRanges(mod);
 
-  // Match 2+ consecutive blank lines — a blank line is \n followed by
-  // optional whitespace then another \n.  This catches both `\n\n\n`
-  // and `\n  \n  \n` (indented blank lines).
+  // Match 2+ consecutive blank lines (with optional indentation).
   const matches = [...mod.__source.matchAll(/\n([\t ]*\n){2,}/g)];
   if (matches.length === 0) return;
 
-  // Process from end to start so positions stay valid
-  for (let index = matches.length - 1; index >= 0; index--) {
-    const match = matches[index];
+  let newSource = mod.__source;
+  let offset = 0;
+  let changed = false;
+
+  for (const match of matches) {
     const matchStart = match.index;
 
-    // Skip if this match is inside a preserved element
+    // Skip if inside a preserved element
     if (protectedRanges.some(([start, end]) => matchStart >= start && matchStart < end)) continue;
 
-    // Replace the entire match with \n\n (one blank line)
-    const replacement = '\n\n';
-    const start = matchStart;
-    const end = matchStart + match[0].length;
-    mod.__source = mod.__source.slice(0, start) + replacement + mod.__source.slice(end);
-    mod.__trackDelta(removeDelta(start + replacement.length, end));
+    const shiftedStart = matchStart + offset;
+    const shiftedEnd = shiftedStart + match[0].length;
+    newSource = newSource.slice(0, shiftedStart) + '\n\n' + newSource.slice(shiftedEnd);
+    offset += 2 - match[0].length;
+    changed = true;
   }
 
-  mod.__cachedInnerHTML = new WeakMap();
-  mod.__cachedOuterHTML = new WeakMap();
+  if (changed) {
+    // Re-parse to sync AST — collapse can affect text nodes, comments,
+    // and content that spans multiple AST node types.
+    resetHtmlMod(mod, newSource);
+  }
 }
 
 /**
@@ -499,12 +491,43 @@ function trimFormattingWhitespace(mod: HtmlMod): void {
   const leadingMatch = /^[\t\n\f\r ]+/.exec(mod.__source);
   if (leadingMatch) {
     const { length } = leadingMatch[0];
+    // Check if the first child is a whitespace text node — update or remove it
+    const firstChild = mod.__dom.children[0];
+    if (firstChild && isText(firstChild)) {
+      const textNode = firstChild as SourceText;
+      const newData = textNode.data.slice(length);
+      if (newData) {
+        textNode.data = newData;
+        textNode.startIndex = 0;
+        textNode.endIndex = newData.length - 1;
+      } else {
+        // Remove the text node entirely
+        mod.__dom.children.shift();
+        const newFirst = mod.__dom.children[0];
+        if (newFirst) (newFirst as { prev?: unknown }).prev = null;
+      }
+    }
     mod.__source = mod.__source.slice(length);
     mod.__trackDelta(removeDelta(0, length));
   }
 
   const trailingMatch = /[\t\n\f\r ]+$/.exec(mod.__source);
   if (trailingMatch) {
+    // Check if the last child is a whitespace text node — update or remove it
+    const lastChild = mod.__dom.children.at(-1);
+    if (lastChild && isText(lastChild)) {
+      const textNode = lastChild as SourceText;
+      const trimLength = trailingMatch[0].length;
+      const newData = textNode.data.slice(0, -trimLength);
+      if (newData) {
+        textNode.data = newData;
+        textNode.endIndex = textNode.startIndex + newData.length - 1;
+      } else {
+        mod.__dom.children.pop();
+        const newLast = mod.__dom.children.at(-1);
+        if (newLast) (newLast as { next?: unknown }).next = null;
+      }
+    }
     mod.__source = mod.__source.slice(0, -trailingMatch[0].length);
   }
 }
@@ -534,6 +557,7 @@ function insertWhitespaceBefore(
   } else {
     mod.__prependLeft(startPos, whitespace);
     mod.__trackDelta(prependLeftDelta(startPos, whitespace));
+    spliceTextNodeBefore(node as SourceChildNode, whitespace, startPos);
   }
 }
 
@@ -553,7 +577,70 @@ function insertWhitespaceAfter(
   } else {
     mod.__appendRight(endPos, whitespace);
     mod.__trackDelta(appendRightDelta(endPos, whitespace));
+    spliceTextNodeAfter(node as SourceChildNode, whitespace, endPos);
   }
+}
+
+/**
+ * Create a text node and splice it into the parent's children array
+ * before the reference node.  This keeps the AST consistent with the
+ * source string after raw insertions on comment/directive nodes.
+ */
+function spliceTextNodeBefore(referenceNode: SourceChildNode, data: string, position: number): void {
+  const parent = (referenceNode as { parent?: { children?: SourceChildNode[] } }).parent;
+  if (!parent?.children) return;
+
+  const textNode = createTextNode(data, position);
+  (textNode as { parent?: unknown }).parent = parent;
+
+  const index = parent.children.indexOf(referenceNode);
+  if (index === -1) return;
+
+  // Link siblings
+  const previous = parent.children[index - 1] ?? null;
+  (textNode as { prev?: unknown }).prev = previous;
+  (textNode as { next?: unknown }).next = referenceNode;
+  if (previous) (previous as { next?: unknown }).next = textNode;
+  (referenceNode as { prev?: unknown }).prev = textNode;
+
+  parent.children.splice(index, 0, textNode as SourceChildNode);
+}
+
+function spliceTextNodeAfter(referenceNode: SourceChildNode, data: string, position: number): void {
+  const parent = (referenceNode as { parent?: { children?: SourceChildNode[] } }).parent;
+  if (!parent?.children) return;
+
+  const textNode = createTextNode(data, position);
+  (textNode as { parent?: unknown }).parent = parent;
+
+  const index = parent.children.indexOf(referenceNode);
+  if (index === -1) return;
+
+  // Link siblings
+  const next = parent.children[index + 1] ?? null;
+  (textNode as { prev?: unknown }).prev = referenceNode;
+  (textNode as { next?: unknown }).next = next;
+  (referenceNode as { next?: unknown }).next = textNode;
+  if (next) (next as { prev?: unknown }).prev = textNode;
+
+  parent.children.splice(index + 1, 0, textNode as SourceChildNode);
+}
+
+function createTextNode(data: string, position: number): SourceText {
+  // Construct a minimal SourceText-compatible object.
+  // domhandler Text nodes are duck-typed — the AST walker and
+  // nodeToString only check type, data, startIndex, endIndex.
+  return {
+    type: 'text',
+    data,
+    startIndex: position,
+    endIndex: position + data.length - 1,
+    // These will be set by spliceTextNode*
+    parent: null,
+    prev: null,
+    next: null,
+    nodeType: 3,
+  } as unknown as SourceText;
 }
 
 // ---------------------------------------------------------------------------
