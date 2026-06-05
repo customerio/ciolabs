@@ -458,14 +458,17 @@ function collapseConsecutiveBlankLines(mod: HtmlMod): void {
 }
 
 /**
- * Collect source ranges of content inside preserved elements (pre, code,
- * textarea).  Scans the raw source string directly — works regardless of
- * whether the AST is synced, and catches preserved elements inside
- * conditional comments (which are comment text to the parser).
+ * Collect source ranges of content that must not be modified by
+ * post-processing (collapse, trim).  Includes:
+ * - Whitespace-preserved elements: pre, code, textarea
+ * - Raw-text elements: script, style
+ *
+ * Scans the raw source string directly — works regardless of whether the
+ * AST is synced, and catches elements inside conditional comments.
  */
 function buildPreservedContentRanges(mod: HtmlMod): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
-  const preservedTagRegex = /<(pre|code|textarea)\b[^>]*>([\S\s]*?)<\/\1>/gi;
+  const preservedTagRegex = /<(pre|code|textarea|script|style)\b[^>]*>([\S\s]*?)<\/\1>/gi;
   for (const match of mod.__source.matchAll(preservedTagRegex)) {
     const openTagEnd = match.index + match[0].indexOf('>') + 1;
     const closeTagStart = match.index + match[0].lastIndexOf('</');

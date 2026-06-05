@@ -1339,6 +1339,16 @@ describe('collapseBlankLines + preserved content', () => {
     const result = prettify('<div><textarea>x\n\n\ny</textarea></div>');
     expect(result.__source).toContain('x\n\n\ny');
   });
+
+  test('does not collapse blank lines inside script', () => {
+    const result = prettify('<head><script>const x = `line1\n\n\nline2`;</script></head>');
+    expect(result.__source).toContain('line1\n\n\nline2');
+  });
+
+  test('does not collapse blank lines inside style', () => {
+    const result = prettify('<head><style>\n\n\n.foo { color: red; }\n\n\n</style></head>');
+    expect(result.__source).toContain('\n\n\n.foo');
+  });
 });
 
 // ---------------------------------------------------------------------------
