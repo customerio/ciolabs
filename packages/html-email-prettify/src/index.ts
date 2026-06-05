@@ -144,12 +144,18 @@ function formatChildren(
     // --- Whitespace text nodes between siblings --------------------------
     // In a block context, normalize whitespace-only text nodes to the
     // correct indentation regardless of what follows (block or inline).
-    // Skip text nodes that sit between bubble comment pairs — those are
-    // inside a single-line conditional and must not be touched.
+    // Skip when:
+    // - The text sits between bubble comment pairs (single-line conditional)
+    // - The text separates two display:inline-block elements (column gap)
     if (isText(child)) {
       const textNode = child as SourceText;
+      const nextSibling = childArray[index + 1];
+      const betweenInlineBlocks =
+        previous && nextSibling && hasInlineBlockStyle(previous) && hasInlineBlockStyle(nextSibling);
+
       if (
         isWhitespaceOnly(textNode.data) &&
+        !betweenInlineBlocks &&
         !(hasBubbleSibling && isTextBetweenBubbleComments(index, childArray, bubbleCommentData))
       ) {
         setTextContent(mod, textNode, `\n${isLast ? parentIndent : childIndent}`);
@@ -414,44 +420,64 @@ function isMultiLineConditional(node: { data?: string }): boolean {
 
 /**
  * Check whether a text node at `index` in `childArray` sits between
- * two comments that form a single-line bubble conditional.  This is a
- * position-independent check — it walks siblings by array index, so it
- * survives source mutations that shift absolute offsets.
+ * an open and close comment that form a single-line bubble conditional.
+ *
+ * Tracks matched pairs so two separate conditionals in the same list
+ * don't falsely protect the gap between them.  Open comments have data
+ * containing `[if` and close comments have data containing `[endif]`.
  */
 function isTextBetweenBubbleComments(
   index: number,
   childArray: Array<SourceElement | SourceText | SourceChildNode>,
   bubbleData: Set<string>
 ): boolean {
-  // Scan backwards for a bubble open comment
+  // Scan backwards for the nearest bubble OPEN comment (data has "[if")
   let foundOpen = false;
   for (let before = index - 1; before >= 0; before--) {
     const node = childArray[before];
-    if (isComment(node) && bubbleData.has((node as { data?: string }).data ?? '')) {
+    if (!isComment(node)) continue;
+    const data = (node as { data?: string }).data ?? '';
+    if (!bubbleData.has(data)) continue;
+
+    if (/\[if\s/i.test(data)) {
+      // Found an open — but only if there's no close between it and us
+      // (which would mean a complete conditional before our text node)
       foundOpen = true;
       break;
+    }
+    if (/\[endif]/i.test(data)) {
+      // Hit a close comment before finding an open — we're outside
+      return false;
     }
   }
   if (!foundOpen) return false;
 
-  // Scan forwards for a bubble close comment
+  // Scan forwards for the matching bubble CLOSE comment (data has "[endif]")
   for (let after = index + 1; after < childArray.length; after++) {
     const node = childArray[after];
-    if (isComment(node) && bubbleData.has((node as { data?: string }).data ?? '')) {
+    if (!isComment(node)) continue;
+    const data = (node as { data?: string }).data ?? '';
+    if (!bubbleData.has(data)) continue;
+
+    if (/\[endif]/i.test(data)) {
       return true;
+    }
+    if (/\[if\s/i.test(data)) {
+      // Hit a new open before finding the close — we're outside
+      return false;
     }
   }
   return false;
 }
 
 /**
- * Check whether either adjacent node is a comment that belongs to a
- * single-line bubble/revealed conditional.  This protects patterns like
- * `<!--[if !mso]><!-->...<![endif]-->` where inserting whitespace next
- * to the comment would break inline-block layouts.
+ * Check whether two adjacent non-text nodes are both inside the same
+ * single-line bubble conditional.  Returns true only when:
+ * - nodeA is a bubble open comment and nodeB is content after it, OR
+ * - nodeA is content and nodeB is a bubble close comment
  *
- * Unlike position-range checks, this uses comment data strings which
- * don't shift during formatting.
+ * Does NOT protect the gap between a close and a subsequent open —
+ * that's between two separate conditionals and should be formatted.
  */
 function isBubbleCommentBoundary(
   nodeA: SourceElement | SourceText | SourceChildNode,
@@ -459,12 +485,19 @@ function isBubbleCommentBoundary(
   bubbleData: Set<string>
 ): boolean {
   if (bubbleData.size === 0) return false;
-  for (const node of [nodeA, nodeB]) {
-    if (isComment(node)) {
-      const data = (node as { data?: string }).data ?? '';
-      if (bubbleData.has(data)) return true;
-    }
+
+  // nodeA is a bubble open → nodeB is inside the conditional
+  if (isComment(nodeA)) {
+    const data = (nodeA as { data?: string }).data ?? '';
+    if (bubbleData.has(data) && /\[if\s/i.test(data)) return true;
   }
+
+  // nodeB is a bubble close → nodeA is inside the conditional
+  if (isComment(nodeB)) {
+    const data = (nodeB as { data?: string }).data ?? '';
+    if (bubbleData.has(data) && /\[endif]/i.test(data)) return true;
+  }
+
   return false;
 }
 

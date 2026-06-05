@@ -697,6 +697,16 @@ describe('whitespace-sensitive email patterns', () => {
     expect(result).toContain('</div><div style="display:inline-block;width:50%;">Col 2</div>');
   });
 
+  test('inline-block columns with existing whitespace text node stay adjacent', () => {
+    // Already-formatted source with a space between inline-block elements.
+    // The formatter must not expand this to a newline + indent.
+    const result = format(
+      '<div style="font-size:0;"><div style="display:inline-block;width:50%;">Col 1</div> <div style="display:inline-block;width:50%;">Col 2</div></div>'
+    );
+    // Should NOT have a newline between the two inline-block divs
+    expect(result).not.toMatch(/<\/div>\n\s*<div style="display:inline-block;width:50%;">Col 2/);
+  });
+
   test('inline-block div next to block element gets separated', () => {
     const result = format('<td><div style="display:inline-block;">A</div><p>B</p></td>');
     // The p is not inline-block, so whitespace should be inserted
@@ -996,6 +1006,21 @@ describe('downlevel-revealed conditional comments', () => {
     // The space between <p>A</p> and <p>B</p> must survive — it's inside
     // a single-line bubble conditional.
     expect(result).toContain('<p>A</p> <p>B</p>');
+  });
+
+  test('two bubble conditionals in same sibling list: gap between them is formatted', () => {
+    // Two separate revealed conditionals with a block element between them.
+    // The whitespace between the first close and second open should NOT
+    // be protected — it's outside both conditionals.
+    const result = format(
+      '<div><!--[if !mso]><!--><span>A</span><!--<![endif]--><p>middle</p><!--[if !mso]><!--><span>B</span><!--<![endif]--></div>'
+    );
+
+    // Content inside each conditional is preserved
+    expect(result).toContain('<span>A</span>');
+    expect(result).toContain('<span>B</span>');
+    // The <p> between them should be on its own line (formatted)
+    expect(result).toMatch(/\n\s+<p>middle<\/p>/);
   });
 });
 
