@@ -146,6 +146,13 @@ export default function prettify(input: HtmlMod | string, options?: PrettifyOpti
 
   trimFormattingWhitespace(mod);
 
+  // Re-sync the AST to match the final source.  Formatting uses a mix of
+  // AST-aware operations (HtmlModElement.before/after, HtmlModText.innerHTML)
+  // and raw string operations (for comments/directives).  The raw operations
+  // track position deltas but don't create/remove AST text nodes.  A final
+  // re-parse ensures the AST is fully consistent for downstream consumers.
+  resetHtmlMod(mod, mod.__source);
+
   return mod;
 }
 
@@ -311,67 +318,96 @@ function formatInsideConditionalComment(
  *   style="margin:1em 0">
  * ```
  *
- * Rewrites the inside of opening tags in a single pass.  Each tag's
- * attribute positions shift independently, making incremental AST
- * updates impractical — a re-parse is the correct approach here.
+ * Walks the AST to find elements (safe from comments/inline text),
+ * then rewrites their opening tags.  A re-parse at the end of prettify()
+ * syncs the AST.
  */
 function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
   const { maxLineLength, wrapAttributes, indent } = options;
-  const openTagRegex = /(<[a-z][\da-z-]*)((?:\s+[^\s/=>]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)+)(\s*\/?>)/gi;
 
+  // Collect elements that need wrapping, with their source positions.
+  // Walk the AST so we only touch real element opening tags.
+  const targets: Array<{ element: SourceElement; openTagSource: string; startIndex: number }> = [];
+
+  const walk = (nodes: Iterable<SourceElement | SourceText | SourceChildNode>) => {
+    for (const node of nodes) {
+      if (!isTag(node)) continue;
+      const element = node as SourceElement;
+
+      // Check if this element's opening tag needs wrapping
+      if (element.source.attributes.length > 0) {
+        const openStart = element.source.openTag.startIndex;
+        const openEnd = element.source.openTag.endIndex + 1;
+        const openTagSource = mod.__source.slice(openStart, openEnd);
+
+        const lineStart = mod.__source.lastIndexOf('\n', openStart) + 1;
+        const leadingLength = openStart - lineStart;
+        const tagLineLength = leadingLength + openTagSource.length;
+
+        if (wrapAttributes !== 'auto' || tagLineLength > maxLineLength) {
+          targets.push({ element, openTagSource, startIndex: openStart });
+        }
+      }
+
+      // Always walk children
+      if (element.children.length > 0) {
+        walk(element.children as Iterable<SourceElement | SourceText | SourceChildNode>);
+      }
+    }
+  };
+  walk(mod.__dom.children as Iterable<SourceElement | SourceText | SourceChildNode>);
+
+  if (targets.length === 0) return;
+
+  // Process from end to start so earlier positions stay valid
   let newSource = mod.__source;
-  let offset = 0;
+  for (let index = targets.length - 1; index >= 0; index--) {
+    const { element, openTagSource, startIndex } = targets[index];
+    const openEnd = element.source.openTag.endIndex + 1;
 
-  for (const match of mod.__source.matchAll(openTagRegex)) {
-    const fullMatch = match[0];
-    const tagStart = match[1];
-    const attributesPart = match[2];
-    const closing = match[3];
-    const matchIndex = match.index;
+    // Parse tag name and attributes from the source
+    const tagNameMatch = /^<([^\s/=>]+)/.exec(openTagSource);
+    if (!tagNameMatch) continue;
+    const tagName = tagNameMatch[0]; // e.g. "<table"
 
-    const lineStart = mod.__source.lastIndexOf('\n', matchIndex) + 1;
-    const leadingWhitespace = mod.__source.slice(lineStart, matchIndex);
-
-    if (wrapAttributes === 'auto' && leadingWhitespace.length + fullMatch.length <= maxLineLength) continue;
-
-    const attributes = parseAttributes(attributesPart);
+    // Extract individual attribute strings from source attributes
+    const attributes: string[] = [];
+    for (const attribute of element.source.attributes) {
+      attributes.push(attribute.source.data);
+    }
     if (attributes.length === 0) continue;
+
+    // Get the closing part (> or />)
+    const lastAttributeEnd = element.source.attributes.at(-1)!.source.endIndex + 1;
+    const closing = openTagSource.slice(lastAttributeEnd - startIndex);
+
+    // Build replacement
+    const lineStart = newSource.lastIndexOf('\n', startIndex) + 1;
+    const leadingWhitespace = newSource.slice(lineStart, startIndex);
 
     let replacement: string;
     if (wrapAttributes === 'force-aligned') {
-      const alignIndent = ' '.repeat(leadingWhitespace.length + tagStart.length + 1);
-      replacement = `${tagStart} ${attributes[0]}`;
+      const alignIndent = ' '.repeat(leadingWhitespace.length + tagName.length + 1);
+      replacement = `${tagName} ${attributes[0]}`;
       for (let attributeIndex = 1; attributeIndex < attributes.length; attributeIndex++) {
         replacement += `\n${alignIndent}${attributes[attributeIndex]}`;
       }
       replacement += closing;
     } else {
       const attributeIndent = leadingWhitespace + indent;
-      replacement = tagStart;
+      replacement = tagName;
       for (const attribute of attributes) {
         replacement += `\n${attributeIndent}${attribute}`;
       }
       replacement += closing;
     }
 
-    const shiftedIndex = matchIndex + offset;
-    newSource = newSource.slice(0, shiftedIndex) + replacement + newSource.slice(shiftedIndex + fullMatch.length);
-    offset += replacement.length - fullMatch.length;
+    newSource = newSource.slice(0, startIndex) + replacement + newSource.slice(openEnd);
   }
 
   if (newSource !== mod.__source) {
-    resetHtmlMod(mod, newSource);
+    mod.__source = newSource;
   }
-}
-
-function parseAttributes(attributesPart: string): string[] {
-  const attributes: string[] = [];
-  const regex = /\s+([^\s/=>]+(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)/g;
-  let match;
-  while ((match = regex.exec(attributesPart)) !== null) {
-    attributes.push(match[1]);
-  }
-  return attributes;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,22 +416,55 @@ function parseAttributes(attributesPart: string): string[] {
 
 /**
  * Collapse runs of 3+ consecutive newlines into 2 (one blank line).
- * Processes from end to start so positions stay valid.
+ * Skips content inside preserved elements (pre, code, textarea).
  */
 function collapseConsecutiveBlankLines(mod: HtmlMod): void {
+  // Build a set of character ranges to protect
+  const protectedRanges = buildPreservedContentRanges(mod);
+
   const matches = [...mod.__source.matchAll(/\n{3,}/g)];
   if (matches.length === 0) return;
 
+  // Process from end to start so positions stay valid
   for (let index = matches.length - 1; index >= 0; index--) {
     const match = matches[index];
-    const start = match.index + 2;
-    const end = match.index + match[0].length;
+    const matchStart = match.index;
+
+    // Skip if this match is inside a preserved element
+    if (protectedRanges.some(([start, end]) => matchStart >= start && matchStart < end)) continue;
+
+    const start = matchStart + 2;
+    const end = matchStart + match[0].length;
     mod.__source = mod.__source.slice(0, start) + mod.__source.slice(end);
     mod.__trackDelta(removeDelta(start, end));
   }
 
   mod.__cachedInnerHTML = new WeakMap();
   mod.__cachedOuterHTML = new WeakMap();
+}
+
+/**
+ * Collect source ranges of content inside preserved elements (pre, code,
+ * textarea).  Used to protect these ranges from post-processing operations.
+ */
+function buildPreservedContentRanges(mod: HtmlMod): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  const walk = (nodes: Iterable<SourceElement | SourceText | SourceChildNode>) => {
+    for (const node of nodes) {
+      if (isTag(node)) {
+        const element = node as SourceElement;
+        if (isPreserved(element)) {
+          const contentStart = element.source.openTag.endIndex + 1;
+          const contentEnd = element.source.closeTag?.startIndex ?? element.endIndex;
+          ranges.push([contentStart, contentEnd]);
+        } else if (element.children.length > 0) {
+          walk(element.children as Iterable<SourceElement | SourceText | SourceChildNode>);
+        }
+      }
+    }
+  };
+  walk(mod.__dom.children as Iterable<SourceElement | SourceText | SourceChildNode>);
+  return ranges;
 }
 
 function trimFormattingWhitespace(mod: HtmlMod): void {

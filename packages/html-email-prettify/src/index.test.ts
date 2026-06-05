@@ -1277,3 +1277,75 @@ describe('NBSP in conditional comments', () => {
     expect(result).toContain('\u00A0');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: AST sync after formatting
+// ---------------------------------------------------------------------------
+
+describe('AST consistency', () => {
+  test('querySelector returns consistent innerHTML after formatting', () => {
+    const mod = prettify('<div><!--x--><p>a</p></div>');
+    const div = mod.querySelector('div');
+    expect(div).not.toBeNull();
+    // The innerHTML should match what's between <div> and </div> in __source
+    const divMatch = /<div>([\S\s]*)<\/div>/.exec(mod.__source);
+    expect(divMatch).not.toBeNull();
+    expect(div!.innerHTML).toBe(divMatch![1]);
+  });
+
+  test('querySelector works correctly after formatting', () => {
+    const mod = prettify('<div><p class="test">hello</p></div>');
+    const p = mod.querySelector('p');
+    expect(p).not.toBeNull();
+    expect(p!.getAttribute('class')).toBe('test');
+    expect(p!.innerHTML).toBe('hello');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: collapseBlankLines preserves pre/code/textarea
+// ---------------------------------------------------------------------------
+
+describe('collapseBlankLines + preserved content', () => {
+  test('does not collapse blank lines inside pre', () => {
+    const result = prettify('<div><pre>line1\n\n\nline2</pre></div>');
+    expect(result.__source).toContain('line1\n\n\nline2');
+  });
+
+  test('does not collapse blank lines inside code', () => {
+    const result = prettify('<div><code>a\n\n\nb</code></div>');
+    expect(result.__source).toContain('a\n\n\nb');
+  });
+
+  test('does not collapse blank lines inside textarea', () => {
+    const result = prettify('<div><textarea>x\n\n\ny</textarea></div>');
+    expect(result.__source).toContain('x\n\n\ny');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: attribute wrapping doesn't corrupt comments
+// ---------------------------------------------------------------------------
+
+describe('attribute wrapping safety', () => {
+  test('does not wrap attributes inside conditional comments', () => {
+    const result = prettify(
+      '<!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td><![endif]-->',
+      { maxLineLength: 40 }
+    );
+    // The conditional comment content should remain intact
+    expect(result.__source).toContain(
+      '<!--[if mso]><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td><![endif]-->'
+    );
+  });
+
+  test('does not corrupt inline text when wrapping nearby element', () => {
+    const result = prettify(
+      '<div><p>Hello <a href="https://example.com" style="color: red; text-decoration: none; font-weight: bold;">link</a></p></div>',
+      { maxLineLength: 40 }
+    );
+    // The <p>Hello text should not appear on attribute lines
+    expect(result.__source).toContain('Hello');
+    expect(result.__source).toContain('link</a>');
+  });
+});
