@@ -8,6 +8,7 @@ Open source libraries and configurations used at [Customer.io](https://customer.
 - [@ciolabs/config-prettier](./packages/config-prettier) - Shared Prettier configuration for Customer.io projects
 - [@ciolabs/framecast](./packages/framecast) - TypeScript cross-frame communication library
 - [@ciolabs/html-email-formatter](./packages/html-email-formatter) - Format and prettify HTML email content with conditional comment support
+- [@ciolabs/html-email-prettify](./packages/html-email-prettify) - AST-based email HTML formatter with email-safe whitespace handling
 - [@ciolabs/html-find-conditional-comments](./packages/html-find-conditional-comments) - Finds all conditional comments in a string
 - [@ciolabs/html-preserve-comment-whitespace](./packages/html-preserve-comment-whitespace) - Preserves the presence or lack thereof of whitespace surrounding HTML comments
 - [@ciolabs/html-process-conditional-comments](./packages/html-process-conditional-comments) - Makes it easy to safely process HTML inside of conditional comments
