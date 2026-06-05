@@ -57,8 +57,8 @@ describe('basic formatting', () => {
     const result = format(
       `<!DOCTYPE html><html><head><title>Test</title></head><body><div><p>hello</p></div></body></html>`
     );
-    expect(result).toContain('<!DOCTYPE html>');
-    expect(result).toContain('<html>');
+    // DOCTYPE and html should be on separate lines
+    expect(result).toMatch(/<!DOCTYPE html>\n<html>/);
     expect(result).toContain('</html>');
     // Content should be indented
     expect(result).toMatch(/\s+<p>hello<\/p>/);
@@ -1022,5 +1022,51 @@ describe('legacy inline elements', () => {
   test('wbr stays inline', () => {
     const result = format('<p>longword<wbr/>here</p>');
     expect(result).toContain('longword<wbr/>here');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: case-insensitive conditional comments
+// ---------------------------------------------------------------------------
+
+describe('case-insensitive conditional comments', () => {
+  test('uppercase IF is recognized as multi-line conditional', () => {
+    const result = format(`<!--[IF mso]>
+<table><tr><td>x</td></tr></table>
+<![endif]-->`);
+
+    expect(result).toContain('<table>');
+    expect(result).toContain('<tr>');
+    expect(result).toContain('<td>x</td>');
+  });
+
+  test('mixed case conditional comment gets formatted', () => {
+    const result = format(`<div>
+<!--[IF MSO]>
+<table><tr><td>content</td></tr></table>
+<![ENDIF]-->
+</div>`);
+
+    expect(result).toContain('<!--[IF MSO]>');
+    expect(result).toContain('<![ENDIF]-->');
+    expect(result).toContain('<table>');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: DOCTYPE directive formatting
+// ---------------------------------------------------------------------------
+
+describe('DOCTYPE formatting', () => {
+  test('html tag goes on its own line after DOCTYPE', () => {
+    const result = format('<!DOCTYPE html><html><body><p>hi</p></body></html>');
+    const lines = result.split('\n');
+    expect(lines[0]).toBe('<!DOCTYPE html>');
+    expect(lines[1]).toBe('<html>');
+  });
+
+  test('DOCTYPE is preserved exactly', () => {
+    const result = format('<!DOCTYPE html><html><body></body></html>');
+    expect(result).toContain('<!DOCTYPE html>');
   });
 });

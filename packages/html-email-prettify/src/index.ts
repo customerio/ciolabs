@@ -1,7 +1,7 @@
 import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 import { HtmlMod, HtmlModElement, HtmlModText } from '@ciolabs/html-mod';
 import type { SourceElement, SourceText, SourceChildNode } from '@ciolabs/htmlparser2-source';
-import { isComment, isTag, isText } from '@ciolabs/htmlparser2-source';
+import { isComment, isDirective, isTag, isText } from '@ciolabs/htmlparser2-source';
 
 /**
  * Inline HTML elements — we never add newlines around these.
@@ -118,7 +118,10 @@ function formatChildren(
   // whitespace *around* them, just not inside them.
   // Multi-line conditional comments also count — they need internal formatting.
   const hasBlock = childArray.some(
-    child => (isTag(child) && !isInline(child as SourceElement)) || (isComment(child) && isMultiLineConditional(child))
+    child =>
+      (isTag(child) && !isInline(child as SourceElement)) ||
+      (isComment(child) && isMultiLineConditional(child)) ||
+      isDirective(child)
   );
 
   if (!hasBlock) return;
@@ -159,7 +162,7 @@ function formatChildren(
       // First child — insert whitespace after parent open tag.
       if (isTag(child)) {
         insertBeforeIfNeeded(mod, child as SourceElement, `\n${childIndent}`);
-      } else if (isComment(child)) {
+      } else if (isComment(child) || isDirective(child)) {
         insertBeforeComment(mod, child, `\n${childIndent}`);
       }
     } else if (
@@ -175,7 +178,7 @@ function formatChildren(
       //   conditional (e.g. <!--[if !mso]><!-->...<![endif]-->)
       if (isTag(previous)) {
         insertAfterIfNeeded(mod, previous as SourceElement, `\n${childIndent}`);
-      } else if (isComment(previous)) {
+      } else if (isComment(previous) || isDirective(previous)) {
         insertAfterComment(mod, previous, `\n${childIndent}`);
       }
     }
@@ -221,6 +224,11 @@ function formatChildren(
         formatInsideConditionalComment(mod, child, depth + 1, indent);
       }
     }
+
+    // --- Directive nodes (<!DOCTYPE html>, etc.) --------------------------
+    if (isDirective(child) && isLast) {
+      insertAfterComment(mod, child, `\n${parentIndent}`);
+    }
   }
 }
 
@@ -244,8 +252,8 @@ function formatInsideConditionalComment(
   const { data, startIndex, endIndex } = commentNode;
 
   // Extract the opening conditional (e.g., "[if mso]>") and closing (e.g., "<![endif]")
-  const openMatch = /^\[if\s[^]*?]>/.exec(data);
-  const closeMatch = /<!\[endif]$/.exec(data);
+  const openMatch = /^\[if\s[^]*?]>/i.exec(data);
+  const closeMatch = /<!\[endif]$/i.exec(data);
   if (!openMatch || !closeMatch) return;
 
   const rawInnerHtml = data.slice(openMatch[0].length, data.length - closeMatch[0].length);
@@ -393,12 +401,14 @@ function isWhitespaceOnly(string_: string): boolean {
 function isMultiLineConditional(node: { data?: string }): boolean {
   if (!node.data) return false;
   const { data } = node;
-  if (!data.startsWith('[if ')) return false;
-  if (!data.endsWith('<![endif]')) return false;
+  if (!/^\[if\s/i.test(data)) return false;
+  if (!/\[endif]$/i.test(data)) return false;
   // Extract inner content
-  const openMatch = /^\[if\s[^]*?]>/.exec(data);
+  const openMatch = /^\[if\s[^]*?]>/i.exec(data);
   if (!openMatch) return false;
-  const inner = data.slice(openMatch[0].length, data.length - '<![endif]'.length);
+  const closeMatch = /<!\[endif]$/i.exec(data);
+  if (!closeMatch) return false;
+  const inner = data.slice(openMatch[0].length, data.length - closeMatch[0].length);
   return inner.includes('\n');
 }
 
