@@ -60,16 +60,26 @@ prettify(input, {
 
 Attributes are broken onto new lines using the "break before attribute" style, which saves a character:
 
-```html
-<!-- Before -->
-<table cellpadding="0" cellspacing="0" border="0" width="600" align="center">
-  <!-- After (wrapAttributes: 'auto' or 'force') -->
-  <table cellpadding="0" cellspacing="0" border="0" width="600" align="center">
-    <!-- After (wrapAttributes: 'force-aligned') -->
-    <table cellpadding="0" cellspacing="0" border="0" width="600" align="center"></table>
-  </table>
-</table>
-```
+Before:
+
+    <table cellpadding="0" cellspacing="0" border="0" width="600" align="center">
+
+After (`wrapAttributes: 'auto'` or `'force'`):
+
+    <table
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      width="600"
+      align="center">
+
+After (`wrapAttributes: 'force-aligned'`):
+
+    <table cellpadding="0"
+           cellspacing="0"
+           border="0"
+           width="600"
+           align="center">
 
 Tags that start mid-line (e.g. `<p>Hello <a href="...">`) are not wrapped — only tags at the start of a line.
 

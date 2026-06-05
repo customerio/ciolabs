@@ -122,9 +122,12 @@ function resolveOptions(options?: PrettifyOptions): ResolvedOptions {
 /**
  * Format and prettify HTML email content.
  *
- * Walks the html-mod AST and adjusts whitespace text nodes in place —
- * no re-parse, no full-string rewrite.  The `HtmlMod` instance stays
- * live with valid positions throughout.
+ * Walks the html-mod AST and adjusts whitespace text nodes, then
+ * re-parses to sync the AST.  The returned `HtmlMod` has a consistent
+ * AST for further edits.
+ *
+ * **Note:** Any `HtmlModElement` handles captured before calling
+ * `prettify(mod)` will be stale — re-query after formatting.
  *
  * - If `HtmlMod`, the instance is mutated in place and returned.
  * - If `string`, a new `HtmlMod` is created, formatted, and returned.
@@ -357,8 +360,8 @@ function wrapLongAttributes(mod: HtmlMod, options: ResolvedOptions): void {
         }
       }
 
-      // Always walk children
-      if (element.children.length > 0) {
+      // Walk children unless this is a preserved element (pre/code/textarea)
+      if (!isPreserved(element) && element.children.length > 0) {
         walk(element.children as Iterable<SourceElement | SourceText | SourceChildNode>);
       }
     }
@@ -458,10 +461,14 @@ function collapseConsecutiveBlankLines(mod: HtmlMod): void {
 
 /**
  * Collect source ranges of content inside preserved elements (pre, code,
- * textarea).  Used to protect these ranges from post-processing operations.
+ * textarea).  Walks the AST and also scans the raw source with regex to
+ * catch preserved elements inside conditional comments (which are comment
+ * text to the parser, not in the AST).
  */
 function buildPreservedContentRanges(mod: HtmlMod): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
+
+  // Walk the AST for top-level preserved elements
   const walk = (nodes: Iterable<SourceElement | SourceText | SourceChildNode>) => {
     for (const node of nodes) {
       if (isTag(node)) {
@@ -477,6 +484,19 @@ function buildPreservedContentRanges(mod: HtmlMod): Array<[number, number]> {
     }
   };
   walk(mod.__dom.children as Iterable<SourceElement | SourceText | SourceChildNode>);
+
+  // Also scan raw source for preserved elements inside comments
+  // (conditional comment content is not in the AST)
+  const preservedTagRegex = /<(pre|code|textarea)\b[^>]*>([\S\s]*?)<\/\1>/gi;
+  for (const match of mod.__source.matchAll(preservedTagRegex)) {
+    const openTagEnd = match.index + match[0].indexOf('>') + 1;
+    const closeTagStart = match.index + match[0].lastIndexOf('</');
+    // Only add if not already covered by an AST range
+    if (!ranges.some(([start, end]) => openTagEnd >= start && closeTagStart <= end)) {
+      ranges.push([openTagEnd, closeTagStart]);
+    }
+  }
+
   return ranges;
 }
 

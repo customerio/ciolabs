@@ -1410,3 +1410,36 @@ describe('force wrap without maxLineLength', () => {
     expect(result.__source).toMatch(/\n\s+id="y"/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: wrap skips preserved element children
+// ---------------------------------------------------------------------------
+
+describe('attribute wrapping + preserved elements', () => {
+  test('does not wrap attributes inside pre', () => {
+    const result = prettify('<pre>\n<span class="long-class-name" style="color:red">x</span>\n</pre>', {
+      maxLineLength: 20,
+    });
+    // The span inside pre should NOT be wrapped
+    expect(result.__source).not.toContain('<span\n');
+    expect(result.__source).toContain('class="long-class-name"');
+  });
+
+  test('does not wrap attributes inside code', () => {
+    const result = prettify('<code><a href="x" class="y" style="z">link</a></code>', {
+      wrapAttributes: 'force',
+    });
+    expect(result.__source).not.toContain('<a\n');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: collapse skips pre inside conditional comments
+// ---------------------------------------------------------------------------
+
+describe('collapse + pre inside conditional comments', () => {
+  test('preserves blank lines in pre inside conditional comment', () => {
+    const result = format('<!--[if mso]>\n<pre>line1\n\n\nline2</pre>\n<![endif]-->');
+    expect(result).toContain('line1\n\n\nline2');
+  });
+});
