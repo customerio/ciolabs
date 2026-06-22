@@ -13,7 +13,14 @@ import { decode } from 'html-entities';
 
 import * as AstManipulator from './ast-manipulator';
 import { AstUpdater } from './ast-updater';
-import { getContentStart, getContentEnd, makeClosingTag, isSelfClosing, hasTrailingSlash } from './element-utils';
+import {
+  getContentStart,
+  getContentEnd,
+  getOuterEnd,
+  makeClosingTag,
+  isSelfClosing,
+  hasTrailingSlash,
+} from './element-utils';
 import { calculateRemoveDelta, type PositionDelta } from './position-delta';
 import { atomicOverwrite, atomicAppendRight, atomicPrependLeft, atomicRemove } from './string-operations';
 
@@ -120,14 +127,16 @@ export class HtmlMod {
     const children = this.__dom.children;
     while (remaining > 0 && children.length > 0) {
       const node = children.at(-1);
-      if (node.type !== 'text') break;
+      if (!node || node.type !== 'text') break;
       const dataLength = node.data.length;
       if (dataLength <= remaining) {
         children.pop();
         remaining -= dataLength;
       } else {
         node.data = node.data.slice(0, dataLength - remaining);
-        node.endIndex = node.startIndex + node.data.length - 1;
+        if (node.startIndex != null) {
+          node.endIndex = node.startIndex + node.data.length - 1;
+        }
         remaining = 0;
       }
     }
@@ -398,7 +407,7 @@ export class HtmlModElement {
 
   get sourceRange() {
     const startIndex = this.__element.source.openTag.startIndex;
-    const endIndex = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
+    const endIndex = getOuterEnd(this.__element);
     const html = this.__htmlMod.__source;
 
     // count the lines before this element
@@ -556,10 +565,7 @@ export class HtmlModElement {
       return '';
     }
 
-    return this.__htmlMod.__source.slice(
-      this.__element.source.openTag.endIndex + 1,
-      this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex
-    );
+    return this.__htmlMod.__source.slice(getContentStart(this.__element), getContentEnd(this.__element));
   }
 
   set innerHTML(html: string) {
@@ -653,10 +659,7 @@ export class HtmlModElement {
       return cached;
     }
 
-    return this.__htmlMod.__source.slice(
-      this.__element.source.openTag.startIndex,
-      this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1
-    );
+    return this.__htmlMod.__source.slice(this.__element.source.openTag.startIndex, getOuterEnd(this.__element));
   }
 
   /**
@@ -740,7 +743,7 @@ export class HtmlModElement {
   }
 
   after(html: string) {
-    const insertPos = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
+    const insertPos = getOuterEnd(this.__element);
 
     atomicAppendRight(this.__htmlMod, insertPos, html, this.__element);
 
@@ -819,17 +822,11 @@ export class HtmlModElement {
       // Only cache if not already cached
       if (!this.__htmlMod.__cachedInnerHTML.has(node)) {
         // Read innerHTML directly from source before it changes
-        const innerHTML = this.__htmlMod.__source.slice(
-          node.source.openTag.endIndex + 1,
-          node?.source?.closeTag?.startIndex ?? node.endIndex
-        );
+        const innerHTML = this.__htmlMod.__source.slice(getContentStart(node), getContentEnd(node));
         this.__htmlMod.__cachedInnerHTML.set(node, innerHTML);
 
         // Also cache outerHTML
-        const outerHTML = this.__htmlMod.__source.slice(
-          node.source.openTag.startIndex,
-          node.source.closeTag?.endIndex ?? node.endIndex + 1
-        );
+        const outerHTML = this.__htmlMod.__source.slice(node.source.openTag.startIndex, getOuterEnd(node));
         this.__htmlMod.__cachedOuterHTML.set(node, outerHTML);
 
         this.__removed = true;
@@ -856,10 +853,7 @@ export class HtmlModElement {
     this.__cacheDescendantsInnerHTML();
 
     const removeStart = this.__element.source.openTag.startIndex;
-    const removeEnd = Math.min(
-      this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1,
-      this.__htmlMod.__source.length
-    );
+    const removeEnd = Math.min(getOuterEnd(this.__element), this.__htmlMod.__source.length);
 
     atomicRemove(this.__htmlMod, removeStart, removeEnd, this.__element);
 
@@ -876,10 +870,7 @@ export class HtmlModElement {
     this.__cacheDescendantsInnerHTML();
 
     const replaceStart = this.__element.source.openTag.startIndex;
-    const replaceEnd = Math.min(
-      this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1,
-      this.__htmlMod.__source.length
-    );
+    const replaceEnd = Math.min(getOuterEnd(this.__element), this.__htmlMod.__source.length);
 
     atomicOverwrite(this.__htmlMod, replaceStart, replaceEnd, html, this.__element);
 
