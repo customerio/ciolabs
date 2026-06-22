@@ -13,7 +13,14 @@ import { decode } from 'html-entities';
 
 import * as AstManipulator from './ast-manipulator';
 import { AstUpdater } from './ast-updater';
-import { getContentStart, getContentEnd, makeClosingTag, isSelfClosing, hasTrailingSlash } from './element-utils';
+import {
+  getContentStart,
+  getContentEnd,
+  getOuterEnd,
+  makeClosingTag,
+  isSelfClosing,
+  hasTrailingSlash,
+} from './element-utils';
 import { calculateRemoveDelta, type PositionDelta } from './position-delta';
 import { atomicOverwrite, atomicAppendRight, atomicPrependLeft, atomicRemove } from './string-operations';
 
@@ -82,6 +89,59 @@ export class HtmlMod {
     // Note: __source is already up-to-date from string operations
   }
 
+  /**
+   * Reconcile the AST after leading characters were stripped from the source.
+   *
+   * The removed region (always whitespace for the trim methods) is a contiguous
+   * prefix occupied by root-level text node(s). Fully-removed text nodes are
+   * dropped from the AST; a straddling node has its leading data trimmed. Must
+   * run BEFORE the corresponding remove delta so the delta then fixes the
+   * straddling node's endIndex (its startIndex stays at the front).
+   */
+  __reconcileLeadingTrim(count: number): void {
+    let remaining = count;
+    const children = this.__dom.children;
+    while (remaining > 0 && children.length > 0) {
+      const node = children[0];
+      if (node.type !== 'text') break;
+      const dataLength = node.data.length;
+      if (dataLength <= remaining) {
+        children.shift();
+        remaining -= dataLength;
+      } else {
+        node.data = node.data.slice(remaining);
+        remaining = 0;
+      }
+    }
+  }
+
+  /**
+   * Reconcile the AST after trailing characters were stripped from the source.
+   *
+   * Mirror of __reconcileLeadingTrim for a contiguous suffix. A straddling node
+   * keeps its startIndex, so we fix its endIndex here (the remove delta won't —
+   * the node sits before the delta's mutation start).
+   */
+  __reconcileTrailingTrim(count: number): void {
+    let remaining = count;
+    const children = this.__dom.children;
+    while (remaining > 0 && children.length > 0) {
+      const node = children.at(-1);
+      if (!node || node.type !== 'text') break;
+      const dataLength = node.data.length;
+      if (dataLength <= remaining) {
+        children.pop();
+        remaining -= dataLength;
+      } else {
+        node.data = node.data.slice(0, dataLength - remaining);
+        if (node.startIndex != null) {
+          node.endIndex = node.startIndex + node.data.length - 1;
+        }
+        remaining = 0;
+      }
+    }
+  }
+
   trim() {
     const beforeSource = this.__source;
     const afterSource = beforeSource.trim();
@@ -93,11 +153,16 @@ export class HtmlMod {
       const trimmedStart = beforeSource.length - beforeSource.trimStart().length;
       const trimmedEnd = trimmedTotal - trimmedStart;
 
-      if (trimmedStart > 0) {
-        this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
-      }
+      // Handle the trailing removal first so its delta is expressed in the
+      // original coordinate space; the leading delta then shifts everything
+      // (including the trailing-adjusted nodes) left uniformly.
       if (trimmedEnd > 0) {
+        this.__reconcileTrailingTrim(trimmedEnd);
         this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmedEnd, beforeSource.length));
+      }
+      if (trimmedStart > 0) {
+        this.__reconcileLeadingTrim(trimmedStart);
+        this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
       }
     }
 
@@ -112,6 +177,7 @@ export class HtmlMod {
     // Queue delta for removed characters at start
     const trimmed = beforeSource.length - afterSource.length;
     if (trimmed > 0) {
+      this.__reconcileLeadingTrim(trimmed);
       this.__trackDelta(calculateRemoveDelta(0, trimmed));
     }
 
@@ -126,6 +192,7 @@ export class HtmlMod {
     // Queue delta for removed characters at end
     const trimmed = beforeSource.length - afterSource.length;
     if (trimmed > 0) {
+      this.__reconcileTrailingTrim(trimmed);
       this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmed, beforeSource.length));
     }
 
@@ -160,15 +227,19 @@ export class HtmlMod {
       this.__source = keepLines.join('\n');
     }
 
-    // Track deltas
-    if (trimmedStartLines > 0) {
-      const trimmedChars = beforeLines.slice(0, trimmedStartLines).join('\n').length + 1; // +1 for final newline
-      this.__trackDelta(calculateRemoveDelta(0, trimmedChars));
-    }
-
+    // Track deltas. Trailing first (original coordinates), then leading, so the
+    // leading delta shifts everything uniformly and the two removals don't
+    // interfere with each other's coordinates.
     if (trimmedEndLines > 0) {
       const startPos = beforeLines.slice(0, beforeLines.length - trimmedEndLines).join('\n').length;
+      this.__reconcileTrailingTrim(beforeSource.length - startPos);
       this.__trackDelta(calculateRemoveDelta(startPos, beforeSource.length));
+    }
+
+    if (trimmedStartLines > 0) {
+      const trimmedChars = beforeLines.slice(0, trimmedStartLines).join('\n').length + 1; // +1 for final newline
+      this.__reconcileLeadingTrim(trimmedChars);
+      this.__trackDelta(calculateRemoveDelta(0, trimmedChars));
     }
 
     return this;
@@ -336,7 +407,7 @@ export class HtmlModElement {
 
   get sourceRange() {
     const startIndex = this.__element.source.openTag.startIndex;
-    const endIndex = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
+    const endIndex = getOuterEnd(this.__element);
     const html = this.__htmlMod.__source;
 
     // count the lines before this element
@@ -494,10 +565,7 @@ export class HtmlModElement {
       return '';
     }
 
-    return this.__htmlMod.__source.slice(
-      this.__element.source.openTag.endIndex + 1,
-      this.__element?.source?.closeTag?.startIndex ?? this.__element.endIndex
-    );
+    return this.__htmlMod.__source.slice(getContentStart(this.__element), getContentEnd(this.__element));
   }
 
   set innerHTML(html: string) {
@@ -524,7 +592,10 @@ export class HtmlModElement {
         const tagEnd = this.__element.source.openTag.endIndex + 1;
         atomicOverwrite(this.__htmlMod, slashStart, tagEnd, `>${combined}`, this.__element);
       } else {
-        const insertPos = this.__element.source.openTag.endIndex;
+        // No trailing slash (e.g. void elements like <br>, <img src="a">):
+        // insert AFTER the `>` (endIndex + 1), not before it, or the content
+        // and synthesized close tag land inside the open tag.
+        const insertPos = this.__element.source.openTag.endIndex + 1;
         atomicAppendRight(this.__htmlMod, insertPos, combined, this.__element);
       }
     } else if (isEmpty) {
@@ -555,11 +626,13 @@ export class HtmlModElement {
 
       if (html.length > 0) {
         const closeTagStart = openTagEnd + 1 + html.length;
-        const closeTagEnd = closeTagStart + closingTag.length - 1;
+        // endIndex is exclusive (one past the `>`), matching the parser's convention
+        const closeTagEnd = closeTagStart + closingTag.length;
         AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
       } else {
         const closeTagStart = openTagEnd + 1;
-        const closeTagEnd = closeTagStart + closingTag.length - 1;
+        // endIndex is exclusive (one past the `>`), matching the parser's convention
+        const closeTagEnd = closeTagStart + closingTag.length;
         AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
       }
     }
@@ -586,10 +659,7 @@ export class HtmlModElement {
       return cached;
     }
 
-    return this.__htmlMod.__source.slice(
-      this.__element.source.openTag.startIndex,
-      this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1
-    );
+    return this.__htmlMod.__source.slice(this.__element.source.openTag.startIndex, getOuterEnd(this.__element));
   }
 
   /**
@@ -619,6 +689,7 @@ export class HtmlModElement {
     const endIndex = this.__element.source.openTag.endIndex;
     const closeTag = makeClosingTag(this.tagName);
 
+    let openTagEnd: number;
     if (hasTrailingSlash(this.__element, this.__htmlMod.__source)) {
       // Replace ` />` or `/>` with `></tag>`
       // Walk back from `/` to skip whitespace before the slash
@@ -628,12 +699,20 @@ export class HtmlModElement {
         start--;
       }
       atomicOverwrite(this.__htmlMod, start, endIndex + 1, `>${closeTag}`, this.__element);
+      // The new `>` lands where the `/` (and any preceding spaces) began.
+      openTagEnd = start;
     } else {
       atomicAppendRight(this.__htmlMod, endIndex + 1, closeTag, this.__element);
+      // The `>` is unchanged.
+      openTagEnd = endIndex;
     }
 
-    // Update the AST to reflect the element is no longer self-closing
-    this.__element.source.openTag.isSelfClosing = false;
+    // Fully sync the AST to reflect the new explicit close tag: update the
+    // open-tag end, attach the close tag, and fix element.endIndex. Leaving any
+    // of these stale corrupts a later before()/after()/append()/innerHTML.
+    const closeTagStart = openTagEnd + 1;
+    const closeTagEnd = closeTagStart + closeTag.length; // exclusive, matches parser
+    AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
 
     return this;
   }
@@ -664,7 +743,7 @@ export class HtmlModElement {
   }
 
   after(html: string) {
-    const insertPos = this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1;
+    const insertPos = getOuterEnd(this.__element);
 
     atomicAppendRight(this.__htmlMod, insertPos, html, this.__element);
 
@@ -698,15 +777,20 @@ export class HtmlModElement {
     }
 
     if (selfClosing) {
-      const parsePos = originalEndIndex + 1;
+      // When the tag had a trailing slash, the overwrite replaced `/>` with a
+      // single `>`, shifting the `>` (and therefore the inserted content) left
+      // by one. parsePos must be derived from the post-overwrite open-tag end,
+      // not the original `>` position, or every inserted position drifts.
       const openTagEnd = hadSlash ? originalEndIndex - 1 : originalEndIndex;
+      const parsePos = openTagEnd + 1;
 
       const newNodes = AstManipulator.parseHtmlAtPosition(html, parsePos, this.__htmlMod.__options);
       AstManipulator.prependChild(this.__element, newNodes);
 
       const closingTag = makeClosingTag(this.__element.tagName);
       const closeTagStart = parsePos + html.length;
-      const closeTagEnd = closeTagStart + closingTag.length - 1;
+      // endIndex is exclusive (one past the `>`), matching the parser's convention
+      const closeTagEnd = closeTagStart + closingTag.length;
       AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
     } else {
       const insertPos = originalEndIndex + 1;
@@ -738,17 +822,11 @@ export class HtmlModElement {
       // Only cache if not already cached
       if (!this.__htmlMod.__cachedInnerHTML.has(node)) {
         // Read innerHTML directly from source before it changes
-        const innerHTML = this.__htmlMod.__source.slice(
-          node.source.openTag.endIndex + 1,
-          node?.source?.closeTag?.startIndex ?? node.endIndex
-        );
+        const innerHTML = this.__htmlMod.__source.slice(getContentStart(node), getContentEnd(node));
         this.__htmlMod.__cachedInnerHTML.set(node, innerHTML);
 
         // Also cache outerHTML
-        const outerHTML = this.__htmlMod.__source.slice(
-          node.source.openTag.startIndex,
-          node.source.closeTag?.endIndex ?? node.endIndex + 1
-        );
+        const outerHTML = this.__htmlMod.__source.slice(node.source.openTag.startIndex, getOuterEnd(node));
         this.__htmlMod.__cachedOuterHTML.set(node, outerHTML);
 
         this.__removed = true;
@@ -775,10 +853,7 @@ export class HtmlModElement {
     this.__cacheDescendantsInnerHTML();
 
     const removeStart = this.__element.source.openTag.startIndex;
-    const removeEnd = Math.min(
-      this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1,
-      this.__htmlMod.__source.length
-    );
+    const removeEnd = Math.min(getOuterEnd(this.__element), this.__htmlMod.__source.length);
 
     atomicRemove(this.__htmlMod, removeStart, removeEnd, this.__element);
 
@@ -795,10 +870,7 @@ export class HtmlModElement {
     this.__cacheDescendantsInnerHTML();
 
     const replaceStart = this.__element.source.openTag.startIndex;
-    const replaceEnd = Math.min(
-      this.__element.source.closeTag?.endIndex ?? this.__element.endIndex + 1,
-      this.__htmlMod.__source.length
-    );
+    const replaceEnd = Math.min(getOuterEnd(this.__element), this.__htmlMod.__source.length);
 
     atomicOverwrite(this.__htmlMod, replaceStart, replaceEnd, html, this.__element);
 
@@ -1060,7 +1132,9 @@ export class HtmlModText {
   }
 
   set innerHTML(html: string) {
-    if (!this.__text.endIndex) {
+    // Guard against an unpositioned node, but allow endIndex === 0 (a one-char
+    // text node at the very start of the document) — `!0` would drop the write.
+    if (this.__text.endIndex == null) {
       return;
     }
 
@@ -1075,7 +1149,8 @@ export class HtmlModText {
   }
 
   set textContent(text: string) {
-    if (!this.__text.endIndex) {
+    // Allow endIndex === 0 (one-char text node at index 0); `!0` would drop it.
+    if (this.__text.endIndex == null) {
       return;
     }
 
