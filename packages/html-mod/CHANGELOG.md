@@ -1,5 +1,18 @@
 # @ciolabs/html-mod
 
+## 1.1.2
+
+### Patch Changes
+
+- [#53](https://github.com/customerio/ciolabs/pull/53) [`671d5d9`](https://github.com/customerio/ciolabs/commit/671d5d96c73dd3e001346940423c35fb9598dde5) Thanks [@avigoldman](https://github.com/avigoldman)! - Fix synthesized close tags to use the open tag's source casing. The parser
+  pairs open/close tags case-sensitively, but `expandSelfClosing`,
+  `prepend`/`append`, and `innerHTML`/`textContent` synthesized a lowercase close
+  tag. On a mixed-case element (`<X-Image/>`, `<X-Card>...`), that produced
+  `<X-Image></x-image>` — which the parser will not re-pair on the next parse,
+  leaving the close tag orphaned and corrupting a later mutation (e.g. an
+  `outerHTML`/`replaceWith` that relies on the tracked close-tag range). All
+  synthesized close tags now match the open tag's casing and round-trip cleanly.
+
 ## 1.1.1
 
 ### Patch Changes
