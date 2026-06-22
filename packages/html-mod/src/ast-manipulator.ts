@@ -384,5 +384,11 @@ export function convertToRegularTag(
       data: `</${element.tagName}>`,
       name: element.tagName,
     };
+
+    // The element now ends at the close tag. Keep element.endIndex (the
+    // inclusive index of the final `>`, i.e. closeTagEnd - 1) in sync, or
+    // later position updates whose mutation starts past the stale endIndex
+    // will short-circuit and leave the close tag pointing at the wrong place.
+    element.endIndex = closeTagEnd - 1;
   }
 }

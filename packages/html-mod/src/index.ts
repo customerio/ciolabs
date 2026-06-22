@@ -524,7 +524,10 @@ export class HtmlModElement {
         const tagEnd = this.__element.source.openTag.endIndex + 1;
         atomicOverwrite(this.__htmlMod, slashStart, tagEnd, `>${combined}`, this.__element);
       } else {
-        const insertPos = this.__element.source.openTag.endIndex;
+        // No trailing slash (e.g. void elements like <br>, <img src="a">):
+        // insert AFTER the `>` (endIndex + 1), not before it, or the content
+        // and synthesized close tag land inside the open tag.
+        const insertPos = this.__element.source.openTag.endIndex + 1;
         atomicAppendRight(this.__htmlMod, insertPos, combined, this.__element);
       }
     } else if (isEmpty) {
@@ -555,11 +558,13 @@ export class HtmlModElement {
 
       if (html.length > 0) {
         const closeTagStart = openTagEnd + 1 + html.length;
-        const closeTagEnd = closeTagStart + closingTag.length - 1;
+        // endIndex is exclusive (one past the `>`), matching the parser's convention
+        const closeTagEnd = closeTagStart + closingTag.length;
         AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
       } else {
         const closeTagStart = openTagEnd + 1;
-        const closeTagEnd = closeTagStart + closingTag.length - 1;
+        // endIndex is exclusive (one past the `>`), matching the parser's convention
+        const closeTagEnd = closeTagStart + closingTag.length;
         AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
       }
     }
@@ -619,6 +624,7 @@ export class HtmlModElement {
     const endIndex = this.__element.source.openTag.endIndex;
     const closeTag = makeClosingTag(this.tagName);
 
+    let openTagEnd: number;
     if (hasTrailingSlash(this.__element, this.__htmlMod.__source)) {
       // Replace ` />` or `/>` with `></tag>`
       // Walk back from `/` to skip whitespace before the slash
@@ -628,12 +634,20 @@ export class HtmlModElement {
         start--;
       }
       atomicOverwrite(this.__htmlMod, start, endIndex + 1, `>${closeTag}`, this.__element);
+      // The new `>` lands where the `/` (and any preceding spaces) began.
+      openTagEnd = start;
     } else {
       atomicAppendRight(this.__htmlMod, endIndex + 1, closeTag, this.__element);
+      // The `>` is unchanged.
+      openTagEnd = endIndex;
     }
 
-    // Update the AST to reflect the element is no longer self-closing
-    this.__element.source.openTag.isSelfClosing = false;
+    // Fully sync the AST to reflect the new explicit close tag: update the
+    // open-tag end, attach the close tag, and fix element.endIndex. Leaving any
+    // of these stale corrupts a later before()/after()/append()/innerHTML.
+    const closeTagStart = openTagEnd + 1;
+    const closeTagEnd = closeTagStart + closeTag.length; // exclusive, matches parser
+    AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
 
     return this;
   }
@@ -698,15 +712,20 @@ export class HtmlModElement {
     }
 
     if (selfClosing) {
-      const parsePos = originalEndIndex + 1;
+      // When the tag had a trailing slash, the overwrite replaced `/>` with a
+      // single `>`, shifting the `>` (and therefore the inserted content) left
+      // by one. parsePos must be derived from the post-overwrite open-tag end,
+      // not the original `>` position, or every inserted position drifts.
       const openTagEnd = hadSlash ? originalEndIndex - 1 : originalEndIndex;
+      const parsePos = openTagEnd + 1;
 
       const newNodes = AstManipulator.parseHtmlAtPosition(html, parsePos, this.__htmlMod.__options);
       AstManipulator.prependChild(this.__element, newNodes);
 
       const closingTag = makeClosingTag(this.__element.tagName);
       const closeTagStart = parsePos + html.length;
-      const closeTagEnd = closeTagStart + closingTag.length - 1;
+      // endIndex is exclusive (one past the `>`), matching the parser's convention
+      const closeTagEnd = closeTagStart + closingTag.length;
       AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
     } else {
       const insertPos = originalEndIndex + 1;
