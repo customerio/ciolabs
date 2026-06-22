@@ -91,4 +91,67 @@ describe('expandSelfClosing', () => {
     element.expandSelfClosing();
     expect(element.isSelfClosing).toBe(false);
   });
+
+  describe('AST stays consistent after expansion (no follow-up corruption)', () => {
+    test('outerHTML/toString are complete after expansion', () => {
+      const h = new HtmlMod('<x-p>a <x-icon name="star"/> b</x-p>');
+      const icon = h.querySelectorAll('x-icon')[0];
+      icon.expandSelfClosing();
+      expect(icon.outerHTML).toBe('<x-icon name="star"></x-icon>');
+      expect(icon.toString()).toBe('<x-icon name="star"></x-icon>');
+    });
+
+    test('setAttribute after expansion does not corrupt the document', () => {
+      const h = new HtmlMod('<x-p>a <x-icon name="star"/> b</x-p>');
+      const icon = h.querySelectorAll('x-icon')[0];
+      icon.expandSelfClosing();
+      icon.dataset.source = 'ZZZ';
+      expect(h.toString()).toBe('<x-p>a <x-icon name="star" data-source="ZZZ"></x-icon> b</x-p>');
+    });
+
+    test('innerHTML is empty after expansion', () => {
+      const h = new HtmlMod('<x-icon name="star"/>');
+      const icon = h.querySelector('x-icon')!;
+      icon.expandSelfClosing();
+      expect(icon.innerHTML).toBe('');
+    });
+
+    test('after() inserts at the right position after expansion', () => {
+      const h = new HtmlMod('<wrap><x-icon/> tail</wrap>');
+      h.querySelector('x-icon')!.expandSelfClosing();
+      h.querySelector('x-icon')!.after('<b></b>');
+      expect(h.toString()).toBe('<wrap><x-icon></x-icon><b></b> tail</wrap>');
+    });
+
+    test('before() inserts at the right position after expansion', () => {
+      const h = new HtmlMod('<wrap><x-icon/> tail</wrap>');
+      h.querySelector('x-icon')!.expandSelfClosing();
+      h.querySelector('x-icon')!.before('<b></b>');
+      expect(h.toString()).toBe('<wrap><b></b><x-icon></x-icon> tail</wrap>');
+    });
+
+    test('append() inserts inside the element after expansion', () => {
+      const h = new HtmlMod('<wrap><x-icon/></wrap>');
+      h.querySelector('x-icon')!.expandSelfClosing();
+      h.querySelector('x-icon')!.append('<b>hi</b>');
+      expect(h.toString()).toBe('<wrap><x-icon><b>hi</b></x-icon></wrap>');
+    });
+
+    test('mixed-case tag round-trips after expansion + setAttribute', () => {
+      const h = new HtmlMod('<wrap><X-Image src="a"/></wrap>');
+      h.querySelector('x-image')!.expandSelfClosing();
+      // Open tag preserves source casing; close tag uses the parser tag name.
+      expect(h.toString()).toBe('<wrap><X-Image src="a"></x-image></wrap>');
+      h.querySelector('x-image')!.dataset.source = 'ZZZ';
+      expect(h.toString()).toBe('<wrap><X-Image src="a" data-source="ZZZ"></x-image></wrap>');
+    });
+
+    test('spaced form round-trips after expansion + setAttribute', () => {
+      const h = new HtmlMod('<wrap><x-spacer /></wrap>');
+      h.querySelector('x-spacer')!.expandSelfClosing();
+      expect(h.toString()).toBe('<wrap><x-spacer></x-spacer></wrap>');
+      h.querySelector('x-spacer')!.dataset.source = 'ZZZ';
+      expect(h.toString()).toBe('<wrap><x-spacer data-source="ZZZ"></x-spacer></wrap>');
+    });
+  });
 });
