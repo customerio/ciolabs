@@ -584,7 +584,7 @@ export class HtmlModElement {
     const originalOpenTagEnd = this.__element.source.openTag.endIndex;
 
     if (selfClosing) {
-      const closingTag = makeClosingTag(this.__element.tagName);
+      const closingTag = makeClosingTag(this.__element.source.openTag.name);
       const combined = html + closingTag;
 
       if (hasSlash) {
@@ -621,7 +621,7 @@ export class HtmlModElement {
     }
 
     if (selfClosing) {
-      const closingTag = makeClosingTag(this.__element.tagName);
+      const closingTag = makeClosingTag(this.__element.source.openTag.name);
       const openTagEnd = hasSlash ? this.__element.source.openTag.endIndex - 1 : this.__element.source.openTag.endIndex;
 
       if (html.length > 0) {
@@ -687,7 +687,11 @@ export class HtmlModElement {
     this.__htmlMod.__cachedOuterHTML.delete(this.__element);
 
     const endIndex = this.__element.source.openTag.endIndex;
-    const closeTag = makeClosingTag(this.tagName);
+    // Use the open tag's source casing for the close tag. The parser pairs
+    // open/close tags case-sensitively, so a synthesized lowercase close tag
+    // on a mixed-case element (`<X-Image/>` -> `<X-Image></x-image>`) would not
+    // re-pair on the next parse, leaving an orphaned close tag.
+    const closeTag = makeClosingTag(this.__element.source.openTag.name);
 
     let openTagEnd: number;
     if (hasTrailingSlash(this.__element, this.__htmlMod.__source)) {
@@ -759,7 +763,7 @@ export class HtmlModElement {
     const originalEndIndex = this.__element.source.openTag.endIndex;
 
     if (selfClosing) {
-      const closingTag = makeClosingTag(this.__element.tagName);
+      const closingTag = makeClosingTag(this.__element.source.openTag.name);
 
       if (hadSlash) {
         const slashStart = originalEndIndex - 1;
@@ -787,7 +791,7 @@ export class HtmlModElement {
       const newNodes = AstManipulator.parseHtmlAtPosition(html, parsePos, this.__htmlMod.__options);
       AstManipulator.prependChild(this.__element, newNodes);
 
-      const closingTag = makeClosingTag(this.__element.tagName);
+      const closingTag = makeClosingTag(this.__element.source.openTag.name);
       const closeTagStart = parsePos + html.length;
       // endIndex is exclusive (one past the `>`), matching the parser's convention
       const closeTagEnd = closeTagStart + closingTag.length;

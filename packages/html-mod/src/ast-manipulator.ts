@@ -377,12 +377,15 @@ export function convertToRegularTag(
     element.source.openTag.isSelfClosing = false;
     element.source.openTag.endIndex = openTagEnd; // Update '>' position
 
-    // Add closeTag information
+    // Add closeTag information. Use the open tag's source casing so the
+    // synthesized close tag matches what was written to the source string and
+    // re-pairs on the next parse (the parser matches tags case-sensitively).
+    const sourceTagName = element.source.openTag.name ?? element.tagName;
     element.source.closeTag = {
       startIndex: closeTagStart,
       endIndex: closeTagEnd,
-      data: `</${element.tagName}>`,
-      name: element.tagName,
+      data: `</${sourceTagName}>`,
+      name: sourceTagName,
     };
 
     // The element now ends at the close tag. Keep element.endIndex (the
