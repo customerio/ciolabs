@@ -140,10 +140,25 @@ describe('expandSelfClosing', () => {
     test('mixed-case tag round-trips after expansion + setAttribute', () => {
       const h = new HtmlMod('<wrap><X-Image src="a"/></wrap>');
       h.querySelector('x-image')!.expandSelfClosing();
-      // Open tag preserves source casing; close tag uses the parser tag name.
-      expect(h.toString()).toBe('<wrap><X-Image src="a"></x-image></wrap>');
+      // The synthesized close tag uses the open tag's source casing so the
+      // result re-pairs on the next parse (the parser matches case-sensitively);
+      // a lowercase close tag here would orphan on reparse.
+      expect(h.toString()).toBe('<wrap><X-Image src="a"></X-Image></wrap>');
       h.querySelector('x-image')!.dataset.source = 'ZZZ';
-      expect(h.toString()).toBe('<wrap><X-Image src="a" data-source="ZZZ"></x-image></wrap>');
+      expect(h.toString()).toBe('<wrap><X-Image src="a" data-source="ZZZ"></X-Image></wrap>');
+    });
+
+    test('mixed-case expansion re-pairs on reparse (no orphan close tag)', () => {
+      const h = new HtmlMod('<X-Image src="a"/>');
+      h.querySelector('x-image')!.expandSelfClosing();
+      // Round-trip the serialized output through a fresh parse: the close tag
+      // must pair back to the element, or a later mutation (e.g. a consumer's
+      // collapse/replace) leaves an orphaned `</x-image>`.
+      const reparsed = new HtmlMod(h.toString());
+      const element = reparsed.querySelector('x-image')!;
+      expect(element.__element.source.closeTag).not.toBeNull();
+      element.replaceWith('REPL');
+      expect(reparsed.toString()).toBe('REPL');
     });
 
     test('spaced form round-trips after expansion + setAttribute', () => {
