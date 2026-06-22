@@ -1141,7 +1141,9 @@ export class HtmlModText {
   }
 
   set innerHTML(html: string) {
-    if (!this.__text.endIndex) {
+    // Guard against an unpositioned node, but allow endIndex === 0 (a one-char
+    // text node at the very start of the document) — `!0` would drop the write.
+    if (this.__text.endIndex == null) {
       return;
     }
 
@@ -1156,7 +1158,8 @@ export class HtmlModText {
   }
 
   set textContent(text: string) {
-    if (!this.__text.endIndex) {
+    // Allow endIndex === 0 (one-char text node at index 0); `!0` would drop it.
+    if (this.__text.endIndex == null) {
       return;
     }
 
