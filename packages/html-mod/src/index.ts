@@ -82,6 +82,57 @@ export class HtmlMod {
     // Note: __source is already up-to-date from string operations
   }
 
+  /**
+   * Reconcile the AST after leading characters were stripped from the source.
+   *
+   * The removed region (always whitespace for the trim methods) is a contiguous
+   * prefix occupied by root-level text node(s). Fully-removed text nodes are
+   * dropped from the AST; a straddling node has its leading data trimmed. Must
+   * run BEFORE the corresponding remove delta so the delta then fixes the
+   * straddling node's endIndex (its startIndex stays at the front).
+   */
+  __reconcileLeadingTrim(count: number): void {
+    let remaining = count;
+    const children = this.__dom.children;
+    while (remaining > 0 && children.length > 0) {
+      const node = children[0];
+      if (node.type !== 'text') break;
+      const dataLength = node.data.length;
+      if (dataLength <= remaining) {
+        children.shift();
+        remaining -= dataLength;
+      } else {
+        node.data = node.data.slice(remaining);
+        remaining = 0;
+      }
+    }
+  }
+
+  /**
+   * Reconcile the AST after trailing characters were stripped from the source.
+   *
+   * Mirror of __reconcileLeadingTrim for a contiguous suffix. A straddling node
+   * keeps its startIndex, so we fix its endIndex here (the remove delta won't —
+   * the node sits before the delta's mutation start).
+   */
+  __reconcileTrailingTrim(count: number): void {
+    let remaining = count;
+    const children = this.__dom.children;
+    while (remaining > 0 && children.length > 0) {
+      const node = children.at(-1);
+      if (node.type !== 'text') break;
+      const dataLength = node.data.length;
+      if (dataLength <= remaining) {
+        children.pop();
+        remaining -= dataLength;
+      } else {
+        node.data = node.data.slice(0, dataLength - remaining);
+        node.endIndex = node.startIndex + node.data.length - 1;
+        remaining = 0;
+      }
+    }
+  }
+
   trim() {
     const beforeSource = this.__source;
     const afterSource = beforeSource.trim();
@@ -93,11 +144,16 @@ export class HtmlMod {
       const trimmedStart = beforeSource.length - beforeSource.trimStart().length;
       const trimmedEnd = trimmedTotal - trimmedStart;
 
-      if (trimmedStart > 0) {
-        this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
-      }
+      // Handle the trailing removal first so its delta is expressed in the
+      // original coordinate space; the leading delta then shifts everything
+      // (including the trailing-adjusted nodes) left uniformly.
       if (trimmedEnd > 0) {
+        this.__reconcileTrailingTrim(trimmedEnd);
         this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmedEnd, beforeSource.length));
+      }
+      if (trimmedStart > 0) {
+        this.__reconcileLeadingTrim(trimmedStart);
+        this.__trackDelta(calculateRemoveDelta(0, trimmedStart));
       }
     }
 
@@ -112,6 +168,7 @@ export class HtmlMod {
     // Queue delta for removed characters at start
     const trimmed = beforeSource.length - afterSource.length;
     if (trimmed > 0) {
+      this.__reconcileLeadingTrim(trimmed);
       this.__trackDelta(calculateRemoveDelta(0, trimmed));
     }
 
@@ -126,6 +183,7 @@ export class HtmlMod {
     // Queue delta for removed characters at end
     const trimmed = beforeSource.length - afterSource.length;
     if (trimmed > 0) {
+      this.__reconcileTrailingTrim(trimmed);
       this.__trackDelta(calculateRemoveDelta(beforeSource.length - trimmed, beforeSource.length));
     }
 
@@ -160,15 +218,19 @@ export class HtmlMod {
       this.__source = keepLines.join('\n');
     }
 
-    // Track deltas
-    if (trimmedStartLines > 0) {
-      const trimmedChars = beforeLines.slice(0, trimmedStartLines).join('\n').length + 1; // +1 for final newline
-      this.__trackDelta(calculateRemoveDelta(0, trimmedChars));
-    }
-
+    // Track deltas. Trailing first (original coordinates), then leading, so the
+    // leading delta shifts everything uniformly and the two removals don't
+    // interfere with each other's coordinates.
     if (trimmedEndLines > 0) {
       const startPos = beforeLines.slice(0, beforeLines.length - trimmedEndLines).join('\n').length;
+      this.__reconcileTrailingTrim(beforeSource.length - startPos);
       this.__trackDelta(calculateRemoveDelta(startPos, beforeSource.length));
+    }
+
+    if (trimmedStartLines > 0) {
+      const trimmedChars = beforeLines.slice(0, trimmedStartLines).join('\n').length + 1; // +1 for final newline
+      this.__reconcileLeadingTrim(trimmedChars);
+      this.__trackDelta(calculateRemoveDelta(0, trimmedChars));
     }
 
     return this;
