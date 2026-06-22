@@ -40,6 +40,9 @@ function lastDescendantEnd(element: SourceElement): number {
   }
 
   const last = children.at(-1);
+  if (!last) {
+    return element.source.openTag.endIndex + 1;
+  }
 
   if (last.type === 'tag') {
     const lastElement = last as SourceElement;
