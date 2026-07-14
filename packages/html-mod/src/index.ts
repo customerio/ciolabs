@@ -1019,6 +1019,12 @@ export class HtmlModElement {
     };
 
     if (htmlMod.__isBatching) {
+      // Only the appendRight branch needs a same-position retry: two
+      // appendRights at one position apply LIFO, which the position sort
+      // can't reproduce. The overwrite branch spans this element's own tag
+      // tail — distinct elements can't overlap there, and a same-element edit
+      // is force-flushed by the structural conflict guard above — so it never
+      // collides; the __flushBatch overlap invariant is the backstop.
       if (operation.type === 'appendRight' && htmlMod.__batchAppendRightPositions.has(operation.start)) {
         // Same-position appendRights apply LIFO sequentially — flush and
         // re-run so the position is recomputed against the flushed state.
