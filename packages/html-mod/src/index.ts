@@ -31,6 +31,11 @@ import {
 } from './position-delta';
 import { atomicOverwrite, atomicAppendRight, atomicPrependLeft, atomicRemove } from './string-operations';
 
+/** Batch edit kinds that rewrite the open-tag/content boundary. */
+function isStructuralBatchKind(kind: string): boolean {
+  return kind === 'prepend' || kind === 'append' || kind === 'expand';
+}
+
 /** Sort rank for same-position batched edits — see __flushBatch. */
 function batchAnchorRank(edit: QueuedEdit): number {
   return edit.delta.operationType === 'appendRight' ? 0 : edit.delta.operationType === 'overwrite' ? 1 : 2;
@@ -218,8 +223,17 @@ export class HtmlMod {
    * Flush when the incoming edit cannot safely coexist with queued edits:
    *  - the same kind already queued on this element (repeat after/before/
    *    same-name attribute — sequential execution is order-sensitive there)
-   *  - prepend/append mixed with ANYTHING on the same element (they touch
-   *    the open-tag region and, for empty elements, share positions)
+   *  - a "structural" kind (`isStructuralBatchKind`: prepend, append, expand)
+   *    mixed with ANYTHING on the same element — they rewrite the open-tag /
+   *    content boundary, so positions shift or ranges overlap.
+   *
+   * NOTE on "structural": `isStructuralBatchKind` is the narrow set of
+   * open-tag-boundary rewriters used for THIS conflict check.
+   * `__queueStructuralBatchEdit` / `__batchHasStructuralEdits` use a broader
+   * notion — any queued NODE insertion (before/after included) — that gates
+   * `children`/`textContent`/`isSelfClosing` reads. The two overlap but are
+   * not the same set.
+   *
    * (Same-position appendRight conflicts — sequential LIFO — are handled at
    * queue time with a flush-and-retry, since the flush invalidates the
    * positions already computed by the caller.)
@@ -227,9 +241,20 @@ export class HtmlMod {
   __flushBatchIfConflicting(element: SourceElement, kind: string): void {
     const kinds = this.__batchedElementKinds.get(element);
     if (!kinds) return;
-    const incomingIsContent = kind === 'prepend' || kind === 'append';
-    const queuedHasContent = kinds.has('prepend') || kinds.has('append');
-    if (kinds.has(kind) || incomingIsContent || queuedHasContent) {
+    // "Structural" kinds rewrite the open-tag/content boundary, so they
+    // conflict with ANY other edit on the same element (positions shift or
+    // ranges overlap): prepend/append insert into the content region, and
+    // expand rewrites the self-closing tail. An incoming structural edit
+    // flushes if anything is queued; any incoming edit flushes if a
+    // structural edit is queued.
+    let queuedHasStructural = false;
+    for (const queued of kinds) {
+      if (isStructuralBatchKind(queued)) {
+        queuedHasStructural = true;
+        break;
+      }
+    }
+    if (kinds.has(kind) || isStructuralBatchKind(kind) || queuedHasStructural) {
       this.__flushBatch();
     }
   }
@@ -949,33 +974,41 @@ export class HtmlModElement {
    * siblings.
    */
   expandSelfClosing(): this {
-    this.__htmlMod.__flushBatch();
+    // A queued edit on this element would make the open-tag positions read
+    // below stale — flush it first. Distinct elements never conflict, so the
+    // hot loop (expanding every self-closing element in a document) stays
+    // flush-free.
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, 'expand');
     if (!isSelfClosing(this.__element)) return this;
 
-    // Invalidate cached outerHTML since we're changing the element's structure
-    this.__htmlMod.__cachedOuterHTML.delete(this.__element);
-
-    const endIndex = this.__element.source.openTag.endIndex;
+    const element = this.__element;
+    const htmlMod = this.__htmlMod;
+    const endIndex = element.source.openTag.endIndex;
     // Use the open tag's source casing for the close tag. The parser pairs
     // open/close tags case-sensitively, so a synthesized lowercase close tag
     // on a mixed-case element (`<X-Image/>` -> `<X-Image></x-image>`) would not
     // re-pair on the next parse, leaving an orphaned close tag.
-    const closeTag = makeClosingTag(this.__element.source.openTag.name);
+    const closeTag = makeClosingTag(element.source.openTag.name);
 
+    // Compute the single string operation + the resulting open-tag end, in
+    // pre-batch coordinates. Raw-source reads are safe: the conflict flush
+    // above guarantees this element has no queued edit, so its own open-tag
+    // bytes are unshifted.
+    let operation: { type: 'overwrite' | 'appendRight'; start: number; end: number; content: string };
     let openTagEnd: number;
-    if (hasTrailingSlash(this.__element, this.__htmlMod.__source)) {
+    if (hasTrailingSlash(element, htmlMod.__sourceRaw)) {
       // Replace ` />` or `/>` with `></tag>`
       // Walk back from `/` to skip whitespace before the slash
       let start = endIndex; // endIndex points to `>`
       start--; // now at `/`
-      while (start > 0 && this.__htmlMod.__source[start - 1] === ' ') {
+      while (start > 0 && htmlMod.__sourceRaw[start - 1] === ' ') {
         start--;
       }
-      atomicOverwrite(this.__htmlMod, start, endIndex + 1, `>${closeTag}`, this.__element);
+      operation = { type: 'overwrite', start, end: endIndex + 1, content: `>${closeTag}` };
       // The new `>` lands where the `/` (and any preceding spaces) began.
       openTagEnd = start;
     } else {
-      atomicAppendRight(this.__htmlMod, endIndex + 1, closeTag, this.__element);
+      operation = { type: 'appendRight', start: endIndex + 1, end: endIndex + 1, content: closeTag };
       // The `>` is unchanged.
       openTagEnd = endIndex;
     }
@@ -983,9 +1016,53 @@ export class HtmlModElement {
     // Fully sync the AST to reflect the new explicit close tag: update the
     // open-tag end, attach the close tag, and fix element.endIndex. Leaving any
     // of these stale corrupts a later before()/after()/append()/innerHTML.
-    const closeTagStart = openTagEnd + 1;
-    const closeTagEnd = closeTagStart + closeTag.length; // exclusive, matches parser
-    AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
+    // Runs at flush (batched) or immediately (eager); `shift` is the
+    // cumulative delta of edits sorted before this one.
+    const finalize = (shift: number): void => {
+      // Invalidate cached outerHTML — the element's structure changed.
+      htmlMod.__cachedOuterHTML.delete(element);
+      const shiftedOpenTagEnd = openTagEnd + shift;
+      const closeTagStart = shiftedOpenTagEnd + 1;
+      const closeTagEnd = closeTagStart + closeTag.length; // exclusive, matches parser
+      AstManipulator.convertToRegularTag(element, shiftedOpenTagEnd, closeTagStart, closeTagEnd);
+    };
+
+    if (htmlMod.__isBatching) {
+      // Only the appendRight branch needs a same-position retry: two
+      // appendRights at one position apply LIFO, which the position sort
+      // can't reproduce. The overwrite branch spans this element's own tag
+      // tail — distinct elements can't overlap there, and a same-element edit
+      // is force-flushed by the structural conflict guard above — so it never
+      // collides; the __flushBatch overlap invariant is the backstop.
+      if (operation.type === 'appendRight' && htmlMod.__batchAppendRightPositions.has(operation.start)) {
+        // Same-position appendRights apply LIFO sequentially — flush and
+        // re-run so the position is recomputed against the flushed state.
+        htmlMod.__flushBatch();
+        return this.expandSelfClosing();
+      }
+      htmlMod.__queueStructuralBatchEdit(
+        {
+          start: operation.start,
+          end: operation.end,
+          content: operation.content,
+          delta:
+            operation.type === 'overwrite'
+              ? calculateOverwriteDelta(operation.start, operation.end, operation.content)
+              : calculateAppendRightDelta(operation.start, operation.content),
+          element,
+          finalize,
+        },
+        'expand'
+      );
+      return this;
+    }
+
+    if (operation.type === 'overwrite') {
+      atomicOverwrite(htmlMod, operation.start, operation.end, operation.content, element);
+    } else {
+      atomicAppendRight(htmlMod, operation.start, operation.content, element);
+    }
+    finalize(0);
 
     return this;
   }
