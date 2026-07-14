@@ -231,6 +231,86 @@ describe('structural batch equivalence', () => {
   });
 });
 
+const VOID_TAGS = new Set(['img', 'br', 'hr', 'input']);
+
+function expandableSelfClosing(element: ReturnType<HtmlMod['querySelectorAll']>[number]): boolean {
+  return element.isSelfClosing && !VOID_TAGS.has(element.tagName.toLowerCase());
+}
+
+function expandAllReverse(h: HtmlMod): void {
+  const elements = h.querySelectorAll('*');
+  for (let index = elements.length - 1; index >= 0; index--) {
+    const element = elements[index];
+    if (expandableSelfClosing(element)) {
+      element.setAttribute('data-carta-self-closed', '');
+      element.expandSelfClosing();
+    }
+  }
+}
+
+function expectExpandEquivalence(source: string): void {
+  const eager = new HtmlMod(source);
+  expandAllReverse(eager);
+
+  const batched = new HtmlMod(source);
+  batched.batch(() => expandAllReverse(batched));
+
+  expect(batched.toString()).toBe(eager.toString());
+  expect(positionSnapshot(batched)).toBe(positionSnapshot(eager));
+}
+
+describe('expandSelfClosing batch equivalence', () => {
+  test('space-slash form <x-spacer /> across many elements', () => {
+    expectExpandEquivalence('<x-a /><x-b /><x-c /><x-d />');
+  });
+
+  test('no-space form <x-spacer/>', () => {
+    expectExpandEquivalence('<x-a/><x-b/><x-c/>');
+  });
+
+  test('mixed forms interleaved with real content and void elements', () => {
+    expectExpandEquivalence(
+      '<x-section><x-spacer /><img src="a.png"/><x-image src="b.gif"/><br/>text<x-divider /></x-section>'
+    );
+  });
+
+  test('nested self-closing elements', () => {
+    expectExpandEquivalence('<x-outer><x-inner /></x-outer><x-sibling />');
+  });
+
+  test('a self-closing element that also gets an attribute in the same batch flushes correctly', () => {
+    // setAttribute + expand on the SAME element must not produce overlapping
+    // edits — expand is structural and flushes any pending edit on it.
+    const source = '<x-a /><x-b />';
+    const eager = new HtmlMod(source);
+    for (const element of eager.querySelectorAll('x-a, x-b')) {
+      element.setAttribute('data-k', element.tagName);
+      element.expandSelfClosing();
+    }
+    const batched = new HtmlMod(source);
+    batched.batch(() => {
+      for (const element of batched.querySelectorAll('x-a, x-b')) {
+        element.setAttribute('data-k', element.tagName);
+        element.expandSelfClosing();
+      }
+    });
+    expect(batched.toString()).toBe(eager.toString());
+    expect(positionSnapshot(batched)).toBe(positionSnapshot(eager));
+  });
+
+  test('isSelfClosing read mid-batch reflects a queued expand', () => {
+    const h = new HtmlMod('<x-a /><x-b />');
+    h.batch(() => {
+      const a = h.querySelectorAll('x-a')[0];
+      expect(a.isSelfClosing).toBe(true);
+      a.expandSelfClosing();
+      // Queued expand must be visible to the structural read.
+      expect(a.isSelfClosing).toBe(false);
+    });
+    expect(h.toString()).toBe('<x-a></x-a><x-b />');
+  });
+});
+
 describe('structural batch guards', () => {
   test('children reads flush pending structural edits', () => {
     const h = new HtmlMod('<div><span>x</span></div>');
