@@ -171,9 +171,12 @@ export class HtmlMod {
    * observe pending state flush the batch first (source/serialization
    * reads, selector queries, attribute reads on an edited element, any
    * non-attribute mutation, a second write to an already-edited element).
-   * The one observable difference: position fields (`startIndex`,
-   * `sourceRange`, …) read inside the batch reflect pre-batch coordinates —
-   * mutually consistent, but not final until the batch ends.
+   * The one observable difference: raw AST position fields (the
+   * `startIndex`/`endIndex` on nodes reached via `children`) read inside the
+   * batch reflect pre-batch coordinates — mutually consistent, but not final
+   * until the batch ends. Position GETTERS that combine AST offsets with the
+   * source string (e.g. `sourceRange`) flush first and return final
+   * coordinates.
    */
   batch<T>(callback: () => T): T {
     this.__batchDepth++;
@@ -1526,6 +1529,12 @@ export class HtmlModElement {
       const removeStart = attribute.source.startIndex - 1;
       const removeEnd = attribute.source.endIndex + 1;
 
+      // The batched path queues the FIRST match and returns, matching the
+      // single-attribute contract. The eager loop below removes every match,
+      // but on duplicate names its post-first-splice positions are already
+      // stale — so neither path is meaningfully correct for malformed input
+      // with duplicate attribute names; valid HTML (unique names) is
+      // identical either way.
       if (this.__htmlMod.__isBatching) {
         this.__htmlMod.__queueBatchEdit(
           {

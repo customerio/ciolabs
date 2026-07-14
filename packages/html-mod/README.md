@@ -194,7 +194,7 @@ htmlMod.toString(); // all edits applied
 
 The result is always identical to running the same operations unbatched. Reads that could observe pending state flush the batch automatically first: `toString()`, `innerHTML`/`outerHTML`, selector queries, attribute reads on an element with queued edits, `children` reads when inserts are pending, and any non-batched mutation. Conflicting writes (the same attribute twice, a repeated `before`/`after` on one element, `prepend`/`append` mixes) also flush first, so batching is safe to wrap around any loop — worst case it degrades to unbatched behavior.
 
-One caveat: position fields (`sourceRange`, `startIndex`, …) read _inside_ an open batch reflect pre-batch coordinates. They are mutually consistent with each other and become final when the batch ends.
+One caveat: raw AST position fields (the `startIndex`/`endIndex` on nodes reached via `children`) read _inside_ an open batch reflect pre-batch coordinates. They are mutually consistent with each other and become final when the batch ends. Position getters that combine AST offsets with the source string (e.g. `sourceRange`) flush the batch first and always return final coordinates.
 
 Batches nest; edits apply when the outermost batch exits (or on the first flushing read). The callback's return value is passed through.
 
