@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/prefer-dom-node-dataset -- raw attribute APIs are part of the surface under test */
 import { describe, expect, test } from 'vitest';
 
-import { HtmlMod } from './index';
+import { HtmlMod, HtmlModText } from './index';
 
 /**
  * Structural batching (before/after/prepend/append) — same contract as
@@ -365,6 +365,44 @@ describe('structural batch guards', () => {
       expect(a.isSelfClosing).toBe(false);
     });
     expect(h.toString()).toBe('<x-a >content</x-a><x-b></x-b>');
+  });
+
+  test('multiple new attributes on trailing-slash elements match eager spacing (review finding)', () => {
+    // The "is there already a space before the /" heuristic reads the source
+    // string; without flushing this element's queued edit first, the second
+    // write cannot see the first insert's trailing space and adds its own —
+    // a double space that diverges from eager output.
+    for (const source of ['<div><img/></div>', '<div><img /></div>', '<x-a/><x-b />']) {
+      const eager = new HtmlMod(source);
+      for (const element of eager.querySelectorAll('img, x-a, x-b')) {
+        element.setAttribute('a', '1');
+        element.setAttribute('b', '2');
+      }
+
+      const batched = new HtmlMod(source);
+      batched.batch(() => {
+        for (const element of batched.querySelectorAll('img, x-a, x-b')) {
+          element.setAttribute('a', '1');
+          element.setAttribute('b', '2');
+        }
+      });
+
+      expect(batched.toString(), source).toBe(eager.toString());
+      expect(batched.toString(), source).not.toContain('  ');
+    }
+  });
+
+  test('HtmlModText innerHTML setter flushes pending batched edits (review finding)', () => {
+    const h = new HtmlMod('text<div>x</div>');
+    h.batch(() => {
+      h.querySelectorAll('div')[0].setAttribute('data-k', 'v');
+      // A raw text-node write mid-batch must flush, not trip the assert.
+      const textNode = (h as unknown as { __dom: { children: Array<{ type: string }> } }).__dom.children.find(
+        candidate => candidate.type === 'text'
+      );
+      new HtmlModText(textNode as never, h).innerHTML = 'REPLACED';
+    });
+    expect(h.toString()).toBe('REPLACED<div data-k="v">x</div>');
   });
 
   test('interleaved batches and eager ops keep positions coherent', () => {

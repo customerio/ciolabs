@@ -294,6 +294,9 @@ export class HtmlMod {
     const sorted = [...edits].sort((a, b) => a.start - b.start || batchAnchorRank(a) - batchAnchorRank(b));
     for (let index = 1; index < sorted.length; index++) {
       if (sorted[index].start < sorted[index - 1].end) {
+        // Invariant check — the conflict guards make this unreachable. Note
+        // the queue was already cleared above, so on this path the queued
+        // edits are dropped rather than applied against unknown state.
         throw new Error('html-mod: overlapping batched edits');
       }
     }
@@ -1390,9 +1393,16 @@ export class HtmlModElement {
 
       // For self-closing tags with trailing slash, insert before the '/' and add space after attribute
       if (isSelfClosing(this.__element)) {
-        // Raw read is safe mid-batch: this element has no queued edits (the
-        // guard at the top flushed if it did), and these chars belong to its
-        // own open tag.
+        // The space heuristic below reads the element's own open-tag chars.
+        // The top-of-method conflict guard deliberately lets DISTINCT-name
+        // attribute writes coexist on one element — but a queued write's
+        // trailing space is invisible in the pre-batch string, and missing
+        // it here would add a second space (batched ≠ eager). Flush this
+        // element's pending edits and re-read the insert position.
+        if (this.__htmlMod.__isBatching) {
+          this.__htmlMod.__flushBatchIfElementPending(this.__element);
+          insertPos = this.__element.source.openTag.endIndex;
+        }
         const charBeforeGt = this.__htmlMod.__sourceRaw.charAt(insertPos - 1);
         if (charBeforeGt === '/') {
           // Check if there's already a space before the '/'
@@ -1596,6 +1606,8 @@ export class HtmlModText {
   }
 
   set innerHTML(html: string) {
+    // Non-batched mutation: positions read below must be post-flush.
+    this.__htmlMod.__flushBatch();
     // Guard against an unpositioned node, but allow endIndex === 0 (a one-char
     // text node at the very start of the document) — `!0` would drop the write.
     if (this.__text.endIndex == null) {
