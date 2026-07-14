@@ -223,8 +223,17 @@ export class HtmlMod {
    * Flush when the incoming edit cannot safely coexist with queued edits:
    *  - the same kind already queued on this element (repeat after/before/
    *    same-name attribute — sequential execution is order-sensitive there)
-   *  - prepend/append mixed with ANYTHING on the same element (they touch
-   *    the open-tag region and, for empty elements, share positions)
+   *  - a "structural" kind (`isStructuralBatchKind`: prepend, append, expand)
+   *    mixed with ANYTHING on the same element — they rewrite the open-tag /
+   *    content boundary, so positions shift or ranges overlap.
+   *
+   * NOTE on "structural": `isStructuralBatchKind` is the narrow set of
+   * open-tag-boundary rewriters used for THIS conflict check.
+   * `__queueStructuralBatchEdit` / `__batchHasStructuralEdits` use a broader
+   * notion — any queued NODE insertion (before/after included) — that gates
+   * `children`/`textContent`/`isSelfClosing` reads. The two overlap but are
+   * not the same set.
+   *
    * (Same-position appendRight conflicts — sequential LIFO — are handled at
    * queue time with a flush-and-retry, since the flush invalidates the
    * positions already computed by the caller.)

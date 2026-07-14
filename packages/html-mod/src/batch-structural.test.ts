@@ -309,6 +309,27 @@ describe('expandSelfClosing batch equivalence', () => {
     });
     expect(h.toString()).toBe('<x-a></x-a><x-b />');
   });
+
+  test('expand then setAttribute on the same element (symmetric to attr+expand)', () => {
+    // The queued expand converts the element out of self-closing; a following
+    // setAttribute on it must flush first (structural conflict) and then add
+    // the attribute to the now-regular tag — byte-identical to eager order.
+    const source = '<x-a /><x-b />';
+    const eager = new HtmlMod(source);
+    for (const element of eager.querySelectorAll('x-a, x-b')) {
+      element.expandSelfClosing();
+      element.setAttribute('data-k', element.tagName);
+    }
+    const batched = new HtmlMod(source);
+    batched.batch(() => {
+      for (const element of batched.querySelectorAll('x-a, x-b')) {
+        element.expandSelfClosing();
+        element.setAttribute('data-k', element.tagName);
+      }
+    });
+    expect(batched.toString()).toBe(eager.toString());
+    expect(positionSnapshot(batched)).toBe(positionSnapshot(eager));
+  });
 });
 
 describe('structural batch guards', () => {
