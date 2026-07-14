@@ -33,8 +33,12 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           scope: '@ciolabs'
 
+      # npm@latest is 12.x, which requires Node >=22.22 and breaks on the
+      # Node 20 runner below. npm 11.x still satisfies the OIDC requirement
+      # (>= 11.5.1) and supports Node 20 — pin to it rather than track the
+      # newest major into the publish pipeline.
       - name: Install npm 11.5.1+ for OIDC support
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
