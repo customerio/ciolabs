@@ -174,6 +174,30 @@ Returns the first `HtmlModElement` that matches the selector.
 
 Returns an array of `HtmlModElement` that match the selector.
 
+#### batch<T>(callback: () => T) => T
+
+Runs the callback with writes batched, then applies them all at once. Use it around loops that make many small writes — every unbatched mutation pays a full string splice plus an AST position update over all following nodes, so write-heavy loops scale quadratically with document size. Batching applies the queued edits in one string rebuild and one position pass, which stays flat as documents grow (a 3,600-write loop on a 232KB document drops from ~500ms to ~7ms).
+
+Batched operations: `setAttribute`, `removeAttribute` (and everything built on them — `dataset`, `id`/`className` setters, `toggleAttribute`), plus the structural inserts `before`, `after`, `prepend`, and `append`. Everything else applies immediately, flushing any queued edits first.
+
+```js
+const htmlMod = new HtmlMod(html);
+
+htmlMod.batch(() => {
+  for (const element of htmlMod.querySelectorAll('*')) {
+    element.dataset.key = generateKey();
+  }
+});
+
+htmlMod.toString(); // all edits applied
+```
+
+The result is always identical to running the same operations unbatched. Reads that could observe pending state flush the batch automatically first: `toString()`, `innerHTML`/`outerHTML`, selector queries, attribute reads on an element with queued edits, `children` reads when inserts are pending, and any non-batched mutation. Conflicting writes (the same attribute twice, a repeated `before`/`after` on one element, `prepend`/`append` mixes) also flush first, so batching is safe to wrap around any loop — worst case it degrades to unbatched behavior.
+
+One caveat: position fields (`sourceRange`, `startIndex`, …) read _inside_ an open batch reflect pre-batch coordinates. They are mutually consistent with each other and become final when the batch ends.
+
+Batches nest; edits apply when the outermost batch exits (or on the first flushing read). The callback's return value is passed through.
+
 ## HtmlModElement
 
 The `HtmlModElement` class is the class that is used to manipulate the HTML. It's the class that is returned when you run a query.
