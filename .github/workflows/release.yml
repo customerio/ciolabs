@@ -16,6 +16,11 @@ jobs:
       id-token: write
       contents: write
       pull-requests: write
+      # The "Auto-pass required checks" step POSTs a commit status on the
+      # release PR, which needs statuses:write. Default GITHUB_TOKEN perms
+      # don't include it, so the POST 403s ("Resource not accessible by
+      # integration").
+      statuses: write
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
