@@ -392,6 +392,17 @@ describe('structural batch guards', () => {
     }
   });
 
+  test('removeAttribute on duplicate names removes the first match (documented contract)', () => {
+    // Malformed input: duplicate attribute names. The batched path removes
+    // the first match per the single-attribute contract; pin that behavior.
+    const h = new HtmlMod('<div data-k="1" data-k="2">x</div>');
+    h.batch(() => {
+      h.querySelectorAll('div')[0].removeAttribute('data-k');
+    });
+    // First occurrence removed, second remains.
+    expect(h.toString()).toBe('<div data-k="2">x</div>');
+  });
+
   test('HtmlModText innerHTML setter flushes pending batched edits (review finding)', () => {
     const h = new HtmlMod('text<div>x</div>');
     h.batch(() => {

@@ -279,13 +279,11 @@ export class HtmlMod {
       return;
     }
 
-    const edits = this.__batchEdits;
-    this.__batchEdits = [];
-    this.__batchedElementKinds = new Map();
-    this.__batchAppendRightPositions = new Set();
-    this.__batchPrependLeftPositions = new Map();
-    this.__batchHasStructuralEdits = false;
-
+    // Validate the queued edits BEFORE mutating any state. If the
+    // "unreachable" overlap invariant ever fires (or a sort throws), we
+    // leave the queue and source untouched so the error is non-destructive
+    // rather than silently dropping edits and leaving __sourceRaw stale.
+    //
     // Sort by position; at equal positions, appendRight sorts before
     // prependLeft — appendRight anchors to the content on its LEFT (an
     // `after(A)` stays adjacent to A) while prependLeft anchors to the
@@ -294,15 +292,23 @@ export class HtmlMod {
     // adjacent elements land on the same boundary, regardless of call
     // order. Array.prototype.sort is stable, so same-position same-kind
     // edits keep queue order (they can only come from the same call site).
-    const sorted = [...edits].sort((a, b) => a.start - b.start || batchAnchorRank(a) - batchAnchorRank(b));
+    const sorted = [...this.__batchEdits].sort((a, b) => a.start - b.start || batchAnchorRank(a) - batchAnchorRank(b));
     for (let index = 1; index < sorted.length; index++) {
       if (sorted[index].start < sorted[index - 1].end) {
-        // Invariant check — the conflict guards make this unreachable. Note
-        // the queue was already cleared above, so on this path the queued
-        // edits are dropped rather than applied against unknown state.
+        // Invariant check — the conflict guards make this unreachable. The
+        // queue is still intact here, so throwing drops nothing.
         throw new Error('html-mod: overlapping batched edits');
       }
     }
+
+    // Validation passed — now commit. Clear queue state first so a
+    // finalizer that re-enters (e.g. via a flushing read) sees an empty
+    // queue and cannot recurse into this same flush.
+    this.__batchEdits = [];
+    this.__batchedElementKinds = new Map();
+    this.__batchAppendRightPositions = new Set();
+    this.__batchPrependLeftPositions = new Map();
+    this.__batchHasStructuralEdits = false;
 
     this.__sourceRaw = buildBatchedSource(this.__sourceRaw, sorted);
     applyEditsToAstPositions(this.__dom, sorted);
