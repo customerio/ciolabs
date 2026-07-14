@@ -13,6 +13,7 @@ import { decode } from 'html-entities';
 
 import * as AstManipulator from './ast-manipulator';
 import { AstUpdater } from './ast-updater';
+import { applyEditsToAstPositions, buildBatchedSource, finalizerShifts, type QueuedEdit } from './batch';
 import {
   getContentStart,
   getContentEnd,
@@ -21,16 +22,42 @@ import {
   isSelfClosing,
   hasTrailingSlash,
 } from './element-utils';
-import { calculateRemoveDelta, type PositionDelta } from './position-delta';
+import {
+  calculateAppendRightDelta,
+  calculateOverwriteDelta,
+  calculatePrependLeftDelta,
+  calculateRemoveDelta,
+  type PositionDelta,
+} from './position-delta';
 import { atomicOverwrite, atomicAppendRight, atomicPrependLeft, atomicRemove } from './string-operations';
+
+/** Sort rank for same-position batched edits — see __flushBatch. */
+function batchAnchorRank(edit: QueuedEdit): number {
+  return edit.delta.operationType === 'appendRight' ? 0 : edit.delta.operationType === 'overwrite' ? 1 : 2;
+}
 
 export type HtmlModOptions = Options & {
   HtmlModElement?: typeof HtmlModElement; // allow for custom HtmlModElement
 };
 
 export class HtmlMod {
-  __source: string;
+  /**
+   * Raw source storage. Internal batch machinery reads/writes this
+   * directly; everything else goes through the `__source` accessor, which
+   * flushes any pending batched edits first so no reader can observe a
+   * stale string.
+   */
+  __sourceRaw: string;
   __dom: SourceDocument;
+
+  get __source(): string {
+    this.__flushBatch();
+    return this.__sourceRaw;
+  }
+
+  set __source(value: string) {
+    this.__sourceRaw = value;
+  }
 
   __HtmlMod: typeof HtmlMod;
   __HtmlModElement: typeof HtmlModElement;
@@ -41,7 +68,7 @@ export class HtmlMod {
   __cachedOuterHTML: WeakMap<SourceElement, string> = new WeakMap();
 
   constructor(source: string, options?: HtmlModOptions) {
-    this.__source = source;
+    this.__sourceRaw = source;
     this.__options = {
       recognizeSelfClosing: true,
       ...options,
@@ -58,19 +85,201 @@ export class HtmlMod {
    * Public but marked with __ to indicate internal use
    */
   __overwrite(start: number, end: number, content: string): void {
-    this.__source = this.__source.slice(0, start) + content + this.__source.slice(end);
+    this.__assertNoPendingBatchEdits();
+    this.__sourceRaw = this.__sourceRaw.slice(0, start) + content + this.__sourceRaw.slice(end);
   }
 
   __appendRight(index: number, content: string): void {
-    this.__source = this.__source.slice(0, index) + content + this.__source.slice(index);
+    this.__assertNoPendingBatchEdits();
+    this.__sourceRaw = this.__sourceRaw.slice(0, index) + content + this.__sourceRaw.slice(index);
   }
 
   __prependLeft(index: number, content: string): void {
-    this.__source = this.__source.slice(0, index) + content + this.__source.slice(index);
+    this.__assertNoPendingBatchEdits();
+    this.__sourceRaw = this.__sourceRaw.slice(0, index) + content + this.__sourceRaw.slice(index);
   }
 
   __remove(start: number, end: number): void {
-    this.__source = this.__source.slice(0, start) + this.__source.slice(end);
+    this.__assertNoPendingBatchEdits();
+    this.__sourceRaw = this.__sourceRaw.slice(0, start) + this.__sourceRaw.slice(end);
+  }
+
+  /**
+   * Raw splices operate on coordinates the caller computed BEFORE calling —
+   * if batched edits are still pending at that point, those coordinates are
+   * stale and applying them would corrupt the document. Every non-batched
+   * mutator flushes at entry (before reading positions); reaching here with
+   * pending edits means a flush guard is missing. Throw loudly rather than
+   * corrupt source.
+   */
+  __assertNoPendingBatchEdits(): void {
+    if (this.__batchEdits.length > 0) {
+      throw new Error('html-mod: string operation with pending batched edits — missing flush guard');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Batched write mode (see batch.ts for the cost/correctness model)
+  // -------------------------------------------------------------------------
+
+  __batchDepth = 0;
+  __batchEdits: QueuedEdit[] = [];
+  /**
+   * Edit kinds queued per element: 'before' | 'after' | 'prepend' |
+   * 'append' | 'attr:<name>'. Used for precise conflict detection — e.g.
+   * one `before` + one `after` + several distinct-name attribute writes on
+   * the same element coexist safely (disjoint ranges, order-independent),
+   * while a repeated `after` or a same-name attribute rewrite must flush.
+   */
+  __batchedElementKinds: Map<SourceElement, Set<string>> = new Map();
+  /**
+   * Positions with a queued appendRight insert. Sequential execution
+   * applies same-position appendRights LIFO (the second call's position
+   * does not shift), which a stable position sort cannot reproduce — so a
+   * second appendRight at an occupied position flushes first.
+   */
+  __batchAppendRightPositions: Set<number> = new Set();
+  /**
+   * Whether any queued edit inserts nodes (before/after/prepend/append).
+   * Structural READS (`children`) must flush when true — the AST tree
+   * mutation is deferred to the finalizer, so the child list is stale until
+   * then. Attribute-only batches never set this, keeping the hot
+   * query-then-write loops flush-free.
+   */
+  __batchHasStructuralEdits = false;
+
+  /**
+   * Run `fn` with attribute writes batched: `setAttribute`/`removeAttribute`
+   * (and everything built on them — `dataset`, `id`/`className` setters,
+   * `toggleAttribute`) queue their edits and apply them in ONE string
+   * rebuild + ONE AST position pass when the batch ends, instead of paying
+   * O(document) per write.
+   *
+   * Semantics are identical to unbatched execution: reads that could
+   * observe pending state flush the batch first (source/serialization
+   * reads, selector queries, attribute reads on an edited element, any
+   * non-attribute mutation, a second write to an already-edited element).
+   * The one observable difference: position fields (`startIndex`,
+   * `sourceRange`, …) read inside the batch reflect pre-batch coordinates —
+   * mutually consistent, but not final until the batch ends.
+   */
+  batch<T>(callback: () => T): T {
+    this.__batchDepth++;
+    try {
+      return callback();
+    } finally {
+      this.__batchDepth--;
+      if (this.__batchDepth === 0) {
+        this.__flushBatch();
+      }
+    }
+  }
+
+  get __isBatching(): boolean {
+    return this.__batchDepth > 0;
+  }
+
+  __queueBatchEdit(edit: QueuedEdit, kind: string): void {
+    if (edit.delta.operationType === 'appendRight') {
+      this.__batchAppendRightPositions.add(edit.delta.mutationStart);
+    }
+    this.__batchEdits.push(edit);
+    let kinds = this.__batchedElementKinds.get(edit.element);
+    if (!kinds) {
+      kinds = new Set();
+      this.__batchedElementKinds.set(edit.element, kinds);
+    }
+    kinds.add(kind);
+  }
+
+  __queueStructuralBatchEdit(edit: QueuedEdit, kind: string): void {
+    this.__batchHasStructuralEdits = true;
+    this.__queueBatchEdit(edit, kind);
+  }
+
+  /**
+   * Flush when the incoming edit cannot safely coexist with queued edits:
+   *  - the same kind already queued on this element (repeat after/before/
+   *    same-name attribute — sequential execution is order-sensitive there)
+   *  - prepend/append mixed with ANYTHING on the same element (they touch
+   *    the open-tag region and, for empty elements, share positions)
+   * (Same-position appendRight conflicts — sequential LIFO — are handled at
+   * queue time with a flush-and-retry, since the flush invalidates the
+   * positions already computed by the caller.)
+   */
+  __flushBatchIfConflicting(element: SourceElement, kind: string): void {
+    const kinds = this.__batchedElementKinds.get(element);
+    if (!kinds) return;
+    const incomingIsContent = kind === 'prepend' || kind === 'append';
+    const queuedHasContent = kinds.has('prepend') || kinds.has('append');
+    if (kinds.has(kind) || incomingIsContent || queuedHasContent) {
+      this.__flushBatch();
+    }
+  }
+
+  /** Flush when queued edits would make this element's attribute state stale. */
+  __flushBatchIfAttributesPending(element: SourceElement): void {
+    const kinds = this.__batchedElementKinds.get(element);
+    if (!kinds) return;
+    for (const kind of kinds) {
+      if (kind.startsWith('attr:') || kind === 'prepend' || kind === 'append') {
+        this.__flushBatch();
+        return;
+      }
+    }
+  }
+
+  /** Flush when deferred node insertions would make the child list stale. */
+  __flushBatchIfStructuralPending(): void {
+    if (this.__batchHasStructuralEdits) {
+      this.__flushBatch();
+    }
+  }
+
+  /** Flush if this element has ANY queued edits (coarse write/read guard). */
+  __flushBatchIfElementPending(element: SourceElement): void {
+    if (this.__batchedElementKinds.has(element)) {
+      this.__flushBatch();
+    }
+  }
+
+  /**
+   * Apply every queued edit: one string rebuild, one AST position walk,
+   * then the deferred per-edit AST metadata writes. No-op when empty.
+   */
+  __flushBatch(): void {
+    if (this.__batchEdits.length === 0) {
+      return;
+    }
+
+    const edits = this.__batchEdits;
+    this.__batchEdits = [];
+    this.__batchedElementKinds = new Map();
+    this.__batchAppendRightPositions = new Set();
+    this.__batchHasStructuralEdits = false;
+
+    // Sort by position; at equal positions, appendRight sorts before
+    // prependLeft — appendRight anchors to the content on its LEFT (an
+    // `after(A)` stays adjacent to A) while prependLeft anchors to the
+    // content on its RIGHT (a `before(B)` stays adjacent to B), which is
+    // exactly the order sequential execution produces when two inserts from
+    // adjacent elements land on the same boundary, regardless of call
+    // order. Array.prototype.sort is stable, so same-position same-kind
+    // edits keep queue order (they can only come from the same call site).
+    const sorted = [...edits].sort((a, b) => a.start - b.start || batchAnchorRank(a) - batchAnchorRank(b));
+    for (let index = 1; index < sorted.length; index++) {
+      if (sorted[index].start < sorted[index - 1].end) {
+        throw new Error('html-mod: overlapping batched edits');
+      }
+    }
+
+    this.__sourceRaw = buildBatchedSource(this.__sourceRaw, sorted);
+    applyEditsToAstPositions(this.__dom, sorted);
+
+    const shifts = finalizerShifts(sorted);
+    for (const [index, edit] of sorted.entries()) {
+      edit.finalize(shifts[index]);
+    }
   }
 
   /**
@@ -262,6 +471,9 @@ export class HtmlMod {
   }
 
   querySelector(selector: string): HtmlModElement | null {
+    // Attribute selectors read attribs, which are stale for batch-edited
+    // elements — flush before matching.
+    this.__flushBatch();
     // If selector contains :scope, use querySelectorAll and return first result
     // This ensures :scope handling is consistent between querySelector and querySelectorAll
     if (selector.includes(':scope')) {
@@ -278,6 +490,9 @@ export class HtmlMod {
   }
 
   querySelectorAll(selector: string): HtmlModElement[] {
+    // Attribute selectors read attribs, which are stale for batch-edited
+    // elements — flush before matching.
+    this.__flushBatch();
     // Handle :scope selector on root document
     // When :scope is used on the document root, it should refer to the document itself
     // cheerio-select doesn't support :scope on document nodes, so we need to handle it manually
@@ -435,6 +650,7 @@ export class HtmlModElement {
   }
 
   set tagName(tagName: string) {
+    this.__htmlMod.__flushBatch();
     if (!this.__element.endIndex) {
       return;
     }
@@ -465,6 +681,7 @@ export class HtmlModElement {
   }
 
   get classList() {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     const classes = this.__element.attribs.class ?? '';
     const result: string[] = [];
 
@@ -480,6 +697,7 @@ export class HtmlModElement {
   }
 
   get className() {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     return this.__element.attribs.class ?? '';
   }
 
@@ -546,6 +764,7 @@ export class HtmlModElement {
   }
 
   get attributes() {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     return this.__element.source.attributes.map(attribute => {
       return {
         name: attribute.name.data,
@@ -569,6 +788,7 @@ export class HtmlModElement {
   }
 
   set innerHTML(html: string) {
+    this.__htmlMod.__flushBatch();
     if (!this.__element.endIndex) {
       return;
     }
@@ -645,6 +865,7 @@ export class HtmlModElement {
   }
 
   set textContent(text: string) {
+    this.__htmlMod.__flushBatch();
     if (!this.__element.endIndex) {
       return;
     }
@@ -681,6 +902,7 @@ export class HtmlModElement {
    * siblings.
    */
   expandSelfClosing(): this {
+    this.__htmlMod.__flushBatch();
     if (!isSelfClosing(this.__element)) return this;
 
     // Invalidate cached outerHTML since we're changing the element's structure
@@ -722,6 +944,7 @@ export class HtmlModElement {
   }
 
   get children() {
+    this.__htmlMod.__flushBatchIfStructuralPending();
     return this.__element.children;
   }
 
@@ -736,86 +959,202 @@ export class HtmlModElement {
   }
 
   before(html: string) {
-    const insertPos = this.__element.source.openTag.startIndex;
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, 'before');
+    const element = this.__element;
+    const htmlMod = this.__htmlMod;
+    const insertPos = element.source.openTag.startIndex;
 
-    atomicPrependLeft(this.__htmlMod, insertPos, html, this.__element);
+    const finalize = (shift: number) => {
+      const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos + shift, htmlMod.__options);
+      // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- AST helper, not a DOM node
+      AstManipulator.insertBefore(element, newNodes);
+    };
 
-    const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
-    AstManipulator.insertBefore(this.__element, newNodes);
+    if (htmlMod.__isBatching) {
+      htmlMod.__queueStructuralBatchEdit(
+        {
+          start: insertPos,
+          end: insertPos,
+          content: html,
+          delta: calculatePrependLeftDelta(insertPos, html),
+          element,
+          finalize,
+        },
+        'before'
+      );
+      return this;
+    }
+
+    atomicPrependLeft(htmlMod, insertPos, html, element);
+    finalize(0);
 
     return this;
   }
 
-  after(html: string) {
-    const insertPos = getOuterEnd(this.__element);
+  after(html: string): this {
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, 'after');
+    const element = this.__element;
+    const htmlMod = this.__htmlMod;
+    const insertPos = getOuterEnd(element);
 
-    atomicAppendRight(this.__htmlMod, insertPos, html, this.__element);
+    const finalize = (shift: number) => {
+      const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos + shift, htmlMod.__options);
+      AstManipulator.insertAfter(element, newNodes);
+    };
 
-    const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
-    AstManipulator.insertAfter(this.__element, newNodes);
+    if (htmlMod.__isBatching) {
+      if (htmlMod.__batchAppendRightPositions.has(insertPos)) {
+        // Same-position appendRights apply LIFO sequentially — flush and
+        // re-run so the position is recomputed against the flushed state.
+        htmlMod.__flushBatch();
+        return this.after(html);
+      }
+      htmlMod.__queueStructuralBatchEdit(
+        {
+          start: insertPos,
+          end: insertPos,
+          content: html,
+          delta: calculateAppendRightDelta(insertPos, html),
+          element,
+          finalize,
+        },
+        'after'
+      );
+      return this;
+    }
+
+    atomicAppendRight(htmlMod, insertPos, html, element);
+    finalize(0);
 
     return this;
   }
 
-  prepend(html: string) {
-    const selfClosing = isSelfClosing(this.__element);
-    const hadSlash = hasTrailingSlash(this.__element, this.__htmlMod.__source);
-    const originalEndIndex = this.__element.source.openTag.endIndex;
+  prepend(html: string): this {
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, 'prepend');
+    const element = this.__element;
+    const htmlMod = this.__htmlMod;
+    const selfClosing = isSelfClosing(element);
+    // Raw read is safe mid-batch: this element has no queued edits (the
+    // guard above flushed if it did), and the slash belongs to its own tag.
+    const hadSlash = hasTrailingSlash(element, htmlMod.__sourceRaw);
+    const originalEndIndex = element.source.openTag.endIndex;
 
+    /** The single string operation this call performs. */
+    let operation: { type: 'overwrite' | 'appendRight' | 'prependLeft'; start: number; end: number; content: string };
     if (selfClosing) {
-      const closingTag = makeClosingTag(this.__element.source.openTag.name);
+      const closingTag = makeClosingTag(element.source.openTag.name);
 
       if (hadSlash) {
         const slashStart = originalEndIndex - 1;
         const gtEnd = originalEndIndex + 1;
-        const replacement = `>${html}${closingTag}`;
-        atomicOverwrite(this.__htmlMod, slashStart, gtEnd, replacement, this.__element);
+        operation = { type: 'overwrite', start: slashStart, end: gtEnd, content: `>${html}${closingTag}` };
       } else {
         const insertPos = originalEndIndex + 1;
-        const combined = html + closingTag;
-        atomicAppendRight(this.__htmlMod, insertPos, combined, this.__element);
+        operation = { type: 'appendRight', start: insertPos, end: insertPos, content: html + closingTag };
       }
     } else {
       const insertPos = originalEndIndex + 1;
-      atomicPrependLeft(this.__htmlMod, insertPos, html, this.__element);
+      operation = { type: 'prependLeft', start: insertPos, end: insertPos, content: html };
     }
 
-    if (selfClosing) {
-      // When the tag had a trailing slash, the overwrite replaced `/>` with a
-      // single `>`, shifting the `>` (and therefore the inserted content) left
-      // by one. parsePos must be derived from the post-overwrite open-tag end,
-      // not the original `>` position, or every inserted position drifts.
-      const openTagEnd = hadSlash ? originalEndIndex - 1 : originalEndIndex;
-      const parsePos = openTagEnd + 1;
+    const finalize = (shift: number) => {
+      if (selfClosing) {
+        // When the tag had a trailing slash, the overwrite replaced `/>` with a
+        // single `>`, shifting the `>` (and therefore the inserted content) left
+        // by one. parsePos must be derived from the post-overwrite open-tag end,
+        // not the original `>` position, or every inserted position drifts.
+        const openTagEnd = (hadSlash ? originalEndIndex - 1 : originalEndIndex) + shift;
+        const parsePos = openTagEnd + 1;
 
-      const newNodes = AstManipulator.parseHtmlAtPosition(html, parsePos, this.__htmlMod.__options);
-      AstManipulator.prependChild(this.__element, newNodes);
+        const newNodes = AstManipulator.parseHtmlAtPosition(html, parsePos, htmlMod.__options);
+        AstManipulator.prependChild(element, newNodes);
 
-      const closingTag = makeClosingTag(this.__element.source.openTag.name);
-      const closeTagStart = parsePos + html.length;
-      // endIndex is exclusive (one past the `>`), matching the parser's convention
-      const closeTagEnd = closeTagStart + closingTag.length;
-      AstManipulator.convertToRegularTag(this.__element, openTagEnd, closeTagStart, closeTagEnd);
+        const closingTag = makeClosingTag(element.source.openTag.name);
+        const closeTagStart = parsePos + html.length;
+        // endIndex is exclusive (one past the `>`), matching the parser's convention
+        const closeTagEnd = closeTagStart + closingTag.length;
+        AstManipulator.convertToRegularTag(element, openTagEnd, closeTagStart, closeTagEnd);
+      } else {
+        const insertPos = originalEndIndex + 1 + shift;
+        const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, htmlMod.__options);
+        AstManipulator.prependChild(element, newNodes);
+      }
+    };
+
+    if (htmlMod.__isBatching) {
+      if (operation.type === 'appendRight' && htmlMod.__batchAppendRightPositions.has(operation.start)) {
+        htmlMod.__flushBatch();
+        return this.prepend(html);
+      }
+      htmlMod.__queueStructuralBatchEdit(
+        {
+          start: operation.start,
+          end: operation.end,
+          content: operation.content,
+          delta:
+            operation.type === 'overwrite'
+              ? calculateOverwriteDelta(operation.start, operation.end, operation.content)
+              : operation.type === 'appendRight'
+                ? calculateAppendRightDelta(operation.start, operation.content)
+                : calculatePrependLeftDelta(operation.start, operation.content),
+          element,
+          finalize,
+        },
+        'prepend'
+      );
+      return this;
+    }
+
+    if (operation.type === 'overwrite') {
+      atomicOverwrite(htmlMod, operation.start, operation.end, operation.content, element);
+    } else if (operation.type === 'appendRight') {
+      atomicAppendRight(htmlMod, operation.start, operation.content, element);
     } else {
-      const insertPos = originalEndIndex + 1;
-      const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
-      AstManipulator.prependChild(this.__element, newNodes);
+      atomicPrependLeft(htmlMod, operation.start, operation.content, element);
     }
+    finalize(0);
 
     return this;
   }
 
-  append(html: string) {
+  append(html: string): this {
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, 'append');
     if (isSelfClosing(this.__element)) {
       return this.prepend(html);
     }
 
-    const insertPos = getContentEnd(this.__element);
+    const element = this.__element;
+    const htmlMod = this.__htmlMod;
+    const insertPos = getContentEnd(element);
 
-    atomicAppendRight(this.__htmlMod, insertPos, html, this.__element);
+    const finalize = (shift: number) => {
+      const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos + shift, htmlMod.__options);
+      AstManipulator.appendChild(element, newNodes);
+    };
 
-    const newNodes = AstManipulator.parseHtmlAtPosition(html, insertPos, this.__htmlMod.__options);
-    AstManipulator.appendChild(this.__element, newNodes);
+    if (htmlMod.__isBatching) {
+      if (htmlMod.__batchAppendRightPositions.has(insertPos)) {
+        // Same-position appendRights apply LIFO sequentially — flush and
+        // re-run so the position is recomputed against the flushed state.
+        htmlMod.__flushBatch();
+        return this.append(html);
+      }
+      htmlMod.__queueStructuralBatchEdit(
+        {
+          start: insertPos,
+          end: insertPos,
+          content: html,
+          delta: calculateAppendRightDelta(insertPos, html),
+          element,
+          finalize,
+        },
+        'append'
+      );
+      return this;
+    }
+
+    atomicAppendRight(htmlMod, insertPos, html, element);
+    finalize(0);
 
     return this;
   }
@@ -850,6 +1189,7 @@ export class HtmlModElement {
   }
 
   remove() {
+    this.__htmlMod.__flushBatch();
     if (this.__removed) {
       return this;
     }
@@ -867,6 +1207,7 @@ export class HtmlModElement {
   }
 
   replaceWith(html: string) {
+    this.__htmlMod.__flushBatch();
     if (this.__removed) {
       return this;
     }
@@ -885,14 +1226,17 @@ export class HtmlModElement {
   }
 
   hasAttribute(name: string) {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     return name in this.__element.attribs;
   }
 
   hasAttributes() {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     return Object.keys(this.__element.attribs).length > 0;
   }
 
   getAttribute(name: string): string | null {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     const attribute = this.__element.source.attributes.find(a => a.name.data === name);
 
     const value = this.__element.attribs[name] ?? null;
@@ -905,11 +1249,20 @@ export class HtmlModElement {
   }
 
   getAttributeNames() {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     return Object.keys(this.__element.attribs);
   }
 
-  setAttribute(name: string, value: string) {
+  setAttribute(name: string, value: string): this {
+    // A conflicting queued edit (same attribute, or content ops that touch
+    // the open-tag region) would make the positions read below stale —
+    // flush first. Distinct-name attribute writes and before/after inserts
+    // on the same element coexist safely.
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, `attr:${name}`);
+
     const attribute = this.__element.source.attributes.find(a => a.name.data === name);
+    /** The single string operation this call performs, applied at the end. */
+    let operation: { type: 'overwrite' | 'appendRight' | 'prependLeft'; start: number; end: number; content: string };
 
     // Process the value and determine the quote
     const [escapedValue, quoteChar] = processValueAndQuote(attribute?.quote ?? null, value);
@@ -934,7 +1287,7 @@ export class HtmlModElement {
         const overwriteEnd = attribute.value?.endIndex + 1 + (hasQuote ? 1 : 0);
         const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-        atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content, this.__element);
+        operation = { type: 'overwrite', start: overwriteStart, end: overwriteEnd, content };
 
         nameStart = attribute.name.startIndex;
         valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -956,7 +1309,7 @@ export class HtmlModElement {
           const overwriteEnd = attribute.value?.endIndex + 2;
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-          atomicOverwrite(this.__htmlMod, overwriteStart, overwriteEnd, content, this.__element);
+          operation = { type: 'overwrite', start: overwriteStart, end: overwriteEnd, content };
 
           nameStart = attribute.name.startIndex;
           valueStart = overwriteStart + (quoteChar ? 1 : 0);
@@ -969,7 +1322,7 @@ export class HtmlModElement {
           const insertPos = attribute.value.startIndex;
           const content = `${quoteChar}${escapedValue}${quoteChar}`;
 
-          atomicAppendRight(this.__htmlMod, insertPos, content, this.__element);
+          operation = { type: 'appendRight', start: insertPos, end: insertPos, content };
 
           nameStart = attribute.name.startIndex;
           valueStart = insertPos + (quoteChar ? 1 : 0);
@@ -981,7 +1334,7 @@ export class HtmlModElement {
         const insertPos = attribute.name.endIndex + 1;
         const content = `=${actualQuoteUsed}${escapedValue}${actualQuoteUsed}`;
 
-        atomicAppendRight(this.__htmlMod, insertPos, content, this.__element);
+        operation = { type: 'appendRight', start: insertPos, end: insertPos, content };
 
         nameStart = attribute.name.startIndex;
         valueStart = insertPos + 2; // +1 for =, +1 for quote
@@ -999,10 +1352,13 @@ export class HtmlModElement {
 
       // For self-closing tags with trailing slash, insert before the '/' and add space after attribute
       if (isSelfClosing(this.__element)) {
-        const charBeforeGt = this.__htmlMod.__source.charAt(insertPos - 1);
+        // Raw read is safe mid-batch: this element has no queued edits (the
+        // guard at the top flushed if it did), and these chars belong to its
+        // own open tag.
+        const charBeforeGt = this.__htmlMod.__sourceRaw.charAt(insertPos - 1);
         if (charBeforeGt === '/') {
           // Check if there's already a space before the '/'
-          const charBeforeSlash = this.__htmlMod.__source.charAt(insertPos - 2);
+          const charBeforeSlash = this.__htmlMod.__sourceRaw.charAt(insertPos - 2);
           if (charBeforeSlash === ' ') {
             // There's already a space, don't add another leading space
             content = `${name}=${actualQuoteUsed}${escapedValue}${actualQuoteUsed} `;
@@ -1015,7 +1371,7 @@ export class HtmlModElement {
         }
       }
 
-      atomicPrependLeft(this.__htmlMod, insertPos, content, this.__element);
+      operation = { type: 'prependLeft', start: insertPos, end: insertPos, content };
 
       // Positions are calculated relative to where content is inserted
       // prependLeft inserts BEFORE insertPos, so content starts at insertPos
@@ -1030,20 +1386,59 @@ export class HtmlModElement {
       sourceEnd = contentStart + content.length - 1 - (hasTrailingSpace ? 1 : 0);
     }
 
-    // 3. Modify AST: Update attribute in element
-    // Positions are already correct since they were calculated before the operation
-    // Pass escapedValue for source.data (HTML), value for attribs (JavaScript)
-    AstManipulator.setAttribute(
-      this.__element,
-      name,
-      escapedValue,
-      actualQuoteUsed as '"' | "'" | null,
-      nameStart,
-      valueStart,
-      sourceStart,
-      sourceEnd,
-      value // unescaped value for attribs
-    );
+    // 3. Apply the string operation and AST metadata. Positions were
+    // calculated against pre-operation state, so they are correct after the
+    // operation applies (eager) — or after the batch flush shifts them by
+    // the cumulative delta of preceding edits (batched).
+    const element = this.__element;
+    const quoteForAst = actualQuoteUsed as '"' | "'" | null;
+    const applyMetadata = (shift: number) =>
+      AstManipulator.setAttribute(
+        element,
+        name,
+        escapedValue,
+        quoteForAst,
+        nameStart + shift,
+        valueStart + shift,
+        sourceStart + shift,
+        sourceEnd + shift,
+        value // unescaped value for attribs
+      );
+
+    if (this.__htmlMod.__isBatching) {
+      if (operation.type === 'appendRight' && this.__htmlMod.__batchAppendRightPositions.has(operation.start)) {
+        // Same-position appendRights apply LIFO sequentially — cannot batch.
+        // Every position captured above is stale after the flush, so re-run
+        // against the flushed state (no pending edits ⇒ no recursion loop).
+        this.__htmlMod.__flushBatch();
+        return this.setAttribute(name, value);
+      }
+      this.__htmlMod.__queueBatchEdit(
+        {
+          start: operation.start,
+          end: operation.end,
+          content: operation.content,
+          delta:
+            operation.type === 'overwrite'
+              ? calculateOverwriteDelta(operation.start, operation.end, operation.content)
+              : operation.type === 'appendRight'
+                ? calculateAppendRightDelta(operation.start, operation.content)
+                : calculatePrependLeftDelta(operation.start, operation.content),
+          element,
+          finalize: applyMetadata,
+        },
+        `attr:${name}`
+      );
+    } else {
+      if (operation.type === 'overwrite') {
+        atomicOverwrite(this.__htmlMod, operation.start, operation.end, operation.content, element);
+      } else if (operation.type === 'appendRight') {
+        atomicAppendRight(this.__htmlMod, operation.start, operation.content, element);
+      } else {
+        atomicPrependLeft(this.__htmlMod, operation.start, operation.content, element);
+      }
+      applyMetadata(0);
+    }
 
     return this;
   }
@@ -1065,7 +1460,12 @@ export class HtmlModElement {
   }
 
   removeAttribute(name: string) {
-    for (const attribute of this.__element.source.attributes) {
+    // Same conflict rules as setAttribute — a queued edit on the same
+    // attribute (or content ops) must land first.
+    this.__htmlMod.__flushBatchIfConflicting(this.__element, `attr:${name}`);
+
+    const element = this.__element;
+    for (const attribute of element.source.attributes) {
       if (attribute.name.data !== name) {
         continue;
       }
@@ -1074,16 +1474,33 @@ export class HtmlModElement {
       const removeStart = attribute.source.startIndex - 1;
       const removeEnd = attribute.source.endIndex + 1;
 
-      atomicRemove(this.__htmlMod, removeStart, removeEnd, this.__element);
+      if (this.__htmlMod.__isBatching) {
+        this.__htmlMod.__queueBatchEdit(
+          {
+            start: removeStart,
+            end: removeEnd,
+            content: '',
+            delta: calculateRemoveDelta(removeStart, removeEnd),
+            element,
+            // AstManipulator.removeAttribute is position-free.
+            finalize: () => AstManipulator.removeAttribute(element, name),
+          },
+          `attr:${name}`
+        );
+        return this;
+      }
+
+      atomicRemove(this.__htmlMod, removeStart, removeEnd, element);
     }
 
     // 3. Modify AST: Remove attribute from element
-    AstManipulator.removeAttribute(this.__element, name);
+    AstManipulator.removeAttribute(element, name);
 
     return this;
   }
 
   querySelector(selector: string): HtmlModElement | null {
+    this.__htmlMod.__flushBatch();
     const result = select(selector, this.__element)?.[0] ?? null;
     if (!result) {
       return null;
@@ -1093,6 +1510,7 @@ export class HtmlModElement {
   }
 
   querySelectorAll(selector: string): HtmlModElement[] {
+    this.__htmlMod.__flushBatch();
     return select(selector, this.__element).map(element => {
       return new this.__htmlMod.__HtmlModElement(element as unknown as SourceElement, this.__htmlMod);
     });
@@ -1153,6 +1571,7 @@ export class HtmlModText {
   }
 
   set textContent(text: string) {
+    this.__htmlMod.__flushBatch();
     // Allow endIndex === 0 (one-char text node at index 0); `!0` would drop it.
     if (this.__text.endIndex == null) {
       return;
