@@ -272,6 +272,101 @@ describe('structural batch guards', () => {
     });
   });
 
+  test('cross-anchor prependLeft ties: before(child) + prepend(parent), both call orders (review finding)', () => {
+    // prepend(parent) and before(firstChild) share the content-start
+    // position but anchor differently: prepend's anchor (the open tag)
+    // never shifts, before's anchor (the child) does — so sequential
+    // execution puts the prepend content first in BOTH call orders, which
+    // a stable queue-order sort cannot reproduce. The batch must flush and
+    // retry.
+    for (const order of ['before-first', 'prepend-first'] as const) {
+      const source = '<div><span>x</span></div>';
+
+      const eager = new HtmlMod(source);
+      if (order === 'before-first') {
+        eager.querySelectorAll('span')[0].before('Y');
+        eager.querySelectorAll('div')[0].prepend('X');
+      } else {
+        eager.querySelectorAll('div')[0].prepend('X');
+        eager.querySelectorAll('span')[0].before('Y');
+      }
+
+      const batched = new HtmlMod(source);
+      batched.batch(() => {
+        const span = batched.querySelectorAll('span')[0];
+        const div = batched.querySelectorAll('div')[0];
+        if (order === 'before-first') {
+          span.before('Y');
+          div.prepend('X');
+        } else {
+          div.prepend('X');
+          span.before('Y');
+        }
+      });
+
+      expect(batched.toString(), order).toBe(eager.toString());
+      expect(batched.toString(), order).toBe('<div>XY<span>x</span></div>');
+    }
+  });
+
+  test('same-element multi-attribute writes still batch flush-free (FIFO-safe tie)', () => {
+    // Two NEW attributes on one element share the prependLeft position but
+    // the same anchor — FIFO both sequentially and under the stable sort.
+    // The cross-anchor guard must NOT deopt this.
+    const h = new HtmlMod('<div><span>x</span></div>');
+    h.batch(() => {
+      // Capture targets first — selector queries flush pending edits.
+      const div = h.querySelectorAll('div')[0];
+      const span = h.querySelectorAll('span')[0];
+      div.setAttribute('data-a', '1');
+      span.setAttribute('data-b', '2');
+      div.setAttribute('data-c', '3');
+      // All three queued — no conflict flush for distinct names/positions.
+      expect(h.__batchEdits).toHaveLength(3);
+    });
+    expect(h.toString()).toBe('<div data-a="1" data-c="3"><span data-b="2">x</span></div>');
+  });
+
+  test('id read mid-batch sees the queued write (review finding)', () => {
+    const h = new HtmlMod('<div><span>x</span></div>');
+    h.batch(() => {
+      const div = h.querySelectorAll('div')[0];
+      div.setAttribute('id', 'fresh');
+      expect(div.id).toBe('fresh');
+    });
+  });
+
+  test('textContent read mid-batch sees queued inserts (review finding)', () => {
+    const h = new HtmlMod('<div><span>x</span></div>');
+    h.batch(() => {
+      const div = h.querySelectorAll('div')[0];
+      div.append('tail');
+      expect(div.textContent).toBe('xtail');
+    });
+  });
+
+  test('sourceRange read mid-batch is coherent, not mixed-coordinate (review finding)', () => {
+    const h = new HtmlMod('<x-a></x-a>\n<x-b></x-b>');
+    let midBatch: unknown;
+    h.batch(() => {
+      h.querySelectorAll('x-a')[0].setAttribute('data-long', 'a long value that shifts positions');
+      midBatch = h.querySelectorAll('x-b')[0].sourceRange;
+    });
+    const after = h.querySelectorAll('x-b')[0].sourceRange;
+    expect(midBatch).toEqual(after);
+  });
+
+  test('isSelfClosing read mid-batch reflects a queued prepend conversion (review finding)', () => {
+    const h = new HtmlMod('<x-a /><x-b></x-b>');
+    h.batch(() => {
+      const a = h.querySelectorAll('x-a')[0];
+      expect(a.isSelfClosing).toBe(true);
+      a.prepend('content');
+      expect(a.isSelfClosing).toBe(false);
+    });
+    expect(h.toString()).toBe('<x-a >content</x-a><x-b></x-b>');
+  });
+
   test('interleaved batches and eager ops keep positions coherent', () => {
     const h = new HtmlMod('<x-a></x-a><x-b></x-b><x-c></x-c>');
     h.batch(() => {

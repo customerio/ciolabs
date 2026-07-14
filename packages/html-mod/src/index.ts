@@ -56,6 +56,9 @@ export class HtmlMod {
   }
 
   set __source(value: string) {
+    // Same corruption tripwire as the raw splices: replacing the source
+    // with batched edits still pending would silently drop them.
+    this.__assertNoPendingBatchEdits();
     this.__sourceRaw = value;
   }
 
@@ -140,6 +143,15 @@ export class HtmlMod {
    */
   __batchAppendRightPositions: Set<number> = new Set();
   /**
+   * Anchor element per queued prependLeft position. Same-position
+   * prependLefts from the SAME element (several new attributes) are FIFO
+   * both sequentially and under the stable sort — safe to batch. From
+   * DIFFERENT elements (`prepend(parent)` + `before(firstChild)` share the
+   * content-start position) the sequential order depends on which anchor
+   * shifted, which the sort cannot reproduce — flush and retry.
+   */
+  __batchPrependLeftPositions: Map<number, SourceElement> = new Map();
+  /**
    * Whether any queued edit inserts nodes (before/after/prepend/append).
    * Structural READS (`children`) must flush when true — the AST tree
    * mutation is deferred to the finalizer, so the child list is stale until
@@ -182,6 +194,8 @@ export class HtmlMod {
   __queueBatchEdit(edit: QueuedEdit, kind: string): void {
     if (edit.delta.operationType === 'appendRight') {
       this.__batchAppendRightPositions.add(edit.delta.mutationStart);
+    } else if (edit.delta.operationType === 'prependLeft') {
+      this.__batchPrependLeftPositions.set(edit.delta.mutationStart, edit.element);
     }
     this.__batchEdits.push(edit);
     let kinds = this.__batchedElementKinds.get(edit.element);
@@ -215,6 +229,16 @@ export class HtmlMod {
     if (kinds.has(kind) || incomingIsContent || queuedHasContent) {
       this.__flushBatch();
     }
+  }
+
+  /**
+   * True when a queued prependLeft at this position anchors to a DIFFERENT
+   * element — sequential ordering then depends on anchor shifting, which
+   * the batch sort cannot reproduce. Callers flush and retry.
+   */
+  __hasPrependLeftCollision(position: number, element: SourceElement): boolean {
+    const anchor = this.__batchPrependLeftPositions.get(position);
+    return anchor !== undefined && anchor !== element;
   }
 
   /** Flush when queued edits would make this element's attribute state stale. */
@@ -256,6 +280,7 @@ export class HtmlMod {
     this.__batchEdits = [];
     this.__batchedElementKinds = new Map();
     this.__batchAppendRightPositions = new Set();
+    this.__batchPrependLeftPositions = new Map();
     this.__batchHasStructuralEdits = false;
 
     // Sort by position; at equal positions, appendRight sorts before
@@ -621,6 +646,11 @@ export class HtmlModElement {
   }
 
   get sourceRange() {
+    // Flush BEFORE reading positions: this getter mixes AST positions with
+    // the source string, and the `__source` accessor below flushes — reading
+    // positions first would measure pre-batch positions against the
+    // post-flush string (mixed coordinates, wrong line/column).
+    this.__htmlMod.__flushBatch();
     const startIndex = this.__element.source.openTag.startIndex;
     const endIndex = getOuterEnd(this.__element);
     const html = this.__htmlMod.__source;
@@ -673,6 +703,7 @@ export class HtmlModElement {
   }
 
   get id() {
+    this.__htmlMod.__flushBatchIfAttributesPending(this.__element);
     return this.__element.attribs.id ?? '';
   }
 
@@ -859,6 +890,8 @@ export class HtmlModElement {
   }
 
   get textContent() {
+    // Pending node inserts are invisible to the AST walk until flush.
+    this.__htmlMod.__flushBatchIfStructuralPending();
     const text = DomUtils.textContent(this.__element);
 
     return decode(text);
@@ -887,6 +920,8 @@ export class HtmlModElement {
    * Whether this element is self-closing (`<tag />` with no close tag).
    */
   get isSelfClosing(): boolean {
+    // A queued prepend() converts a self-closing element at flush time.
+    this.__htmlMod.__flushBatchIfStructuralPending();
     return isSelfClosing(this.__element);
   }
 
@@ -1082,7 +1117,10 @@ export class HtmlModElement {
     };
 
     if (htmlMod.__isBatching) {
-      if (operation.type === 'appendRight' && htmlMod.__batchAppendRightPositions.has(operation.start)) {
+      if (
+        (operation.type === 'appendRight' && htmlMod.__batchAppendRightPositions.has(operation.start)) ||
+        (operation.type === 'prependLeft' && htmlMod.__hasPrependLeftCollision(operation.start, element))
+      ) {
         htmlMod.__flushBatch();
         return this.prepend(html);
       }
@@ -1406,10 +1444,14 @@ export class HtmlModElement {
       );
 
     if (this.__htmlMod.__isBatching) {
-      if (operation.type === 'appendRight' && this.__htmlMod.__batchAppendRightPositions.has(operation.start)) {
-        // Same-position appendRights apply LIFO sequentially — cannot batch.
-        // Every position captured above is stale after the flush, so re-run
-        // against the flushed state (no pending edits ⇒ no recursion loop).
+      if (
+        (operation.type === 'appendRight' && this.__htmlMod.__batchAppendRightPositions.has(operation.start)) ||
+        (operation.type === 'prependLeft' && this.__htmlMod.__hasPrependLeftCollision(operation.start, element))
+      ) {
+        // Same-position inserts whose sequential order the batch sort cannot
+        // reproduce (appendRight LIFO; cross-anchor prependLeft) — flush and
+        // re-run against the flushed state, where every position captured
+        // above is recomputed (no pending edits ⇒ no recursion loop).
         this.__htmlMod.__flushBatch();
         return this.setAttribute(name, value);
       }

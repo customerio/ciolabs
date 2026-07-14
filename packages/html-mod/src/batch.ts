@@ -158,7 +158,11 @@ export function applyEditsToAstPositions(root: SourceDocument, sortedEdits: Queu
     // each field: take the boundary-rule delta, then subtract insert edits
     // that start strictly after this node's end (they were excluded by the
     // eager node-level guard).
-    const nodeEnd = typeof node.endIndex === 'number' ? node.endIndex : Number.MAX_SAFE_INTEGER;
+    // Match the eager updater's coercion: a null endIndex compares as 0
+    // there (`null < mutationStart` → node skipped for any positive
+    // mutation), so map missing endIndex to 0 — not MAX — or the two paths
+    // diverge on position-less nodes.
+    const nodeEnd = typeof node.endIndex === 'number' ? node.endIndex : 0;
     const insertUpToNodeEnd = deltaAt(nodeEnd, insertPrefix);
     const shift = (position: number): number => {
       let delta = deltaAt(position, boundaryPrefix);
