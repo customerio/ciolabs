@@ -36,9 +36,10 @@ type ListenerMap = {
 
 export class Framecast {
   /**
-   * The element we are communicating with.
+   * The element we are communicating with. Nulled by destroy() so a
+   * detached iframe window can be garbage collected.
    */
-  private target: Window;
+  private target: Window | null;
 
   /**
    * Config for the framecast.
@@ -62,6 +63,14 @@ export class Framecast {
   private pendingFunctionCalls: Map<string, { timeout: number; resolve: Function; reject: Function }> = new Map();
 
   /**
+   * The bound message handler, kept so the window listener added in the
+   * constructor can be removed again in destroy(). Binding inline in
+   * add/removeEventListener creates a new function each time, so the
+   * listener would never actually be removed.
+   */
+  private boundHandlePostedMessage = this.handlePostedMessage.bind(this);
+
+  /**
    * When true, broadcast() queues messages instead of posting them.
    * Set by waitForReady({ queueMessages: true }), cleared on
    * handshake success (flush), timeout (discard), or clearQueue().
@@ -76,8 +85,7 @@ export class Framecast {
 
     this.target = target;
     this.config = { ...this.config, ...config };
-    this.self.removeEventListener('message', this.handlePostedMessage.bind(this));
-    this.self.addEventListener('message', this.handlePostedMessage.bind(this));
+    this.self.addEventListener('message', this.boundHandlePostedMessage);
 
     if (this.config.supportEvaluate) {
       this.on('function:evaluate', async (function_: string) => {
@@ -112,6 +120,10 @@ export class Framecast {
   }
 
   private postMessage(type: string, message: any) {
+    if (this.target == null) {
+      return;
+    }
+
     this.target.postMessage(superjson.stringify({ ...message, type, channel: this.channel }), this.origin);
   }
 
@@ -142,6 +154,27 @@ export class Framecast {
     if (this.listeners[eventType]) {
       this.listeners[eventType].delete(listener as any);
     }
+  }
+
+  /**
+   * Removes the window message listener, rejects pending function calls
+   * with a "Framecast destroyed" error, clears all event listeners,
+   * discards any queued broadcasts and releases the reference to the
+   * target window so a detached iframe window can be garbage collected.
+   * postMessage becomes a no-op after destroy. The instance must not be
+   * used after calling destroy.
+   */
+  destroy(): void {
+    this.self.removeEventListener('message', this.boundHandlePostedMessage);
+
+    for (const [id, pendingCall] of this.pendingFunctionCalls.entries()) {
+      this.clearPendingFunctionCall(id);
+      pendingCall.reject(new Error('Framecast destroyed'));
+    }
+
+    this.listeners = { broadcast: new Set() };
+    this.clearQueue();
+    this.target = null;
   }
 
   /**

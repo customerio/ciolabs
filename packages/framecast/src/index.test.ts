@@ -77,8 +77,111 @@ describe('Framecast', () => {
       expect(mockSelfWindow.addEventListener).toHaveBeenCalledWith('message', expect.any(Function));
     });
 
-    it('should remove existing message listener before adding new one', () => {
-      expect(mockSelfWindow.removeEventListener).toHaveBeenCalledWith('message', expect.any(Function));
+    it('should not remove any message listener on construction', () => {
+      expect(mockSelfWindow.removeEventListener).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('destroy', () => {
+    type MessageListener = (event: MessageEvent) => void;
+
+    type StubWindow = Window & { messageListeners: Set<MessageListener>; postMessage: ReturnType<typeof vi.fn> };
+
+    function createStubWindow(): StubWindow {
+      const messageListeners = new Set<MessageListener>();
+
+      return {
+        messageListeners,
+        addEventListener(type: string, listener: MessageListener) {
+          if (type === 'message') {
+            messageListeners.add(listener);
+          }
+        },
+        removeEventListener(type: string, listener: MessageListener) {
+          if (type === 'message') {
+            messageListeners.delete(listener);
+          }
+        },
+        postMessage: vi.fn(),
+      } as unknown as StubWindow;
+    }
+
+    it('adds a single message listener to self on construction', () => {
+      const self = createStubWindow();
+      const target = createStubWindow();
+
+      new Framecast(target, { self });
+
+      expect(self.messageListeners.size).toBe(1);
+    });
+
+    it('removes the message listener added on construction', () => {
+      const self = createStubWindow();
+      const target = createStubWindow();
+
+      const instance = new Framecast(target, { self });
+      instance.destroy();
+
+      expect(self.messageListeners.size).toBe(0);
+    });
+
+    it('does not accumulate window listeners across create/destroy cycles', () => {
+      const self = createStubWindow();
+
+      for (let index = 0; index < 5; index++) {
+        const instance = new Framecast(createStubWindow(), { self });
+        instance.destroy();
+      }
+
+      expect(self.messageListeners.size).toBe(0);
+    });
+
+    it('rejects pending function calls and clears their timeouts', async () => {
+      const self = createStubWindow();
+      const target = createStubWindow();
+      const instance = new Framecast(target, {
+        self,
+        functionTimeoutMs: 20,
+      });
+
+      const rejected = vi.fn();
+      instance.call('anything').catch(rejected);
+
+      instance.destroy();
+      await new Promise(resolve => setTimeout(resolve, 60));
+
+      // rejected once by destroy, not a second time by the call timeout
+      expect(rejected).toHaveBeenCalledTimes(1);
+      expect(rejected).toHaveBeenCalledWith(new Error('Framecast destroyed'));
+    });
+
+    it('releases the target window and makes postMessage a no-op', () => {
+      const self = createStubWindow();
+      const target = createStubWindow();
+      const instance = new Framecast(target, { self });
+
+      instance.destroy();
+      instance.broadcast({ hello: 'world' });
+
+      expect(target.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('discards queued broadcasts', async () => {
+      const self = createStubWindow();
+      const target = createStubWindow();
+      const instance = new Framecast(target, { self, functionTimeoutMs: 20 });
+
+      const readyPromise = instance.waitForReady({ interval: 10, timeout: 50, queueMessages: true });
+      instance.broadcast({ hello: 'queued' });
+
+      instance.destroy();
+      await expect(readyPromise).rejects.toThrow();
+
+      const flushed = target.postMessage.mock.calls.filter(call => {
+        const message = superjson.parse(call[0]) as any;
+        return message.type === 'broadcast';
+      });
+      expect(flushed).toHaveLength(0);
     });
   });
 
