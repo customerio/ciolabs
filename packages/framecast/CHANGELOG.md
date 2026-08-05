@@ -1,5 +1,11 @@
 # @ciolabs/framecast
 
+## 0.3.0
+
+### Minor Changes
+
+- [#64](https://github.com/customerio/ciolabs/pull/64) [`3e68e91`](https://github.com/customerio/ciolabs/commit/3e68e91c1ab0f574cb8106c301dc42b9a0b48a27) Thanks [@yashschandra](https://github.com/yashschandra)! - Fix window `message` listener leak and add `destroy()` method. The constructor previously passed a fresh `this.handlePostedMessage.bind(this)` to both `removeEventListener` and `addEventListener`, so the removal never matched and every Framecast instance leaked its listener for the life of the page. A single bound handler is now kept on the instance, and the new `destroy()` method removes the listener, rejects pending `call()`s with a "Framecast destroyed" error (clearing their timeouts), clears broadcast listeners, discards queued broadcasts, and nulls the target window so a detached iframe can be garbage collected. After `destroy()`, `postMessage` becomes a no-op instead of posting to a stale window.
+
 ## 0.2.0
 
 ### Minor Changes
