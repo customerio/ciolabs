@@ -1,5 +1,11 @@
 # @ciolabs/html-email-formatter
 
+## 0.0.6
+
+### Patch Changes
+
+- [#68](https://github.com/customerio/ciolabs/pull/68) [`7c02021`](https://github.com/customerio/ciolabs/commit/7c0202135fdd1eea0de2b5f585e7c54895da6baa) Thanks [@avigoldman](https://github.com/avigoldman)! - Call js-beautify directly instead of through the unmaintained `pretty` package. The defaults, `ocd` and `newlines` behave as before, and output is unchanged. `pretty` also passed `condense-newlines` options such as `sep`, `min` and `keepWhitespace` through to the `ocd` pass. The types never allowed them, and they are now ignored. js-beautify stays on `~1.13.4` for parity with parcel-standalone.
+
 ## 0.0.5
 
 ### Patch Changes
