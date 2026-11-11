@@ -9,7 +9,7 @@ export type EmailFormatterOptions = jsBeautify.HTMLBeautifyOptions & {
    * line above each comment, and pull closing comments up to their tag.
    */
   ocd?: boolean;
-  /** The line separator `ocd` condenses runs of blank lines into. Defaults to `\n`. */
+  /** The line separator `ocd` condenses runs of blank lines into. Defaults to `\n` (also when empty). */
   newlines?: string;
 };
 
@@ -20,9 +20,6 @@ const DEFAULT_OPTIONS: jsBeautify.HTMLBeautifyOptions = {
   indent_inner_html: true,
   indent_char: ' ',
   indent_size: 2,
-  // js-beautify 1.14 started formatting custom elements (any tag with a dash)
-  // as inline, which pulled Carta's <x-conditional> and similar tags onto one line.
-  inline_custom_elements: false,
 };
 /* eslint-enable camelcase */
 
@@ -44,7 +41,7 @@ export default function emailFormatter(html: string, options?: EmailFormatterOpt
 
 function beautify(html: string, { ocd, newlines, ...options }: EmailFormatterOptions = {}) {
   const beautified = jsBeautify.html(html, { ...DEFAULT_OPTIONS, ...options });
-  return ocd === true ? condense(beautified, newlines ?? '\n') : beautified;
+  return ocd === true ? condense(beautified, newlines || '\n') : beautified;
 }
 
 const BLANK_LINE = /^[\s"\u180E]+$/;

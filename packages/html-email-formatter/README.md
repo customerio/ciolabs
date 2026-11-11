@@ -75,7 +75,7 @@ Output:
 
 ### With Options
 
-The formatter accepts [js-beautify HTML options](https://beautifier.io/). It defaults to 2-space indentation, indents inside `<html>`, keeps `code`, `pre`, `em`, `strong` and `span` unformatted, and puts custom elements such as `<x-conditional>` on their own lines. Pass `ocd: true` to also condense blank lines and trim the start and end of the document.
+The formatter accepts [js-beautify HTML options](https://beautifier.io/). It defaults to 2-space indentation, indents inside `<html>`, and keeps `code`, `pre`, `em`, `strong` and `span` unformatted. Pass `ocd: true` to also condense blank lines and trim the start and end of the document.
 
 ```typescript
 const formatted = emailFormatter(html, {

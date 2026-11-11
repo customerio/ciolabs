@@ -77,13 +77,8 @@ test('email formatter should properly format from a single line', () => {
   );
 });
 
-test('email formatter keeps custom elements on their own lines', () => {
-  const result = emailFormatter(
-    `<td><fragment #set:html="open" /><x-conditional #if="open" condition="mso" tags="close" /><span>hi</span></td>`
+test('email formatter falls back to a newline when ocd gets an empty newlines', () => {
+  expect(emailFormatter('<div><p>Hello</p>\n\n\n\n<p>x</p></div>', { ocd: true, newlines: '' })).toBe(
+    '<div>\n  <p>Hello</p>\n  <p>x</p>\n</div>'
   );
-
-  expect(result).toBe(`<td>
-  <fragment #set:html="open" />
-  <x-conditional #if="open" condition="mso" tags="close" /><span>hi</span>
-</td>`);
 });

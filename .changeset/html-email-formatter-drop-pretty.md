@@ -2,4 +2,4 @@
 '@ciolabs/html-email-formatter': patch
 ---
 
-Call js-beautify directly instead of through the unmaintained `pretty` package, and move js-beautify from 1.13 to 1.15. The defaults and the `ocd` option behave as before, and custom elements such as `<x-conditional>` stay on their own lines. One fix comes with the upgrade: some object literals inside a `<script>` are no longer indented a level too deep.
+Call js-beautify directly instead of through the unmaintained `pretty` package. The defaults, `ocd` and `newlines` behave as before, and output is unchanged. `pretty` also passed `condense-newlines` options such as `sep`, `min` and `keepWhitespace` through to the `ocd` pass. The types never allowed them, and they are now ignored. js-beautify stays on `~1.13.4` for parity with parcel-standalone.

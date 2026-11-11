@@ -36,7 +36,7 @@
     "@ciolabs/html-find-conditional-comments": "workspace:*",
     "@ciolabs/html-preserve-comment-whitespace": "workspace:*",
     "@types/js-beautify": "^1.13.3",
-    "js-beautify": "~1.15.4",
+    "js-beautify": "~1.13.4",
     "ranges-apply": "^7.0.16"
   }
 }
