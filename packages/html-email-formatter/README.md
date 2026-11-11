@@ -75,7 +75,7 @@ Output:
 
 ### With Options
 
-The formatter accepts options from both [pretty](https://www.npmjs.com/package/pretty) and [js-beautify](https://www.npmjs.com/package/js-beautify):
+The formatter accepts [js-beautify HTML options](https://beautifier.io/). It defaults to 2-space indentation, indents inside `<html>`, keeps `code`, `pre`, `em`, `strong` and `span` unformatted, and puts custom elements such as `<x-conditional>` on their own lines. Pass `ocd: true` to also condense blank lines and trim the start and end of the document.
 
 ```typescript
 const formatted = emailFormatter(html, {
@@ -102,7 +102,7 @@ Formats HTML email content while preserving conditional comments.
 **Parameters:**
 
 - `html` (string) - The HTML content to format
-- `options` (object, optional) - Formatting options combining [pretty options](https://www.npmjs.com/package/pretty#options) and [js-beautify HTML options](https://beautifier.io/)
+- `options` (object, optional) - [js-beautify HTML options](https://beautifier.io/), plus `ocd` and `newlines` (the separator `ocd` condenses blank lines into, `\n` by default)
 
 **Returns:**
 

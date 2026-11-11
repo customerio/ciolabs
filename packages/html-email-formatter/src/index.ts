@@ -1,13 +1,32 @@
 import findConditionalComments from '@ciolabs/html-find-conditional-comments';
 import { preserve, restore } from '@ciolabs/html-preserve-comment-whitespace';
 import jsBeautify from 'js-beautify';
-import pretty from 'pretty';
 import { rApply as applyRanges } from 'ranges-apply';
 
-export default function emailFormatter(
-  html: string,
-  options?: Parameters<typeof pretty>[1] & jsBeautify.HTMLBeautifyOptions
-): string {
+export type EmailFormatterOptions = jsBeautify.HTMLBeautifyOptions & {
+  /**
+   * Condense blank lines, trim the start and end of the document, add a blank
+   * line above each comment, and pull closing comments up to their tag.
+   */
+  ocd?: boolean;
+  /** The line separator `ocd` condenses runs of blank lines into. Defaults to `\n`. */
+  newlines?: string;
+};
+
+// The defaults the `pretty` package applied before this package called js-beautify directly.
+/* eslint-disable camelcase -- js-beautify's option names */
+const DEFAULT_OPTIONS: jsBeautify.HTMLBeautifyOptions = {
+  unformatted: ['code', 'pre', 'em', 'strong', 'span'],
+  indent_inner_html: true,
+  indent_char: ' ',
+  indent_size: 2,
+  // js-beautify 1.14 started formatting custom elements (any tag with a dash)
+  // as inline, which pulled Carta's <x-conditional> and similar tags onto one line.
+  inline_custom_elements: false,
+};
+/* eslint-enable camelcase */
+
+export default function emailFormatter(html: string, options?: EmailFormatterOptions): string {
   const id = Math.random();
   const opener = `<!--${id}`;
   const closer = `${id}-->`;
@@ -15,12 +34,43 @@ export default function emailFormatter(
   html = closeConditionalComments(html, { opener, closer });
 
   const cache = preserve(html);
-  html = pretty(html, options);
+  html = beautify(html, options);
   html = restore(html, cache);
   html = openConditionalComments(html, { opener, closer });
   html = alignOpenAndCloseOfConditionalComments(html);
 
   return html;
+}
+
+function beautify(html: string, { ocd, newlines, ...options }: EmailFormatterOptions = {}) {
+  const beautified = jsBeautify.html(html, { ...DEFAULT_OPTIONS, ...options });
+  return ocd === true ? condense(beautified, newlines ?? '\n') : beautified;
+}
+
+const BLANK_LINE = /^[\s"\u180E]+$/;
+
+/**
+ * The `ocd` pass from the `pretty` package
+ */
+function condense(html: string, separator: string) {
+  return (
+    html
+      // Trim lines that are only whitespace, so runs of them condense below.
+      // `pretty` counted `"` and U+180E as whitespace too, so this does as well.
+      .split('\n')
+      .map(line => (BLANK_LINE.test(line) ? line.trim() : line))
+      .join('\n')
+      .replaceAll(/\s+$/g, '\n')
+      .replaceAll(/(\r\n|\n|\u2424){2,}/g, separator)
+      // Remove whitespace at the start of the document.
+      .replaceAll(/^\s+/g, '')
+      // Remove extra whitespace at the end of the document.
+      .replaceAll(/\s+$/g, '\n')
+      // Add a blank line above each comment.
+      .replaceAll(/(\s*<!--)/g, '\n$1')
+      // Bring closing comments up to the same line as the closing tag.
+      .replaceAll(/>(\s*)(?=<!--\s*\/)/g, '> ')
+  );
 }
 
 /**

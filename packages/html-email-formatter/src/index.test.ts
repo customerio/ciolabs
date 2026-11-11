@@ -76,3 +76,14 @@ test('email formatter should properly format from a single line', () => {
 </html>`
   );
 });
+
+test('email formatter keeps custom elements on their own lines', () => {
+  const result = emailFormatter(
+    `<td><fragment #set:html="open" /><x-conditional #if="open" condition="mso" tags="close" /><span>hi</span></td>`
+  );
+
+  expect(result).toBe(`<td>
+  <fragment #set:html="open" />
+  <x-conditional #if="open" condition="mso" tags="close" /><span>hi</span>
+</td>`);
+});
